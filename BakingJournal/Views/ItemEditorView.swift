@@ -15,7 +15,7 @@ struct ItemEditorView: View {
             Section("材料") {
                 TextField("名称", text: $draft.name)
                 DecimalField(title: "重量", value: $draft.weight, unit: "g")
-                DecimalField(title: "百分比", value: $percent, unit: "%")
+                PercentageField(title: "百分比", value: $percent)
             }
 
             if draft.category == .starter {
@@ -30,8 +30,6 @@ struct ItemEditorView: View {
                 yeastSection
             }
         }
-        .navigationTitle(draft.name)
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             refreshPercent()
         }
@@ -50,14 +48,14 @@ struct ItemEditorView: View {
     private var starterSection: some View {
         Section("种面") {
             Picker("类型", selection: Binding(
-                get: { draft.starterType ?? "鲁邦种" },
+                get: { draft.starterType ?? BakingTerms.levainStarter },
                 set: { newValue in
                     store.applyStarterType(newValue, to: draft)
                     syncDraft()
                 }
             )) {
                 ForEach(RecipeStore.starterOptions, id: \.self) { option in
-                    Text(option).tag(option)
+                    Text(BakingTerms.starterDisplayName(option)).tag(option)
                 }
             }
 
@@ -146,10 +144,10 @@ struct ItemEditorView: View {
                 }
             ), unit: "g")
 
-            DecimalField(title: "水分", value: Binding(
+            PercentageField(title: "水分", value: Binding(
                 get: { draft.waterContentPct ?? 75 },
                 set: { draft.waterContentPct = max(0, $0) }
-            ), unit: "%")
+            ))
             LabeledContent("贡献水量", value: BakingFormat.weight(store.waterContribution(draft)))
         }
     }
@@ -157,14 +155,14 @@ struct ItemEditorView: View {
     private var yeastSection: some View {
         Section("酵母") {
             Picker("类型", selection: Binding(
-                get: { draft.yeastType ?? "干酵母" },
+                get: { draft.yeastType ?? BakingTerms.dryYeast },
                 set: {
                     draft.yeastType = $0
-                    draft.name = $0
+                    draft.name = BakingTerms.yeastDisplayName($0)
                 }
             )) {
                 ForEach(RecipeStore.yeastOptions, id: \.self) { option in
-                    Text(option).tag(option)
+                    Text(BakingTerms.yeastDisplayName(option)).tag(option)
                 }
             }
         }
@@ -194,13 +192,35 @@ struct DecimalField: View {
         HStack {
             Text(title)
             Spacer()
-            TextField(title, value: $value, format: .number.precision(.fractionLength(0...2)))
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .monospacedDigit()
-                .frame(minWidth: 72)
+            BakingNumericTextField(
+                value: $value,
+                fractionDigits: 0...2,
+                color: UIColor(Color.brandText),
+                font: .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+            )
+            .frame(minWidth: 72)
             Text(unit)
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct PercentageField: View {
+    let title: String
+    @Binding var value: Double
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            BakingPercentageField(
+                value: $value,
+                precision: 1,
+                font: .body,
+                color: .brandPrimary,
+                fieldWidth: 58,
+                totalWidth: 92
+            )
         }
     }
 }

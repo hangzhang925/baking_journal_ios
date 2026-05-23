@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum BakingIcon {
+    case home
     case recipe
     case process
     case start
@@ -46,6 +47,7 @@ enum BakingIcon {
         case .rest: .rest
         case .shaping: .shaping
         case .baking: .baking
+        case .other: .other
         }
     }
 }
@@ -92,6 +94,27 @@ struct BakingIconView: View {
             }
 
             switch icon {
+            case .home:
+                var roof = Path()
+                roof.move(to: point(0.18, 0.48))
+                roof.addLine(to: point(0.50, 0.20))
+                roof.addLine(to: point(0.82, 0.48))
+                stroke(roof)
+
+                let body = Path(roundedRect: CGRect(
+                    x: canvasSize.width * 0.28,
+                    y: canvasSize.height * 0.44,
+                    width: canvasSize.width * 0.44,
+                    height: canvasSize.height * 0.38
+                ), cornerRadius: canvasSize.width * 0.06)
+                fill(body)
+                stroke(body)
+
+                var door = Path()
+                door.move(to: point(0.50, 0.82))
+                door.addLine(to: point(0.50, 0.64))
+                stroke(door, fine: true)
+
             case .recipe:
                 let cover = Path(roundedRect: CGRect(x: canvasSize.width * 0.23, y: canvasSize.height * 0.16, width: canvasSize.width * 0.52, height: canvasSize.height * 0.68), cornerRadius: canvasSize.width * 0.08)
                 fill(cover)
@@ -155,20 +178,38 @@ struct BakingIconView: View {
                 }
 
             case .starter:
-                let jar = Path(roundedRect: CGRect(x: canvasSize.width * 0.28, y: canvasSize.height * 0.22, width: canvasSize.width * 0.44, height: canvasSize.height * 0.58), cornerRadius: canvasSize.width * 0.08)
-                fill(jar)
+                let jarRect = CGRect(
+                    x: canvasSize.width * 0.30,
+                    y: canvasSize.height * 0.26,
+                    width: canvasSize.width * 0.40,
+                    height: canvasSize.height * 0.56
+                )
+                let jar = Path(roundedRect: jarRect, cornerRadius: canvasSize.width * 0.045)
+                fill(jar, opacity: 0.08)
                 stroke(jar)
+
                 var lid = Path()
-                lid.move(to: point(0.34, 0.20))
-                lid.addLine(to: point(0.66, 0.20))
+                lid.move(to: point(0.36, 0.20))
+                lid.addLine(to: point(0.64, 0.20))
+                lid.addLine(to: point(0.64, 0.26))
+                lid.addLine(to: point(0.36, 0.26))
+                lid.closeSubpath()
+                fill(lid, opacity: 0.18)
                 stroke(lid)
+
+                var glassHighlight = Path()
+                glassHighlight.move(to: point(0.39, 0.34))
+                glassHighlight.addLine(to: point(0.39, 0.72))
+                stroke(glassHighlight, fine: true)
+
                 var wave = Path()
-                wave.move(to: point(0.33, 0.52))
-                wave.addQuadCurve(to: point(0.50, 0.52), control: point(0.41, 0.44))
-                wave.addQuadCurve(to: point(0.67, 0.52), control: point(0.59, 0.60))
+                wave.move(to: point(0.34, 0.56))
+                wave.addQuadCurve(to: point(0.50, 0.56), control: point(0.42, 0.48))
+                wave.addQuadCurve(to: point(0.66, 0.56), control: point(0.58, 0.64))
                 stroke(wave, fine: true)
-                circle(0.43, 0.64, 0.035, filled: true)
-                circle(0.58, 0.64, 0.028, filled: true)
+                circle(0.44, 0.67, 0.034, filled: true)
+                circle(0.57, 0.70, 0.026, filled: true)
+                circle(0.52, 0.46, 0.022, filled: true)
 
             case .water:
                 var drop = Path()
@@ -377,13 +418,12 @@ struct BakingToolbarIconButton: View {
     let accessibilityLabel: String
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color.brandPrimary.opacity(0.11))
-            BakingIconView(icon: icon, size: 23, color: .brandPrimary)
-        }
-        .frame(width: 38, height: 38)
-        .contentShape(Circle())
+        BakingIconView(icon: icon, size: BakingTouchTarget.primaryActionGlyph, color: .white)
+            .frame(width: BakingTouchTarget.toolbarVisual, height: BakingTouchTarget.toolbarVisual)
+            .background(Color.brandPrimary)
+            .clipShape(Circle())
+            .frame(width: BakingTouchTarget.iconButton, height: BakingTouchTarget.iconButton)
+            .contentShape(Rectangle())
         .accessibilityLabel(accessibilityLabel)
     }
 }

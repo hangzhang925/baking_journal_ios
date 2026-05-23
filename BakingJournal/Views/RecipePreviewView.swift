@@ -3,12 +3,16 @@ import UIKit
 
 struct RecipePreviewView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
 
     var showsDoneButton: Bool = false
     @State private var shareImage: UIImage?
     @State private var showingShareSheet = false
     @State private var exportError: String?
+    @State private var showingCookView = false
+    @State private var showingWorkspace = false
+    @State private var localWorkspaceStage: RecipeWorkspaceStage = .formula
 
     private let ingredientColumns = [
         GridItem(.flexible(), spacing: 8)
@@ -19,8 +23,6 @@ struct RecipePreviewView: View {
             previewStack
         }
         .background(Color.brandBackground)
-        .navigationTitle(store.currentRecipeDisplayName)
-        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if showsDoneButton {
                 ToolbarItem(placement: .topBarLeading) {
@@ -37,20 +39,25 @@ struct RecipePreviewView: View {
                 Button {
                     exportLongImage()
                 } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.body.weight(.semibold))
+                    BakingSystemIconButtonLabel(systemImage: "square.and.arrow.up")
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("导出长图")
 
-                NavigationLink {
-                    CookView()
+                Button {
+                    if store.isReadyToBake {
+                        presentCook()
+                    } else {
+                        presentWorkspace(.steps)
+                    }
                 } label: {
                     BakingToolbarIconButton(icon: .start, accessibilityLabel: "开始制作")
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(store.isReadyToBake ? "开始制作" : "查看未完成步骤")
 
-                NavigationLink {
-                    RecipeWorkspaceView()
+                Button {
+                    presentWorkspace(.formula)
                 } label: {
                     BakingToolbarIconButton(icon: .edit, accessibilityLabel: "编辑配方")
                 }
@@ -62,6 +69,12 @@ struct RecipePreviewView: View {
                 ActivityViewController(activityItems: [shareImage])
             }
         }
+        .navigationDestination(isPresented: $showingCookView) {
+            CookView()
+        }
+        .navigationDestination(isPresented: $showingWorkspace) {
+            RecipeWorkspaceView(initialStage: localWorkspaceStage)
+        }
         .alert("导出长图失败", isPresented: Binding(
             get: { exportError != nil },
             set: { if !$0 { exportError = nil } }
@@ -71,6 +84,23 @@ struct RecipePreviewView: View {
             }
         } message: {
             Text(exportError ?? "")
+        }
+    }
+
+    private func presentCook() {
+        if showsDoneButton {
+            showingCookView = true
+        } else {
+            navigationController.push(.cook)
+        }
+    }
+
+    private func presentWorkspace(_ stage: RecipeWorkspaceStage) {
+        if showsDoneButton {
+            localWorkspaceStage = stage
+            showingWorkspace = true
+        } else {
+            navigationController.push(.recipeWorkspace(stage))
         }
     }
 
@@ -89,15 +119,25 @@ struct RecipePreviewView: View {
 
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(store.currentRecipeDisplayName)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Color.brandText)
+            HStack(alignment: .top, spacing: 10) {
+                RecipePreviewTitleBlock(
+                    currentRecipeDisplayName: store.currentRecipeDisplayName,
+                    totalDuration: store.totalStepMinutes()
+                )
 
-            CompactPreviewMetrics(summary: store.summary, totalDuration: store.totalStepMinutes())
+                Spacer(minLength: 0)
+
+                RecipeWorkflowBadge(state: store.recipeWorkflowState)
+            }
+
+            Text(store.readinessMessage)
+                .font(.caption)
+                .foregroundStyle(Color.brandSecondaryText)
+
+            CompactPreviewMetrics(summary: store.summary)
         }
         .padding(12)
-        .background(Color.brandSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .bakingCard(radius: BakingRadius.prominentCard)
     }
 
     private var ingredientsCard: some View {
@@ -111,7 +151,7 @@ struct RecipePreviewView: View {
                     CompactIngredientRow(
                         item: item,
                         weightText: BakingFormat.weight(item.weight, gramPrecision: item.tag == .yeast ? 1 : 0),
-                        percentText: item.category == .flour ? nil : "\(BakingFormat.number(percentForPreview(item), precision: 0))%",
+                        percentText: item.category == .flour ? nil : "\(BakingFormat.number(percentForPreview(item), precision: 1))%",
                         detailText: secondaryDetail(for: item),
                         hasWater: store.hasWaterContent(item)
                     )
@@ -126,8 +166,7 @@ struct RecipePreviewView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .padding(12)
-        .background(Color.brandSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .bakingCard(radius: BakingRadius.prominentCard)
     }
 
     private var stepsCard: some View {
@@ -157,8 +196,7 @@ struct RecipePreviewView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .padding(12)
-        .background(Color.brandSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .bakingCard(radius: BakingRadius.prominentCard)
     }
 
     private var previewItems: [RecipeItem] {
@@ -189,7 +227,10 @@ struct RecipePreviewView: View {
     }
 
     private func stepItemsText(for step: JournalStep) -> String? {
-        let names = store.items(for: step).map(\.name)
+        let names = store.allocatedItems(for: step).map { allocatedItem in
+            let item = allocatedItem.item
+            return "\(item.name) \(BakingFormat.weight(allocatedItem.weight, gramPrecision: item.tag == .yeast ? 1 : 0))"
+        }
         guard !names.isEmpty else { return nil }
         return names.joined(separator: " · ")
     }
@@ -218,9 +259,9 @@ struct RecipePreviewView: View {
     }
 
     private func percentForPreview(_ item: RecipeItem) -> Double {
-        let doughWeight = store.summary.doughWeight
-        guard doughWeight > 0 else { return 0 }
-        return item.weight / doughWeight * 100
+        let flourWeight = store.summary.flourWeight
+        guard flourWeight > 0 else { return 0 }
+        return item.weight / flourWeight * 100
     }
 
     private func exportLongImage() {
@@ -232,7 +273,7 @@ struct RecipePreviewView: View {
                 PreviewIngredientSnapshot(
                     item: $0,
                     weightText: BakingFormat.weight($0.weight, gramPrecision: $0.tag == .yeast ? 1 : 0),
-                    percentText: $0.category == .flour ? nil : "\(BakingFormat.number(percentForPreview($0), precision: 0))%",
+                    percentText: $0.category == .flour ? nil : "\(BakingFormat.number(percentForPreview($0), precision: 1))%",
                     detailText: secondaryDetail(for: $0),
                     hasWater: store.hasWaterContent($0)
                 )
@@ -263,18 +304,38 @@ struct RecipePreviewView: View {
     }
 }
 
+private struct RecipePreviewTitleBlock: View {
+    let currentRecipeDisplayName: String
+    let totalDuration: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(currentRecipeDisplayName)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color.brandText)
+
+            if totalDuration > 0 {
+                HStack(spacing: 5) {
+                    BakingIconView(icon: .timer, size: 13, color: .brandPrimary)
+                    Text("\(BakingTerms.recipePreviewEstimatedDuration) \(BakingFormat.duration(minutes: totalDuration))")
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(Color.brandPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
+            }
+        }
+    }
+}
+
 private struct CompactPreviewMetrics: View {
     let summary: RecipeSummary
-    let totalDuration: Double
 
     var body: some View {
         HStack(spacing: 8) {
             metricPill(title: "面团", value: BakingFormat.weight(summary.doughWeight))
             metricPill(title: "面粉", value: BakingFormat.weight(summary.flourWeight))
             metricPill(title: "含水", value: "\(BakingFormat.number(summary.hydration, precision: 1))%", isWater: true)
-            if totalDuration > 0 {
-                metricPill(title: "时长", value: BakingFormat.duration(minutes: totalDuration))
-            }
         }
     }
 
@@ -445,15 +506,15 @@ private struct RecipePreviewExportContent: View {
 
             LazyVStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(currentRecipeDisplayName)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.brandText)
+                    RecipePreviewTitleBlock(
+                        currentRecipeDisplayName: currentRecipeDisplayName,
+                        totalDuration: totalDuration
+                    )
 
-                    CompactPreviewMetrics(summary: summary, totalDuration: totalDuration)
+                    CompactPreviewMetrics(summary: summary)
                 }
                 .padding(12)
-                .background(Color.brandSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .bakingCard(radius: BakingRadius.prominentCard)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("材料")
@@ -480,8 +541,7 @@ private struct RecipePreviewExportContent: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .padding(12)
-                .background(Color.brandSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .bakingCard(radius: BakingRadius.prominentCard)
 
                 if !steps.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
@@ -510,8 +570,7 @@ private struct RecipePreviewExportContent: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .padding(12)
-                    .background(Color.brandSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .bakingCard(radius: BakingRadius.prominentCard)
                 }
             }
             .padding(.horizontal, 14)

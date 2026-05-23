@@ -26,4 +26,11 @@ enum BakingFormat {
         if rest == 0 { return "\(hours) hr" }
         return "\(hours) hr \(rest) min"
     }
+
+    static func clockTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
 }

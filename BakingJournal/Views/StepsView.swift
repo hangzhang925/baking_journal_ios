@@ -1,10 +1,20 @@
 import SwiftUI
 
 struct StepsView: View {
+    @Environment(\.historySwipeSuppressionHandler) private var setHistorySwipeSuppressed
     @EnvironmentObject private var store: RecipeStore
     var embedded: Bool = false
     @State private var expandedStepId: UUID?
     @State private var materialsShelfExpanded = false
+    @State private var previewSteps: [JournalStep]?
+    @State private var activeStepID: UUID?
+    @State private var activeStepFrame: CGRect?
+    @State private var activeStepGrabOffset: CGSize = .zero
+    @State private var activeStepLocation: CGPoint?
+    @State private var stepRowFrames: [UUID: CGRect] = [:]
+    @State private var openSwipeStepID: UUID?
+
+    private let reorderCoordinateSpace = "stepsReorderSpace"
 
     var body: some View {
         Group {
@@ -19,78 +29,194 @@ struct StepsView: View {
     }
 
     private var content: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
-                StepsOverviewCard(
-                    totalMinutes: store.totalStepMinutes(),
-                    stepCount: store.steps.count
-                )
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-
-                if !store.items.isEmpty {
-                    MaterialsShelfCard(
-                        isExpanded: $materialsShelfExpanded,
-                        items: store.items
+        ZStack(alignment: .topLeading) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    StepsOverviewCard(
+                        totalMinutes: store.totalStepMinutes(),
+                        stepCount: store.steps.count
                     )
                     .padding(.horizontal, 14)
-                }
+                    .padding(.top, 6)
 
-                if store.steps.isEmpty {
-                    Text("添加步骤后，就可以把材料分配到每一步。")
-                        .font(.callout)
-                        .foregroundStyle(Color.brandSecondaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.brandSurface.opacity(0.78))
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    if !store.items.isEmpty {
+                        MaterialsShelfCard(
+                            isExpanded: $materialsShelfExpanded,
+                            items: store.items
+                        )
                         .padding(.horizontal, 14)
-                } else {
-                    HStack {
-                        Text("制作步骤")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.brandSecondaryText)
-                        Spacer()
-                        Text("\(store.steps.count) 步")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(Color.brandSecondaryText)
                     }
-                    .padding(.horizontal, 16)
 
-                    ForEach(store.steps) { step in
-                        SwipeToDeleteRow(canDelete: true) {
-                            store.removeStep(step)
-                        } content: {
-                            StepCard(
-                                step: step,
-                                isExpanded: expandedStepId == step.id
-                            ) {
-                                withAnimation(.easeInOut(duration: 0.24)) {
-                                    expandedStepId = expandedStepId == step.id ? nil : step.id
-                                }
-                            }
+                    StepSectionHeader(stepCount: store.steps.count)
+                        .padding(.horizontal, 14)
+
+                    if !store.steps.isEmpty {
+                        ForEach(displayedSteps) { step in
+                            stepRow(step)
+                                .opacity(activeStepID == step.id ? ReorderMotion.previewOpacity : 1)
+                                .background(ReorderFrameReader(id: step.id, coordinateSpace: reorderCoordinateSpace))
+                                .padding(.horizontal, 14)
+                                .animation(ReorderMotion.animation, value: displayedSteps.map(\.id))
                         }
-                        .padding(.horizontal, 14)
                     }
                 }
+                .padding(.bottom, 108)
             }
-            .padding(.bottom, 108)
+            .onPreferenceChange(ReorderRowFramePreferenceKey.self) { frames in
+                stepRowFrames = frames
+            }
+
+            if let activeStep {
+                StepCard(
+                    step: activeStep,
+                    isExpanded: expandedStepId == activeStep.id
+                ) {
+                    withAnimation(.easeInOut(duration: 0.24)) {
+                        expandedStepId = expandedStepId == activeStep.id ? nil : activeStep.id
+                    }
+                }
+                .frame(width: activeStepFrame?.width)
+                .reorderLiftedAppearance()
+                .offset(activeStepOverlayOffset)
+                .allowsHitTesting(false)
+                .zIndex(10)
+            }
         }
+        .coordinateSpace(name: reorderCoordinateSpace)
         .scrollDismissesKeyboard(.interactively)
         .background(Color.brandBackground)
-        .navigationTitle("制作步骤")
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                dismissActiveKeyboard()
-            }
-        )
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("完成") {
+                Button {
                     dismissActiveKeyboard()
+                } label: {
+                    BakingSystemIconButtonLabel(
+                        systemImage: "keyboard.chevron.compact.down",
+                        visualSize: BakingTouchTarget.secondaryActionVisual,
+                        font: .subheadline.weight(.semibold)
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("完成")
             }
+        }
+    }
+
+    private var displayedSteps: [JournalStep] {
+        previewSteps ?? store.steps
+    }
+
+    private var activeStep: JournalStep? {
+        guard let activeStepID else { return nil }
+        return (previewSteps ?? store.steps).first { $0.id == activeStepID }
+            ?? store.steps.first { $0.id == activeStepID }
+    }
+
+    private var activeStepOverlayOffset: CGSize {
+        guard let frame = activeStepFrame else { return .zero }
+        let location = activeStepLocation ?? CGPoint(
+            x: frame.midX,
+            y: frame.midY
+        )
+        return CGSize(
+            width: location.x - activeStepGrabOffset.width,
+            height: location.y - activeStepGrabOffset.height
+        )
+    }
+
+    private func stepRow(_ step: JournalStep) -> some View {
+        BakingSwipeToDeleteRow(canDelete: activeStepID == nil) {
+            store.removeStep(step)
+        } onOpenChanged: { isOpen in
+            updateOpenSwipeStep(step.id, isOpen: isOpen)
+        } content: {
+            StepCard(
+                step: step,
+                isExpanded: expandedStepId == step.id,
+                reorderCoordinateSpace: canStartStepReorder(step) ? reorderCoordinateSpace : nil
+            ) {
+                withAnimation(.easeInOut(duration: 0.24)) {
+                    expandedStepId = expandedStepId == step.id ? nil : step.id
+                }
+            } onReorderChanged: { drag in
+                beginStepReorderIfNeeded(step, drag: drag)
+                updateStepReorder(with: drag.location)
+            } onReorderEnded: { drag in
+                guard let drag else {
+                    cancelStepReorder()
+                    return
+                }
+                updateStepReorder(with: drag.location)
+                commitStepReorder()
+            }
+        }
+    }
+
+    private func canStartStepReorder(_ step: JournalStep) -> Bool {
+        openSwipeStepID == nil
+            && expandedStepId != step.id
+            && activeStepID == nil
+    }
+
+    private func updateOpenSwipeStep(_ stepID: UUID, isOpen: Bool) {
+        if isOpen {
+            openSwipeStepID = stepID
+        } else if openSwipeStepID == stepID {
+            openSwipeStepID = nil
+        }
+    }
+
+    private func beginStepReorderIfNeeded(_ step: JournalStep, drag: DragGesture.Value) {
+        guard activeStepID == nil else { return }
+        let frame = stepRowFrames[step.id]
+        activeStepID = step.id
+        setHistorySwipeSuppressed(true)
+        activeStepFrame = frame
+        activeStepLocation = drag.location
+        if let frame {
+            activeStepGrabOffset = CGSize(
+                width: drag.startLocation.x - frame.minX,
+                height: drag.startLocation.y - frame.minY
+            )
+        }
+        previewSteps = store.steps
+    }
+
+    private func updateStepReorder(with location: CGPoint) {
+        activeStepLocation = location
+        guard let activeStepID,
+              let currentSteps = previewSteps,
+              let movingStep = currentSteps.first(where: { $0.id == activeStepID }) else { return }
+
+        var remainingSteps = currentSteps.filter { $0.id != activeStepID }
+        let destination = remainingSteps.firstIndex { step in
+            guard let frame = stepRowFrames[step.id] else { return false }
+            return location.y < frame.midY
+        } ?? remainingSteps.count
+        remainingSteps.insert(movingStep, at: destination)
+
+        guard remainingSteps.map(\.id) != currentSteps.map(\.id) else { return }
+        withAnimation(ReorderMotion.animation) {
+            previewSteps = remainingSteps
+        }
+    }
+
+    private func commitStepReorder() {
+        if let previewSteps, previewSteps.map(\.id) != store.steps.map(\.id) {
+            store.reorderSteps(previewSteps)
+        }
+        cancelStepReorder()
+    }
+
+    private func cancelStepReorder() {
+        withAnimation(ReorderMotion.animation) {
+            activeStepID = nil
+            activeStepFrame = nil
+            activeStepLocation = nil
+            previewSteps = nil
+            activeStepGrabOffset = .zero
+            setHistorySwipeSuppressed(false)
         }
     }
 }
@@ -99,46 +225,41 @@ private struct StepsOverviewCard: View {
     @EnvironmentObject private var store: RecipeStore
     let totalMinutes: Double
     let stepCount: Int
-    @State private var showingStepOptions = false
+    @State private var showingReadyTooltip = false
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("制作安排")
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(Color.brandText)
-                    Text("把步骤拆清楚，开始页就会更顺。")
-                        .font(.caption2)
-                        .foregroundStyle(Color.brandSecondaryText)
                 }
 
                 Spacer()
 
                 Button {
-                    showingStepOptions = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .imageScale(.large)
-                        .foregroundStyle(Color.brandPrimary)
-                }
-                .popover(isPresented: $showingStepOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                    BakingDropdownPopover(width: 158) {
-                        ForEach(StepType.allCases) { type in
-                            Button {
-                                store.addStep(type: type)
-                                showingStepOptions = false
-                            } label: {
-                                BakingDropdownRow(title: type.label) {
-                                    BakingIconView(icon: BakingIcon.step(for: type), size: 16, color: .brandPrimary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
+                    if store.isReadyToBake {
+                        store.markDraft()
+                    } else if !store.markReadyToBake() {
+                        showingReadyTooltip = true
                     }
+                } label: {
+                    ReadyToBakeButtonLabel(
+                        isReady: store.isReadyToBake,
+                        canBecomeReady: store.canMarkReadyToBake
+                    )
                 }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("添加步骤")
+                .buttonStyle(BakingPressFeedbackButtonStyle())
+                .accessibilityLabel(store.isReadyToBake ? "改回草稿" : "标记为准备烘焙")
+                .accessibilityHint(store.isReadyToBake ? "点按后配方会回到草稿状态" : "点按后配方可以开始烘焙")
+                .popover(isPresented: $showingReadyTooltip, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                    ReadyToBakeTooltip(
+                        title: store.isReadyToBake ? "已准备好" : "还不能烘焙",
+                        message: store.readinessMessage
+                    )
+                    .presentationCompactAdaptation(.popover)
+                }
             }
 
             HStack(spacing: 6) {
@@ -155,32 +276,125 @@ private struct StepsOverviewCard: View {
             }
         }
         .padding(10)
-        .background(Color.brandSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .bakingCard()
     }
 }
 
-private struct StepsMetricPill: View {
-    let title: String
-    let value: String
-    let accent: Color
+private struct ReadyToBakeButtonLabel: View {
+    let isReady: Bool
+    let canBecomeReady: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color.brandSecondaryText)
-            Text(value)
-                .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(accent)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+        Image(systemName: iconName)
+            .font(.title3.weight(.bold))
+            .foregroundStyle(foregroundColor)
+            .frame(width: BakingTouchTarget.iconButton, height: BakingTouchTarget.iconButton)
+        .background(backgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous)
+                .stroke(borderColor, lineWidth: 0.8)
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.brandBackground.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .shadow(color: shadowColor, radius: isReady || canBecomeReady ? 8 : 0, x: 0, y: 4)
+        .opacity(canBecomeReady || isReady ? 1 : 0.62)
+    }
+
+    private var iconName: String {
+        if isReady { return "checkmark" }
+        return canBecomeReady ? "pencil.and.list.clipboard" : "lock.fill"
+    }
+
+    private var foregroundColor: Color {
+        if isReady || canBecomeReady { return .brandSurface }
+        return .brandSecondaryText
+    }
+
+    private var backgroundColor: Color {
+        if isReady { return .brandSage }
+        if canBecomeReady { return .brandPrimary }
+        return Color.brandSecondaryText.opacity(0.10)
+    }
+
+    private var borderColor: Color {
+        if isReady { return Color.brandSage.opacity(0.28) }
+        if canBecomeReady { return Color.brandPrimary.opacity(0.28) }
+        return Color.brandSecondaryText.opacity(0.16)
+    }
+
+    private var shadowColor: Color {
+        if isReady { return Color.brandSage.opacity(0.16) }
+        if canBecomeReady { return Color.brandPrimary.opacity(0.18) }
+        return .clear
+    }
+}
+
+private struct ReadyToBakeTooltip: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                BakingIconView(icon: .process, size: 18, color: .brandPrimary)
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.brandText)
+            }
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(Color.brandSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(width: 220, alignment: .leading)
+        .padding(12)
+        .bakingCard(radius: BakingRadius.popover)
+    }
+}
+
+private struct StepSectionHeader: View {
+    @EnvironmentObject private var store: RecipeStore
+    let stepCount: Int
+    @State private var showingStepOptions = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("\(stepCount) 步")
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .foregroundStyle(Color.brandSecondaryText)
+
+            Spacer()
+
+            Button {
+                showingStepOptions = true
+            } label: {
+                BakingSystemIconButtonLabel(
+                    systemImage: "plus",
+                    visualSize: BakingTouchTarget.secondaryActionVisual,
+                    font: .caption.weight(.bold)
+                )
+            }
+            .popover(isPresented: $showingStepOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                BakingDropdownPopover(width: 158) {
+                    ForEach(StepType.allCases) { type in
+                        Button {
+                            store.addStep(type: type)
+                            showingStepOptions = false
+                        } label: {
+                            BakingDropdownRow(title: type.label) {
+                                BakingIconView(icon: BakingIcon.step(for: type), size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("添加步骤")
+        }
+        .padding(.leading, 2)
+        .padding(.vertical, 2)
     }
 }
 
@@ -188,11 +402,15 @@ private struct StepCard: View {
     @EnvironmentObject private var store: RecipeStore
     let step: JournalStep
     let isExpanded: Bool
+    var reorderCoordinateSpace: String?
     let toggle: () -> Void
+    var onReorderChanged: (DragGesture.Value) -> Void = { _ in }
+    var onReorderEnded: (DragGesture.Value?) -> Void = { _ in }
     @State private var showingDurationPopover = false
     @State private var showingAssignmentPopover = false
     @State private var isDropTargeted = false
     @State private var showingNotes = false
+    @State private var showingProductionMethodPopover = false
     private let nameFieldWidth: CGFloat = 136
     private let durationColumnWidth: CGFloat = 88
     private let temperatureColumnWidth: CGFloat = 88
@@ -200,25 +418,7 @@ private struct StepCard: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 10) {
-                Button(action: toggle) {
-                    ZStack(alignment: .bottomTrailing) {
-                        BakingIconView(icon: BakingIcon.step(for: currentStep.type), size: 20, color: .brandPrimary)
-                            .frame(width: 30, height: 30)
-                            .background(Color.brandBackground.opacity(0.8))
-                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color.brandPrimary)
-                            .frame(width: 14, height: 14)
-                            .background(Color.brandSurface)
-                            .clipShape(Circle())
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                            .offset(x: 3, y: 3)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isExpanded ? "收起步骤设置" : "展开步骤设置")
+                iconControl
 
                 VStack(alignment: .leading, spacing: 1) {
                     TextField(currentStep.type.label, text: stepTextBinding(\.name))
@@ -241,10 +441,6 @@ private struct StepCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 2)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    toggle()
-                }
 
                 HStack(alignment: .top, spacing: 8) {
                     Button {
@@ -303,8 +499,7 @@ private struct StepCard: View {
                                 totalMinutes: Binding(
                                     get: { Int(store.stepMinutes(currentStep).rounded()) },
                                     set: { updateDuration(minutes: $0) }
-                                ),
-                                isPresented: $showingDurationPopover
+                                )
                             )
                             .presentationCompactAdaptation(.popover)
                         }
@@ -340,20 +535,48 @@ private struct StepCard: View {
                         Spacer(minLength: 0)
                     }
 
-                    if showsTemperatureField {
-                        CompactNumberRow(
-                            title: "温度",
-                            value: stepNumberBinding(\.temperature, fallback: 0),
-                            unit: currentStep.type == .baking ? (currentStep.temperatureUnit?.rawValue ?? "F") : "°"
-                        )
-
-                        if currentStep.type == .baking {
-                            Picker("温标", selection: stepTemperatureUnitBinding) {
-                                ForEach(TemperatureUnit.allCases) { unit in
-                                    Text(unit.rawValue).tag(unit)
+                    if currentStep.type == .baking {
+                        StepInlineControl(
+                            icon: productionMethod == .steam ? "humidity" : "oven",
+                            title: "方式",
+                            value: productionMethod.label,
+                            accent: .brandPrimary
+                        ) {
+                            showingProductionMethodPopover.toggle()
+                        }
+                        .popover(isPresented: $showingProductionMethodPopover, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                            BakingDropdownPopover(width: 158) {
+                                ForEach(ProductionMethod.allCases) { method in
+                                    Button {
+                                        updateProductionMethod(method)
+                                        showingProductionMethodPopover = false
+                                    } label: {
+                                        BakingDropdownRow(title: method.label, isSelected: productionMethod == method) {
+                                            Image(systemName: method == .steam ? "humidity" : "oven")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(Color.brandPrimary)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            .pickerStyle(.segmented)
+                            .presentationCompactAdaptation(.popover)
+                        }
+                    }
+
+                    if showsTemperatureField {
+                        if currentStep.type == .baking {
+                            BakingTemperatureEditorRow(
+                                title: "温度",
+                                value: stepNumberBinding(\.temperature, fallback: 0),
+                                unit: stepTemperatureUnitBinding
+                            )
+                        } else {
+                            CompactNumberRow(
+                                title: "温度",
+                                value: stepNumberBinding(\.temperature, fallback: 0),
+                                unit: "°"
+                            )
                         }
                     }
 
@@ -400,15 +623,14 @@ private struct StepCard: View {
             }
         }
         .animation(.easeInOut(duration: 0.22), value: isExpanded)
-        .background(Color.brandSurface)
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(isDropTargeted ? Color.brandPrimary.opacity(0.38) : Color.brandPrimary.opacity(0.08), lineWidth: isDropTargeted ? 1.0 : 0.6)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .bakingCard(
+            radius: BakingRadius.card,
+            stroke: isDropTargeted ? Color.brandPrimary.opacity(0.38) : Color.brandPrimary.opacity(0.08),
+            lineWidth: isDropTargeted ? 1.0 : 0.6
+        )
         .scaleEffect(isDropTargeted ? 1.01 : 1)
-        .dropDestination(for: String.self) { items, _ in
-            guard let raw = items.first, let itemId = UUID(uuidString: raw) else { return false }
+        .dropDestination(for: StepMaterialDragPayload.self) { items, _ in
+            guard let itemId = items.first?.id else { return false }
             store.assign(itemId: itemId, to: currentStep)
             return true
         } isTargeted: { targeted in
@@ -416,6 +638,55 @@ private struct StepCard: View {
                 isDropTargeted = targeted
             }
         }
+    }
+
+    @ViewBuilder private var iconControl: some View {
+        let control = Button(action: toggle) {
+            iconControlLabel
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityLabel(isExpanded ? "收起步骤设置" : "展开步骤设置")
+
+        if let reorderCoordinateSpace {
+            control.simultaneousGesture(reorderGesture(coordinateSpace: reorderCoordinateSpace))
+        } else {
+            control
+        }
+    }
+
+    private var iconControlLabel: some View {
+        ZStack(alignment: .bottomTrailing) {
+            BakingIconView(icon: BakingIcon.step(for: currentStep.type), size: BakingTouchTarget.inlineIconGlyph, color: .brandPrimary)
+                .frame(width: BakingTouchTarget.inlineIconSurface, height: BakingTouchTarget.inlineIconSurface)
+                .background(Color.brandBackground.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(Color.brandPrimary)
+                .frame(width: 14, height: 14)
+                .background(Color.brandSurface)
+                .clipShape(Circle())
+                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                .offset(x: 3, y: 3)
+        }
+    }
+
+    private func reorderGesture(coordinateSpace: String) -> some Gesture {
+        LongPressGesture(minimumDuration: ReorderMotion.holdDuration, maximumDistance: ReorderMotion.holdMaximumDistance)
+            .sequenced(before: DragGesture(minimumDistance: ReorderMotion.dragMinimumDistance, coordinateSpace: .named(coordinateSpace)))
+            .onChanged { value in
+                guard case .second(true, let drag?) = value else { return }
+                onReorderChanged(drag)
+            }
+            .onEnded { value in
+                guard case .second(true, let drag?) = value else {
+                    onReorderEnded(nil)
+                    return
+                }
+                onReorderEnded(drag)
+            }
     }
 
     @ViewBuilder private var assignedMaterialsPreview: some View {
@@ -426,8 +697,9 @@ private struct StepCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 2)
         } else {
-            FlowLayout(spacing: 6) {
-                ForEach(assignedItems) { item in
+            BakingFlowLayout(spacing: 6) {
+                ForEach(assignedItems) { allocatedItem in
+                    let item = allocatedItem.item
                     let palette = item.materialPalette
                     HStack(spacing: 4) {
                         if store.hasWaterContent(item) {
@@ -435,7 +707,7 @@ private struct StepCard: View {
                                 .foregroundStyle(palette.tint)
                         }
                         Text(item.name)
-                        Text(BakingFormat.weight(item.weight, gramPrecision: item.tag == .yeast ? 1 : 0))
+                        Text(BakingFormat.weight(allocatedItem.weight, gramPrecision: item.tag == .yeast ? 1 : 0))
                             .foregroundStyle(palette.text.opacity(0.76))
                     }
                     .font(.caption2.monospacedDigit().weight(.medium))
@@ -453,19 +725,26 @@ private struct StepCard: View {
         store.steps.first { $0.id == step.id } ?? step
     }
 
-    private var assignedItems: [RecipeItem] {
-        store.items(for: currentStep)
+    private var assignedItems: [AllocatedRecipeItem] {
+        store.allocatedItems(for: currentStep)
     }
 
     private var stepDetailText: String {
         if isDropTargeted {
             return "松手放到这一步"
         }
+        if currentStep.type == .baking {
+            return productionMethod.label
+        }
         return currentStep.type.label
     }
 
     private var showsTemperatureField: Bool {
         currentStep.type == .fermentation || currentStep.type == .baking
+    }
+
+    private var productionMethod: ProductionMethod {
+        currentStep.productionMethod ?? .bake
     }
 
     private var compactDurationText: String {
@@ -484,6 +763,20 @@ private struct StepCard: View {
     private var temperatureText: String {
         let value = BakingFormat.number(currentStep.temperature ?? 0, precision: 0)
         return currentStep.type == .baking ? "\(value)\(currentStep.temperatureUnit?.rawValue ?? "F")" : "\(value)°"
+    }
+
+    private func updateProductionMethod(_ method: ProductionMethod) {
+        var next = currentStep
+        next.productionMethod = method
+        switch method {
+        case .bake:
+            next.temperature = 350
+            next.temperatureUnit = .fahrenheit
+        case .steam:
+            next.temperature = 100
+            next.temperatureUnit = .celsius
+        }
+        store.updateStep(next)
     }
 
     private func stepTextBinding(_ keyPath: WritableKeyPath<JournalStep, String>) -> Binding<String> {
@@ -527,7 +820,7 @@ private struct StepCard: View {
     }
 
     private func toggleAssignment(for item: RecipeItem) {
-        if assignedItems.contains(where: { $0.id == item.id }) {
+        if assignedItems.contains(where: { $0.item.id == item.id }) {
             store.removeAssignedItem(item.id, from: currentStep)
         } else {
             store.assign(itemId: item.id, to: currentStep)
@@ -590,19 +883,14 @@ private struct MaterialsShelfCard: View {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("材料库")
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(Color.brandText)
-                        Text(isExpanded ? "拖到下面的步骤。" : "点开后拖进步骤。")
-                            .font(.caption2)
-                            .foregroundStyle(Color.brandSecondaryText)
-                    }
+                HStack(alignment: .center, spacing: 10) {
+                    Text("材料库")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(Color.brandText)
 
                     Spacer()
 
-                    VStack(alignment: .trailing, spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("\(items.count) 个材料")
                             .font(.caption.monospacedDigit().weight(.semibold))
                             .foregroundStyle(Color.brandSecondaryText)
@@ -621,7 +909,7 @@ private struct MaterialsShelfCard: View {
                 Divider().padding(.horizontal, 12)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    FlowLayout(spacing: 6) {
+                    BakingFlowLayout(spacing: 6) {
                         ForEach(items) { item in
                             MaterialDragCard(item: item)
                         }
@@ -634,12 +922,7 @@ private struct MaterialsShelfCard: View {
                 ))
             }
         }
-        .background(Color.brandSurface)
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.brandPrimary.opacity(0.08), lineWidth: 0.6)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .bakingCard()
     }
 }
 
@@ -649,28 +932,42 @@ private struct MaterialDragCard: View {
 
     var body: some View {
         let palette = item.materialPalette
+        Group {
+            if isFullyAssigned {
+                cardContent(palette: palette)
+            } else {
+                cardContent(palette: palette)
+                    .draggable(StepMaterialDragPayload(id: item.id)) {
+                        MaterialDragPreview(item: item)
+                    }
+            }
+        }
+        .opacity(isFullyAssigned ? 0.66 : 1)
+    }
+
+    private func cardContent(palette: MaterialPalette) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
                 BakingIconView(
                     icon: BakingIcon.material(for: item),
                     size: 13,
-                    color: isAssigned ? Color.brandSecondaryText.opacity(0.85) : palette.tint
+                    color: isFullyAssigned ? Color.brandSecondaryText.opacity(0.85) : palette.tint
                 )
                 .frame(width: 18, height: 18)
-                .background(isAssigned ? palette.mutedIconSurface : palette.iconSurface)
+                .background(isFullyAssigned ? palette.mutedIconSurface : palette.iconSurface)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
                 Text(displayName)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(isAssigned ? Color.brandSecondaryText : Color.brandText)
+                    .foregroundStyle(isFullyAssigned ? Color.brandSecondaryText : Color.brandText)
                     .lineLimit(1)
             }
 
             Text(shortWeight)
                 .font(.caption2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(isAssigned ? Color.brandSecondaryText : palette.text)
+                .foregroundStyle(isFullyAssigned ? Color.brandSecondaryText : palette.text)
 
-            Text(categoryLabel)
+            Text(remainingText)
                 .font(.caption2)
                 .foregroundStyle(Color.brandSecondaryText)
                 .lineLimit(1)
@@ -678,28 +975,37 @@ private struct MaterialDragCard: View {
         .padding(.horizontal, 7)
         .padding(.vertical, 6)
         .frame(width: 78, alignment: .leading)
-        .background(isAssigned ? palette.mutedSurface : palette.surface.opacity(0.84))
+        .background {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    (isFullyAssigned ? palette.mutedSurface : palette.surface.opacity(0.84))
+                    palette.tint.opacity(isFullyAssigned ? 0.16 : 0.20)
+                        .frame(width: proxy.size.width * usedRatio)
+                }
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(isAssigned ? Color.brandSecondaryText.opacity(0.14) : palette.stroke, lineWidth: 0.5)
-        }
-        .opacity(isAssigned ? 0.74 : 1)
-        .draggable(item.id.uuidString) {
-            MaterialDragPreview(item: item)
+                .stroke(isFullyAssigned ? Color.brandSecondaryText.opacity(0.14) : palette.stroke, lineWidth: 0.5)
         }
     }
 
-    private var isAssigned: Bool {
-        store.stepContaining(itemId: item.id) != nil
+    private var isFullyAssigned: Bool {
+        store.remainingPercentage(for: item.id) <= 0.01
+    }
+
+    private var usedRatio: CGFloat {
+        CGFloat(min(1, max(0, store.allocatedPercentage(for: item.id) / 100)))
     }
 
     private var displayName: String {
         String(item.name.prefix(3))
     }
 
-    private var categoryLabel: String {
-        item.category.label
+    private var remainingText: String {
+        let remaining = store.remainingPercentage(for: item.id)
+        return remaining <= 0.01 ? "已用完" : "剩 \(BakingFormat.number(remaining, precision: 0))%"
     }
 
     private var shortWeight: String {
@@ -708,7 +1014,6 @@ private struct MaterialDragCard: View {
 }
 
 private struct MaterialDragPreview: View {
-    @EnvironmentObject private var store: RecipeStore
     let item: RecipeItem
 
     var body: some View {
@@ -779,35 +1084,6 @@ private struct StepInfoBadge: View {
     }
 }
 
-private struct StepValuePill: View {
-    let icon: String?
-    let text: String
-    let accent: Color
-    var background: Color = Color.brandPrimary.opacity(0.075)
-    var stroke: Color = Color.brandPrimary.opacity(0.10)
-    var width: CGFloat = 62
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.caption2.weight(.semibold))
-            }
-            Text(text)
-                .font(.callout.monospacedDigit().weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-        }
-        .foregroundStyle(accent)
-        .frame(width: width, height: 30)
-        .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(stroke, lineWidth: 0.5)
-        }
-    }
-}
 
 private struct AssignmentPopoverView: View {
     @EnvironmentObject private var store: RecipeStore
@@ -821,27 +1097,35 @@ private struct AssignmentPopoverView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.brandText)
                 Spacer()
-                Button("All") {
+                Button {
                     store.assignAllItems(to: currentStep)
+                } label: {
+                    BakingSystemIconButtonLabel(
+                        systemImage: "checklist.checked",
+                        visualSize: BakingTouchTarget.secondaryActionVisual,
+                        font: .caption.weight(.semibold)
+                    )
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandPrimary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.brandBackground.opacity(0.85))
-                .clipShape(Capsule())
-                Button("完成") {
+                .buttonStyle(.plain)
+                .accessibilityLabel("全部分配")
+                Button {
                     isPresented = false
+                } label: {
+                    BakingSystemIconButtonLabel(
+                        systemImage: "checkmark",
+                        visualSize: BakingTouchTarget.secondaryActionVisual,
+                        font: .caption.weight(.semibold)
+                    )
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandPrimary)
+                .buttonStyle(.plain)
+                .accessibilityLabel("完成")
             }
 
-            FlowLayout(spacing: 8) {
+            BakingFlowLayout(spacing: 8) {
                 ForEach(store.items) { item in
                     AssignmentMaterialChip(
                         item: item,
-                        selected: currentStep.itemIds.contains(item.id)
+                        step: currentStep
                     ) {
                         toggle(item)
                     }
@@ -854,7 +1138,7 @@ private struct AssignmentPopoverView: View {
     }
 
     private func toggle(_ item: RecipeItem) {
-        if currentStep.itemIds.contains(item.id) {
+        if store.allocationPercentage(for: item.id, in: currentStep) > 0 {
             store.removeAssignedItem(item.id, from: currentStep)
         } else {
             store.assign(itemId: item.id, to: currentStep)
@@ -864,108 +1148,258 @@ private struct AssignmentPopoverView: View {
     private var currentStep: JournalStep {
         store.steps.first { $0.id == step.id } ?? step
     }
-
-    private func ownerName(for item: RecipeItem) -> String? {
-        guard let owner = store.stepContaining(itemId: item.id), owner.id != currentStep.id else { return nil }
-        return owner.name
-    }
 }
 
 private struct AssignmentMaterialChip: View {
     @EnvironmentObject private var store: RecipeStore
     let item: RecipeItem
-    let selected: Bool
+    let step: JournalStep
     let action: () -> Void
+    @State private var showingPercentagePicker = false
+    @State private var draftPercentage: Double = 0
 
     var body: some View {
-        Button(action: action) {
-            let palette = item.materialPalette
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 5) {
-                    BakingIconView(
-                        icon: BakingIcon.material(for: item),
-                        size: 13,
-                        color: palette.tint
-                    )
-                    .frame(width: 18, height: 18)
-                    .background(palette.iconSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        let palette = item.materialPalette
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                BakingIconView(
+                    icon: BakingIcon.material(for: item),
+                    size: 13,
+                    color: isUnavailable ? Color.brandSecondaryText.opacity(0.85) : palette.tint
+                )
+                .frame(width: 18, height: 18)
+                .background(isUnavailable ? palette.mutedIconSurface : palette.iconSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                    Text(String(item.name.prefix(3)))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Color.brandText)
-                        .lineLimit(1)
-                }
-
-                Text(BakingFormat.weight(item.weight, gramPrecision: item.tag == .yeast ? 1 : 0))
-                    .font(.caption2.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(palette.text)
-
-                Text(item.category.label)
-                    .font(.caption2)
-                    .foregroundStyle(Color.brandSecondaryText)
+                Text(String(item.name.prefix(3)))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(isUnavailable ? Color.brandSecondaryText : Color.brandText)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 6)
-            .frame(width: 72, alignment: .leading)
-            .background(selected ? palette.surface.opacity(0.96) : palette.surface.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(selected ? palette.tint.opacity(0.34) : palette.stroke, lineWidth: selected ? 1 : 0.5)
+
+            Text(weightText)
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(isUnavailable ? Color.brandSecondaryText : palette.text)
+
+            Text(statusText)
+                .font(.caption2)
+                .foregroundStyle(Color.brandSecondaryText)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 6)
+        .frame(width: 72, alignment: .leading)
+        .background {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    (isUnavailable ? palette.mutedSurface : palette.surface.opacity(selected ? 0.96 : 0.8))
+                    palette.tint.opacity(selected ? 0.22 : 0.14)
+                        .frame(width: proxy.size.width * usedRatio)
+                }
             }
         }
-        .buttonStyle(.plain)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(selected ? palette.tint.opacity(0.34) : palette.stroke, lineWidth: selected ? 1 : 0.5)
+        }
+        .opacity(isUnavailable ? 0.68 : 1)
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture {
+            guard !isUnavailable else { return }
+            action()
+        }
+        .onLongPressGesture(minimumDuration: 0.35) {
+            guard availablePercentage > 0 else { return }
+            draftPercentage = selected ? selectedPercentage : min(availablePercentage, 50)
+            showingPercentagePicker = true
+        }
+        .accessibilityAddTraits(.isButton)
+        .popover(isPresented: $showingPercentagePicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+            MaterialPercentagePopover(
+                item: item,
+                percentage: $draftPercentage,
+                maxPercentage: availablePercentage,
+                isPresented: $showingPercentagePicker
+            ) {
+                if draftPercentage <= 0 {
+                    store.removeAssignedItem(item.id, from: currentStep)
+                } else {
+                    store.assign(itemId: item.id, percentage: draftPercentage, to: currentStep)
+                }
+            }
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var currentStep: JournalStep {
+        store.steps.first { $0.id == step.id } ?? step
+    }
+
+    private var selectedPercentage: Double {
+        store.allocationPercentage(for: item.id, in: currentStep)
+    }
+
+    private var selected: Bool {
+        selectedPercentage > 0
+    }
+
+    private var availablePercentage: Double {
+        store.remainingPercentage(for: item.id, excluding: currentStep.id)
+    }
+
+    private var isUnavailable: Bool {
+        !selected && availablePercentage <= 0.01
+    }
+
+    private var usedRatio: CGFloat {
+        CGFloat(min(1, max(0, store.allocatedPercentage(for: item.id) / 100)))
+    }
+
+    private var weightText: String {
+        let weight = selected ? store.allocatedWeight(for: item, percentage: selectedPercentage) : item.weight
+        return BakingFormat.weight(weight, gramPrecision: item.tag == .yeast ? 1 : 0)
+    }
+
+    private var statusText: String {
+        if selected {
+            return "\(BakingFormat.number(selectedPercentage, precision: 0))%"
+        }
+        if isUnavailable {
+            return "已用完"
+        }
+        return "剩 \(BakingFormat.number(availablePercentage, precision: 0))%"
+    }
+}
+
+private struct MaterialPercentagePopover: View {
+    let item: RecipeItem
+    @Binding var percentage: Double
+    let maxPercentage: Double
+    @Binding var isPresented: Bool
+    let confirm: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.brandText)
+                    Text("选择这一步要加入的比例")
+                        .font(.caption2)
+                        .foregroundStyle(Color.brandSecondaryText)
+                }
+
+                Spacer()
+
+                Button {
+                    confirm()
+                    isPresented = false
+                } label: {
+                    BakingSystemIconButtonLabel(
+                        systemImage: "checkmark",
+                        visualSize: BakingTouchTarget.secondaryActionVisual,
+                        font: .caption.weight(.semibold)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("确认分配")
+            }
+
+            BakingPercentagePickerControl(
+                value: $percentage,
+                maxValue: maxPercentage,
+                precision: 1,
+                tint: item.materialPalette.text,
+                surface: item.materialPalette.surface.opacity(0.86)
+            )
+
+            HStack {
+                Text("加入")
+                    .font(.caption)
+                    .foregroundStyle(Color.brandSecondaryText)
+                Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    BakingNumericTextField(
+                        value: weightBinding,
+                        fractionDigits: item.tag == .yeast ? 0...1 : 0...0,
+                        color: UIColor(Color.brandText),
+                        font: .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+                    )
+                    .frame(width: 76)
+                    .accessibilityLabel("加入克数")
+
+                    Text("g")
+                        .font(.headline.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(Color.brandSecondaryText)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .background(item.materialPalette.surface.opacity(0.86))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(12)
+        .frame(width: 292, alignment: .leading)
+        .background(Color.brandSurface)
+    }
+
+    private var maxWeight: Double {
+        item.weight * maxPercentage / 100
+    }
+
+    private var currentWeight: Double {
+        item.weight * percentage / 100
+    }
+
+    private var weightBinding: Binding<Double> {
+        Binding(
+            get: { currentWeight },
+            set: { weight in
+                let clampedWeight = min(max(0, weight), maxWeight)
+                percentage = item.weight > 0 ? clampedWeight / item.weight * 100 : 0
+            }
+        )
     }
 }
 
 private struct DurationPopoverView: View {
     @Binding var totalMinutes: Int
-    @Binding var isPresented: Bool
     @State private var interval: TimeInterval = 0
+    @State private var hasSyncedInitialValue = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("设置耗时")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.brandText)
-                Spacer()
-                Button("完成") {
-                    totalMinutes = Int((interval / 60).rounded())
-                    isPresented = false
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandPrimary)
-            }
-
+        VStack(spacing: 0) {
             CountdownDurationPicker(interval: $interval)
                 .frame(height: 180)
                 .frame(maxWidth: .infinity)
-
-            Text(displayText)
-                .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(Color.brandPrimary)
-                .frame(maxWidth: .infinity, alignment: .center)
-
-            Button("取消") {
-                isPresented = false
-            }
-            .font(.caption)
-            .foregroundStyle(Color.brandSecondaryText)
-            .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(12)
-        .frame(width: 320)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(width: 292)
         .background(Color.brandSurface)
         .onAppear {
-            interval = TimeInterval(totalMinutes * 60)
+            syncInitialValueIfNeeded()
+        }
+        .onChange(of: interval) { _, _ in
+            persistInterval()
+        }
+        .onDisappear {
+            persistInterval()
         }
     }
 
-    private var displayText: String {
-        BakingFormat.duration(minutes: interval / 60)
+    private func syncInitialValueIfNeeded() {
+        guard !hasSyncedInitialValue else { return }
+        interval = TimeInterval(max(1, totalMinutes) * 60)
+        hasSyncedInitialValue = true
+    }
+
+    private func persistInterval() {
+        let minutes = Int((interval / 60).rounded())
+        guard totalMinutes != minutes else { return }
+        totalMinutes = minutes
     }
 }
 
@@ -1001,123 +1435,6 @@ private struct CountdownDurationPicker: UIViewRepresentable {
 
         @objc func changed(_ sender: UIDatePicker) {
             interval = sender.countDownDuration
-        }
-    }
-}
-
-private struct SwipeToDeleteRow<Content: View>: View {
-    let canDelete: Bool
-    let onDelete: () -> Void
-    @ViewBuilder let content: () -> Content
-    @State private var offset: CGFloat = 0
-
-    private let actionWidth: CGFloat = 58
-    private let buttonSize = CGSize(width: 52, height: 52)
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            if canDelete && offset != 0 {
-                Button(role: .destructive) {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        offset = 0
-                    }
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.title3.weight(.medium))
-                        .foregroundStyle(.white)
-                        .frame(width: buttonSize.width, height: buttonSize.height)
-                        .background(Color.brandPrimary)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("删除")
-                .padding(.trailing, 3)
-            }
-
-            content()
-                .offset(x: offset)
-                .contentShape(Rectangle())
-                .allowsHitTesting(offset == 0)
-        }
-        .contentShape(Rectangle())
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 14, coordinateSpace: .local)
-                .onChanged { value in
-                    guard canDelete, abs(value.translation.width) > abs(value.translation.height) else { return }
-                    let nextOffset: CGFloat
-                    if offset == 0 {
-                        nextOffset = value.translation.width
-                    } else {
-                        nextOffset = value.translation.width - actionWidth
-                    }
-                    offset = min(0, max(-actionWidth, nextOffset))
-                }
-                .onEnded { value in
-                    guard canDelete else { return }
-                    let projectedOffset: CGFloat
-                    if offset == 0 {
-                        projectedOffset = value.translation.width
-                    } else {
-                        projectedOffset = value.translation.width - actionWidth
-                    }
-
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        if projectedOffset < -actionWidth / 2 {
-                            offset = -actionWidth
-                        } else {
-                            offset = 0
-                        }
-                    }
-                }
-        )
-        .onTapGesture {
-            guard offset != 0 else { return }
-            withAnimation(.easeInOut(duration: 0.18)) {
-                offset = 0
-            }
-        }
-    }
-}
-
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 0
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > width {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-
-        return CGSize(width: width, height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > bounds.minX && x + size.width > bounds.maxX {
-                x = bounds.minX
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
         }
     }
 }

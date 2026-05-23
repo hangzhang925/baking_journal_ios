@@ -1,12 +1,336 @@
 import SwiftUI
 import UIKit
 
-struct RootView: View {
-    var body: some View {
-        NavigationStack {
-            HomeView()
+@MainActor
+final class AppNavigationController: ObservableObject {
+    @Published var resetToken = UUID()
+    @Published var selectedTab: HomeTab = .home
+    @Published var path: [AppRoute] = []
+    @Published private(set) var isHistorySwipeSuppressed = false
+    @Published private(set) var historyDragTranslation: CGFloat = 0
+
+    private var backStack: [AppLocation] = []
+    private var forwardStack: [AppLocation] = []
+    private let historyLimit = 80
+    private var historySuppressionCount = 0
+    private var activeHistoryDirection: HistorySwipeDirection?
+    private var isVerticalHistoryGesture = false
+
+    func popToHome() {
+        selectTab(.home)
+    }
+
+    func selectTab(_ tab: HomeTab) {
+        guard selectedTab != tab || !path.isEmpty else { return }
+        recordCurrentLocation()
+        selectedTab = tab
+        path = []
+        forwardStack.removeAll()
+    }
+
+    func push(_ route: AppRoute) {
+        recordCurrentLocation()
+        path.append(route)
+        forwardStack.removeAll()
+    }
+
+    func goBack() {
+        guard let previous = backStack.popLast() else { return }
+        forwardStack.append(currentLocation)
+        restore(previous)
+    }
+
+    func goForward() {
+        guard let next = forwardStack.popLast() else { return }
+        backStack.append(currentLocation)
+        restore(next)
+    }
+
+    func updateHistorySwipe(translation: CGSize, velocity: CGPoint, containerWidth: CGFloat) {
+        guard !isHistorySwipeSuppressed else { return }
+        guard !isVerticalHistoryGesture else { return }
+
+        if activeHistoryDirection == nil {
+            if BakingGesturePolicy.isVerticalScrollIntent(translation) {
+                isVerticalHistoryGesture = true
+                return
+            }
+
+            guard BakingGesturePolicy.isHorizontalIntent(
+                translation,
+                minimumDistance: BakingGesturePolicy.historySwipeActivationDistance,
+                ratio: BakingGesturePolicy.historySwipeIntentRatio
+            ) else { return }
+
+            let direction: HistorySwipeDirection = translation.width > 0 ? .back : .forward
+            guard canNavigate(direction) else { return }
+            activeHistoryDirection = direction
         }
-        .tint(.brandPrimary)
+
+        guard let activeHistoryDirection else { return }
+        let width = max(containerWidth, 1)
+        let rawTranslation = translation.width
+        let directionalTranslation: CGFloat
+        switch activeHistoryDirection {
+        case .back:
+            directionalTranslation = max(0, rawTranslation)
+        case .forward:
+            directionalTranslation = min(0, rawTranslation)
+        }
+        let capped = min(abs(directionalTranslation), width * 0.72)
+        historyDragTranslation = activeHistoryDirection == .back ? capped : -capped
+    }
+
+    func finishHistorySwipe(translation: CGSize, velocity: CGPoint, containerWidth: CGFloat) {
+        defer {
+            isVerticalHistoryGesture = false
+            activeHistoryDirection = nil
+        }
+
+        guard let activeHistoryDirection else {
+            historyDragTranslation = 0
+            return
+        }
+
+        let width = max(containerWidth, 1)
+        let progress = min(abs(historyDragTranslation) / width, 1)
+        let projected = translation.width + velocity.x * 0.18
+        let shouldCommit = progress > 0.28 || abs(projected) > width * 0.36 || abs(velocity.x) > 720
+
+        guard shouldCommit else {
+            withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
+                historyDragTranslation = 0
+            }
+            return
+        }
+
+        withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.9)) {
+            historyDragTranslation = activeHistoryDirection == .back ? width : -width
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.08))
+            switch activeHistoryDirection {
+            case .back:
+                goBack()
+            case .forward:
+                goForward()
+            }
+            historyDragTranslation = activeHistoryDirection == .back ? -width * 0.22 : width * 0.22
+            withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.88)) {
+                historyDragTranslation = 0
+            }
+        }
+    }
+
+    func setHistorySwipeSuppressed(_ isSuppressed: Bool) {
+        if isSuppressed {
+            historySuppressionCount += 1
+            isHistorySwipeSuppressed = true
+            return
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.18))
+            historySuppressionCount = max(0, historySuppressionCount - 1)
+            isHistorySwipeSuppressed = historySuppressionCount > 0
+        }
+    }
+
+    private var currentLocation: AppLocation {
+        AppLocation(tab: selectedTab, path: path)
+    }
+
+    private func recordCurrentLocation() {
+        let location = currentLocation
+        guard backStack.last != location else { return }
+        backStack.append(location)
+        if backStack.count > historyLimit {
+            backStack.removeFirst(backStack.count - historyLimit)
+        }
+    }
+
+    private func restore(_ location: AppLocation) {
+        selectedTab = location.tab
+        path = location.path
+    }
+
+    private func canNavigate(_ direction: HistorySwipeDirection) -> Bool {
+        switch direction {
+        case .back:
+            !backStack.isEmpty
+        case .forward:
+            !forwardStack.isEmpty
+        }
+    }
+}
+
+enum HistorySwipeDirection {
+    case back
+    case forward
+}
+
+enum AppRoute: Hashable {
+    case recipeSourcePicker
+    case bakeRecipePicker
+    case recipePreview
+    case recipeWorkspace(RecipeWorkspaceStage)
+    case cook
+    case bakeRecordDetail(UUID)
+}
+
+struct AppLocation: Equatable {
+    let tab: HomeTab
+    let path: [AppRoute]
+}
+
+struct RootView: View {
+    @StateObject private var navigationController = AppNavigationController()
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Color.brandBackground
+                    .ignoresSafeArea()
+
+                NavigationStack(path: $navigationController.path) {
+                    HomeView()
+                }
+                .id(navigationController.resetToken)
+                .tint(.brandPrimary)
+                .environmentObject(navigationController)
+                .environment(\.historySwipeSuppressionHandler) { isSuppressed in
+                    navigationController.setHistorySwipeSuppressed(isSuppressed)
+                }
+                .offset(x: navigationController.historyDragTranslation)
+                .scaleEffect(historyDragScale(width: proxy.size.width), anchor: .center)
+                .shadow(color: Color.black.opacity(historyDragShadowOpacity(width: proxy.size.width)), radius: 18, x: 0, y: 8)
+                .animation(.interactiveSpring(response: 0.24, dampingFraction: 0.9), value: navigationController.historyDragTranslation == 0)
+
+                GlobalHistoryPanLayer(
+                    width: proxy.size.width,
+                    onChanged: navigationController.updateHistorySwipe,
+                    onEnded: navigationController.finishHistorySwipe
+                )
+                .ignoresSafeArea()
+            }
+        }
+    }
+
+    private func historyDragScale(width: CGFloat) -> CGFloat {
+        let progress = min(abs(navigationController.historyDragTranslation) / max(width, 1), 1)
+        return 1 - progress * 0.025
+    }
+
+    private func historyDragShadowOpacity(width: CGFloat) -> Double {
+        let progress = min(abs(navigationController.historyDragTranslation) / max(width, 1), 1)
+        return Double(progress) * 0.18
+    }
+}
+
+struct GlobalHistoryPanLayer: UIViewRepresentable {
+    let width: CGFloat
+    let onChanged: (CGSize, CGPoint, CGFloat) -> Void
+    let onEnded: (CGSize, CGPoint, CGFloat) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = InstallerView()
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        guard let uiView = uiView as? InstallerView else { return }
+        uiView.coordinator = context.coordinator
+        uiView.installRecognizerIfNeeded()
+        context.coordinator.width = width
+        context.coordinator.onChanged = onChanged
+        context.coordinator.onEnded = onEnded
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(width: width, onChanged: onChanged, onEnded: onEnded)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var width: CGFloat
+        var onChanged: (CGSize, CGPoint, CGFloat) -> Void
+        var onEnded: (CGSize, CGPoint, CGFloat) -> Void
+
+        init(
+            width: CGFloat,
+            onChanged: @escaping (CGSize, CGPoint, CGFloat) -> Void,
+            onEnded: @escaping (CGSize, CGPoint, CGFloat) -> Void
+        ) {
+            self.width = width
+            self.onChanged = onChanged
+            self.onEnded = onEnded
+        }
+
+        @objc func handlePan(_ recognizer: UIPanGestureRecognizer) {
+            guard let view = recognizer.view else { return }
+            let translation = recognizer.translation(in: view)
+            let velocity = recognizer.velocity(in: view)
+            let translationSize = CGSize(width: translation.x, height: translation.y)
+
+            switch recognizer.state {
+            case .changed:
+                onChanged(translationSize, velocity, width)
+            case .ended, .cancelled, .failed:
+                onEnded(translationSize, velocity, width)
+            default:
+                break
+            }
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
+        }
+    }
+
+    final class InstallerView: UIView {
+        weak var coordinator: Coordinator?
+        private weak var installedView: UIView?
+        private weak var recognizer: UIPanGestureRecognizer?
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            backgroundColor = .clear
+            isUserInteractionEnabled = false
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            installRecognizerIfNeeded()
+        }
+
+        func installRecognizerIfNeeded() {
+            guard let window, let coordinator else { return }
+            if installedView === window { return }
+
+            if let recognizer, let installedView {
+                installedView.removeGestureRecognizer(recognizer)
+            }
+
+            let recognizer = UIPanGestureRecognizer(target: coordinator, action: #selector(Coordinator.handlePan(_:)))
+            recognizer.cancelsTouchesInView = false
+            recognizer.delaysTouchesBegan = false
+            recognizer.delaysTouchesEnded = false
+            recognizer.delegate = coordinator
+            window.addGestureRecognizer(recognizer)
+            self.recognizer = recognizer
+            installedView = window
+        }
+
+        deinit {
+            if let recognizer, let installedView {
+                installedView.removeGestureRecognizer(recognizer)
+            }
+        }
     }
 }
 
@@ -125,9 +449,8 @@ struct MetricStrip: View {
                 )
             }
         }
-        .padding(12)
-        .background(Color.brandSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(BakingSpace.lg)
+        .bakingCard(radius: BakingRadius.card, stroke: .clear)
     }
 }
 
@@ -151,7 +474,7 @@ private struct MetricCell: View {
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
     }
 }
 
@@ -197,10 +520,10 @@ struct BakingDropdownPopover<Content: View>: View {
         .frame(width: width)
         .presentationCompactAdaptation(.popover)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
                 .fill(Color.brandSurface.opacity(0.98))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
                         .stroke(Color.brandPrimary.opacity(0.08), lineWidth: 0.6)
                 }
                 .shadow(color: Color.black.opacity(0.06), radius: 20, x: 0, y: 10)
@@ -234,6 +557,51 @@ struct BakingDropdownRow<Leading: View>: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+    }
+}
+
+struct RecipeWorkflowBadge: View {
+    let state: RecipeWorkflowState
+
+    var body: some View {
+        Text(state.label)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(foregroundColor)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(backgroundColor)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(borderColor, lineWidth: 0.6)
+            }
+    }
+
+    private var foregroundColor: Color {
+        switch state {
+        case .draft:
+            return .brandPrimary
+        case .ready:
+            return .brandSage
+        }
+    }
+
+    private var backgroundColor: Color {
+        switch state {
+        case .draft:
+            return Color.brandPrimary.opacity(0.11)
+        case .ready:
+            return Color.brandSage.opacity(0.12)
+        }
+    }
+
+    private var borderColor: Color {
+        switch state {
+        case .draft:
+            return Color.brandPrimary.opacity(0.18)
+        case .ready:
+            return Color.brandSage.opacity(0.20)
+        }
     }
 }
 

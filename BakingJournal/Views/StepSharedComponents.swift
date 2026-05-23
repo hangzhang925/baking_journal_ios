@@ -1,0 +1,197 @@
+import SwiftUI
+
+enum ReorderMotion {
+    static let holdDuration: TimeInterval = 1
+    static let holdMaximumDistance: CGFloat = BakingGesturePolicy.reorderHoldMaximumDistance
+    static let dragMinimumDistance: CGFloat = BakingGesturePolicy.reorderDragMinimumDistance
+    static let liftScale: CGFloat = 1.035
+    static let previewOpacity = 0.18
+    static let liftShadowRadius: CGFloat = 22
+    static let liftShadowY: CGFloat = 12
+    static let animation = Animation.spring(response: 0.24, dampingFraction: 0.86)
+}
+
+struct ReorderRowFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+    }
+}
+
+struct ReorderFrameReader: View {
+    let id: UUID
+    let coordinateSpace: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: ReorderRowFramePreferenceKey.self,
+                value: [id: proxy.frame(in: .named(coordinateSpace))]
+            )
+        }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func reorderGesture<ReorderGesture: Gesture>(_ gesture: ReorderGesture, enabled: Bool) -> some View {
+        if enabled {
+            simultaneousGesture(gesture)
+        } else {
+            self
+        }
+    }
+
+    func reorderLiftedAppearance() -> some View {
+        self
+            .scaleEffect(ReorderMotion.liftScale)
+            .shadow(color: Color.black.opacity(0.14), radius: ReorderMotion.liftShadowRadius, x: 0, y: ReorderMotion.liftShadowY)
+    }
+}
+
+struct StepsMetricPill: View {
+    let title: String
+    let value: String
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(Color.brandSecondaryText)
+            Text(value)
+                .font(.subheadline.monospacedDigit().weight(.semibold))
+                .foregroundStyle(accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.brandBackground.opacity(0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+struct StepValuePill: View {
+    let icon: String?
+    let text: String
+    let accent: Color
+    var background: Color = Color.brandPrimary.opacity(0.075)
+    var stroke: Color = Color.brandPrimary.opacity(0.10)
+    var width: CGFloat = 62
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.caption2.weight(.semibold))
+            }
+            Text(text)
+                .font(.callout.monospacedDigit().weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .foregroundStyle(accent)
+        .frame(width: width, height: 30)
+        .background(background)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(stroke, lineWidth: 0.5)
+        }
+    }
+}
+
+struct TemperatureUnitCompactPicker: View {
+    @Binding var selection: TemperatureUnit
+
+    var body: some View {
+        Picker("温标", selection: $selection) {
+            ForEach(TemperatureUnit.allCases) { unit in
+                Text(unit.rawValue).tag(unit)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 110)
+        .accessibilityLabel("温标")
+    }
+}
+
+struct TemperatureUnitFlipButton: View {
+    let unit: TemperatureUnit
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color.brandPrimary)
+                    .frame(width: 22, height: 22)
+                    .background(Color.brandPrimary.opacity(0.10))
+                    .clipShape(Circle())
+
+                Text(unit.rawValue)
+                    .font(.callout.monospacedDigit().weight(.bold))
+                    .foregroundStyle(Color.brandText)
+                    .frame(width: 18)
+            }
+            .frame(width: 82, height: 38)
+            .background(Color.brandSurface)
+            .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous)
+                    .stroke(Color.brandPrimary.opacity(0.10), lineWidth: 0.6)
+            }
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .accessibilityLabel("切换温标")
+        .accessibilityValue(unit.rawValue)
+    }
+}
+
+struct BakingTemperatureEditorRow: View {
+    let title: String
+    @Binding var value: Double
+    @Binding var unit: TemperatureUnit
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.subheadline)
+
+            Spacer()
+
+            BakingNumericTextField(
+                value: $value,
+                fractionDigits: 0...0,
+                color: UIColor(Color.brandText),
+                font: .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+            )
+            .frame(width: 74)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .frame(height: 36)
+            .bakingFieldSurface()
+
+            TemperatureUnitFlipButton(unit: unit) {
+                flipUnit()
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func flipUnit() {
+        switch unit {
+        case .fahrenheit:
+            value = ((value - 32) * 5 / 9).rounded()
+            unit = .celsius
+        case .celsius:
+            value = (value * 9 / 5 + 32).rounded()
+            unit = .fahrenheit
+        }
+    }
+}
