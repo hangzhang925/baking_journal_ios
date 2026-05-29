@@ -90,6 +90,7 @@ enum BakingTerms {
     static var defaultRecipeName: String { L10n.tr("recipe.default_new", default: "新配方") }
     static var unnamedRecipe: String { L10n.tr("recipe.unnamed", default: "未命名配方") }
     static var unknownRecipe: String { L10n.tr("recipe.unknown", default: "未知配方") }
+    static var recipeNameLabel: String { L10n.tr("recipe.field.name", default: "配方名称") }
     static var toastRecipeName: String { L10n.tr("recipe.toast.name", default: "吐司配方") }
     static var chiffonRecipeName: String { L10n.tr("recipe.chiffon.name", default: "戚风蛋糕") }
     static var countryBreadRecipeName: String { L10n.tr("recipe.country_bread.name", default: "欧包配方") }
@@ -99,11 +100,17 @@ enum BakingTerms {
     static var done: String { L10n.tr("common.done", default: "完成") }
     static var save: String { L10n.tr("common.save", default: "保存") }
     static var saved: String { L10n.tr("common.saved", default: "已保存") }
+    static var back: String { L10n.tr("common.back", default: "返回") }
+    static var share: String { L10n.tr("common.share", default: "分享") }
+    static var edit: String { L10n.tr("common.edit", default: "编辑") }
     static var delete: String { L10n.tr("common.delete", default: "删除") }
+    static var cancel: String { L10n.tr("common.cancel", default: "取消") }
     static var start: String { L10n.tr("common.start", default: "开始") }
     static var end: String { L10n.tr("common.end", default: "结束") }
     static var time: String { L10n.tr("common.time", default: "时间") }
     static var percentage: String { L10n.tr("common.percentage", default: "百分比") }
+    static var unitGram: String { L10n.tr("common.unit.gram", default: "g") }
+    static var unitPiece: String { L10n.tr("common.unit.piece", default: "个") }
     static var moreActions: String { L10n.tr("common.more_actions", default: "更多操作") }
     static var continueAction: String { L10n.tr("common.continue", default: "继续") }
     static var homeTabTitle: String { L10n.tr("home.tab.home", default: "首页") }
@@ -114,6 +121,10 @@ enum BakingTerms {
     static var homeFeedPlaceholderBody: String { L10n.tr("home.feed.placeholder.body", default: "这里之后会变成烘焙动态和灵感 feed。") }
     static var continueBake: String { L10n.tr("home.action.continue_bake", default: "继续制作") }
     static var addRecipe: String { L10n.tr("home.action.add_recipe", default: "添加配方") }
+    static var editRecipe: String { L10n.tr("home.action.edit_recipe", default: "编辑配方") }
+    static var startBake: String { L10n.tr("home.action.start_bake", default: "开始制作") }
+    static var viewIncompleteSteps: String { L10n.tr("home.action.view_incomplete_steps", default: "查看未完成步骤") }
+    static var exportLongImage: String { L10n.tr("home.action.export_long_image", default: "导出长图") }
     static var bakeAction: String { L10n.tr("home.action.bake", default: "烘焙") }
     static var activeBakeSection: String { L10n.tr("home.section.active_bake", default: "正在制作") }
     static var noRecipes: String { L10n.tr("home.empty.no_recipes", default: "暂无配方") }
@@ -121,11 +132,39 @@ enum BakingTerms {
     static var notFinished: String { L10n.tr("home.status.not_finished", default: "未结束") }
     static var stepCount: String { L10n.tr("home.label.step_count", default: "步骤数") }
     static var reviewNotes: String { L10n.tr("home.section.review_notes", default: "复盘备注") }
+    static var workspaceStagePreview: String { L10n.tr("workspace.stage.preview", default: "预览") }
     static var workspaceStageFormula: String { L10n.tr("workspace.stage.formula", default: "配方") }
     static var workspaceStageSteps: String { L10n.tr("workspace.stage.steps", default: "步骤") }
     static var workspaceStagePicker: String { L10n.tr("workspace.stage.picker", default: "编辑阶段") }
+    static var formulaItemMissing: String { L10n.tr("formula.item.missing", default: "这个材料已经不存在了") }
+    static var formulaDeleteMaterialConfirmationTitle: String {
+        L10n.tr("formula.dialog.delete_material.title", default: "删除这个材料？")
+    }
+    static var formulaDeleteMaterialConfirmationMessage: String {
+        L10n.tr("formula.dialog.delete_material.message", default: "删除后会从当前配方和步骤分配中移除。")
+    }
+    static var formulaTableIngredient: String { L10n.tr("formula.table.ingredient", default: "材料") }
+    static var formulaTablePercentage: String { L10n.tr("formula.table.percentage", default: "比例") }
+    static var formulaTableWeight: String { L10n.tr("formula.table.weight", default: "重量") }
+    static var recipeSourceNewSection: String { L10n.tr("recipe_source.section.new", default: "新建") }
+    static var recipeSourceTemplatesSection: String { L10n.tr("recipe_source.section.templates", default: "系统预设") }
+    static var recipeSourceExistingSection: String { L10n.tr("recipe_source.section.existing", default: "从已有配方开始") }
+    static var recipeSourceStartBlank: String { L10n.tr("recipe_source.action.start_blank", default: "从空白开始") }
+    static var recipeSourceStartBlankDetail: String { L10n.tr("recipe_source.detail.start_blank", default: "手动搭建一个全新的配方") }
+    static var recipeSourceEmptySaved: String { L10n.tr("recipe_source.empty.saved", default: "还没有已保存配方") }
+    static var bakePickerChooseRecipe: String { L10n.tr("bake_picker.section.choose_recipe", default: "选择一个配方") }
+    static var bakePickerEmptyReadyRecipes: String { L10n.tr("bake_picker.empty.ready_recipes", default: "还没有可烘焙的配方") }
+    static var bakePickerFooter: String {
+        L10n.tr("bake_picker.footer.preview_first", default: "进入预览后，你可以再决定什么时候开始烘焙。")
+    }
     static var percentagePickerAccessibility: String {
         L10n.tr("common.percentage_picker.accessibility", default: "调整百分比")
+    }
+    static var percentagePickerDecrease: String {
+        L10n.tr("common.percentage_picker.decrease", default: "减少 1%")
+    }
+    static var percentagePickerIncrease: String {
+        L10n.tr("common.percentage_picker.increase", default: "增加 1%")
     }
 
     static func activeBakeProgress(stepIndex: Int, totalSteps: Int, stepName: String) -> String {
@@ -246,11 +285,77 @@ enum BakingTerms {
     static var starterSlideToMarkFed: String { L10n.tr("starter_profile.action.slide_to_mark_fed", default: "向左滑动完成喂养") }
     static var starterWeightAdjustHint: String { L10n.tr("starter_profile.weight.adjust_hint", default: "向左滑动减少克数，也可以直接输入") }
     static var formulaFieldName: String { L10n.tr("formula.field.name", default: "名称") }
+    static var formulaFieldWeight: String { L10n.tr("formula.field.weight", default: "重量") }
+    static var formulaFieldType: String { L10n.tr("formula.field.type", default: "类型") }
     static var formulaDeleteMaterial: String { L10n.tr("formula.action.delete_material", default: "删除材料") }
     static var formulaYeastType: String { L10n.tr("formula.field.yeast_type", default: "酵母类型") }
     static var formulaWaterContent: String { L10n.tr("formula.field.water_content", default: "含水量") }
+    static var formulaWaterContribution: String { L10n.tr("formula.field.water_contribution", default: "贡献水量") }
+    static var formulaStarterRatio: String { L10n.tr("formula.field.starter_ratio", default: "水粉比例") }
+    static var formulaStarterAddYeast: String { L10n.tr("formula.field.starter_add_yeast", default: "加入种面酵母") }
+    static var formulaStarterYeast: String { L10n.tr("formula.field.starter_yeast", default: "种面酵母") }
+    static var formulaStarterAddEgg: String { L10n.tr("formula.field.starter_add_egg", default: "加入种面鸡蛋") }
+    static var formulaEggCount: String { L10n.tr("formula.field.egg_count", default: "鸡蛋个数") }
+    static var formulaEggUnitWeight: String { L10n.tr("formula.field.egg_unit_weight", default: "单个重量") }
+    static var formulaWaterMark: String { L10n.tr("formula.label.water_mark", default: "含水") }
     static var formulaExpandMaterialSettings: String { L10n.tr("formula.action.expand_material_settings", default: "展开材料设置") }
     static var formulaCollapseMaterialSettings: String { L10n.tr("formula.action.collapse_material_settings", default: "收起材料设置") }
+
+    static var stepsOverviewTitle: String { L10n.tr("steps.overview.title", default: "制作安排") }
+    static var stepsSectionTitle: String { L10n.tr("steps.section.title", default: "制作步骤") }
+    static var stepsEditorTitle: String { L10n.tr("steps.editor.title", default: "编辑步骤") }
+    static var stepsTimingSection: String { L10n.tr("steps.section.timing", default: "时间与温度") }
+    static var stepsMaterialsSection: String { L10n.tr("steps.section.materials", default: "分配材料") }
+    static var stepsMaterialsEmpty: String { L10n.tr("steps.empty.materials", default: "配方里还没有材料。") }
+    static var stepsEmptyMessage: String { L10n.tr("steps.empty.message", default: "添加步骤后，就可以把材料分配到每一步。") }
+    static var stepsMissingStep: String { L10n.tr("steps.empty.missing_step", default: "这个步骤已经不存在了") }
+    static var stepsTableStep: String { L10n.tr("steps.table.step", default: "步骤") }
+    static var stepsTableDuration: String { L10n.tr("steps.table.duration", default: "耗时") }
+    static var stepsTableTemperature: String { L10n.tr("steps.table.temperature", default: "温度") }
+    static var stepsTotalDuration: String { L10n.tr("steps.metric.total_duration", default: "总时长") }
+    static var stepsAddStep: String { L10n.tr("steps.action.add_step", default: "添加步骤") }
+    static var stepsDeleteStep: String { L10n.tr("steps.action.delete_step", default: "删除步骤") }
+    static var stepsAssignAll: String { L10n.tr("steps.action.assign_all", default: "全部分配") }
+    static var stepsConfirmAssignment: String { L10n.tr("steps.action.confirm_assignment", default: "确认分配") }
+    static var stepsMarkReady: String { L10n.tr("steps.action.mark_ready", default: "标记为准备烘焙") }
+    static var stepsMarkDraft: String { L10n.tr("steps.action.mark_draft", default: "改回草稿") }
+    static var stepsReadyTooltipTitle: String { L10n.tr("steps.tooltip.ready.title", default: "已准备好") }
+    static var stepsNotReadyTooltipTitle: String { L10n.tr("steps.tooltip.not_ready.title", default: "还不能烘焙") }
+    static var stepsDeleteConfirmationTitle: String { L10n.tr("steps.dialog.delete.title", default: "删除这个步骤？") }
+    static var stepsDeleteConfirmationMessage: String { L10n.tr("steps.dialog.delete.message", default: "删除后，这一步的材料分配也会移除。") }
+    static var stepsFieldName: String { L10n.tr("steps.field.name", default: "名称") }
+    static var stepsFieldType: String { L10n.tr("steps.field.type", default: "类型") }
+    static var stepsFieldDuration: String { L10n.tr("steps.field.duration", default: "耗时") }
+    static var stepsFieldTemperature: String { L10n.tr("steps.field.temperature", default: "温度") }
+    static var stepsFieldProductionMethod: String { L10n.tr("steps.field.production_method", default: "方式") }
+    static var stepsFieldNotes: String { L10n.tr("steps.field.notes", default: "备注") }
+    static var stepsMinuteUnit: String { L10n.tr("steps.unit.minute", default: "分钟") }
+    static var stepsDegreeUnit: String { L10n.tr("steps.unit.degree", default: "°") }
+    static var stepsHourShort: String { L10n.tr("steps.unit.hour_short", default: "h") }
+    static var stepsMinuteShort: String { L10n.tr("steps.unit.minute_short", default: "m") }
+    static var stepsNoValue: String { L10n.tr("steps.value.none", default: "-") }
+    static var stepsUsedUp: String { L10n.tr("steps.assignment.used_up", default: "已用完") }
+    static var stepsChooseAssignmentPercentage: String {
+        L10n.tr("steps.assignment.choose_percentage", default: "选择这一步要加入的比例")
+    }
+    static var stepsAddWeight: String { L10n.tr("steps.assignment.add_weight", default: "加入") }
+    static var stepsAddWeightAccessibility: String { L10n.tr("steps.assignment.add_weight.accessibility", default: "加入克数") }
+
+    static func stepsCount(_ count: Int) -> String {
+        L10n.format("steps.count", default: "%d 步", count)
+    }
+
+    static func stepsAssignedCount(_ count: Int) -> String {
+        L10n.format("steps.assignment.count", default: "%d 个材料", count)
+    }
+
+    static func stepsAssignmentPercent(_ percent: String) -> String {
+        L10n.format("steps.assignment.percent", default: "%@%%", percent)
+    }
+
+    static func stepsRemainingPercent(_ percent: String) -> String {
+        L10n.format("steps.assignment.remaining_percent", default: "剩 %@%%", percent)
+    }
 
     static func formulaAddCategory(_ category: String) -> String {
         L10n.format("formula.action.add_category", default: "添加%@", category)
@@ -258,6 +363,18 @@ enum BakingTerms {
 
     static func formulaStarterDetail(flour: String, water: String) -> String {
         L10n.format("formula.starter.detail", default: "面粉 %@ / 水 %@", flour, water)
+    }
+
+    static func formulaEggDetail(count: String, water: String) -> String {
+        L10n.format("formula.egg.detail", default: "%@ 个 / 水 %@", count, water)
+    }
+
+    static func formulaEggWaterDetail(_ water: String) -> String {
+        L10n.format("formula.egg.water_detail", default: "水 %@", water)
+    }
+
+    static func formulaEggWaterContentNote(type: String, percent: String) -> String {
+        L10n.format("formula.egg.water_content_note", default: "%@ 含水量 %@%%，水量 = 重量 × 含水量。", type, percent)
     }
 
     static var recipePreviewEstimatedDuration: String {

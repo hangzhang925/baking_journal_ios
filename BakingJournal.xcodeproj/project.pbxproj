@@ -34,6 +34,20 @@
 		AA0000010000000000000119 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000003A /* L10n.swift */; };
 		AA000001000000000000011A /* BakingNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000003D /* BakingNotificationService.swift */; };
 		AA000001000000000000011B /* StarterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000002A /* StarterView.swift */; };
+		AA0000010000000000000301 /* AppNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000201 /* AppNavigationController.swift */; };
+		AA0000010000000000000302 /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000202 /* AppRoute.swift */; };
+		AA0000010000000000000303 /* GlobalHistoryPanLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000203 /* GlobalHistoryPanLayer.swift */; };
+		AA0000010000000000000304 /* KeyboardUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000204 /* KeyboardUtilities.swift */; };
+		AA0000010000000000000305 /* BakingThemeColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000205 /* BakingThemeColors.swift */; };
+		AA0000010000000000000306 /* MetricStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000206 /* MetricStrip.swift */; };
+		AA0000010000000000000307 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000207 /* EmptyStateView.swift */; };
+		AA0000010000000000000308 /* BakingDropdownComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000208 /* BakingDropdownComponents.swift */; };
+		AA0000010000000000000309 /* RecipeWorkflowBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000209 /* RecipeWorkflowBadge.swift */; };
+		AA000001000000000000030A /* MaterialPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020A /* MaterialPalette.swift */; };
+		AA000001000000000000030B /* RecipeLibraryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020B /* RecipeLibraryRow.swift */; };
+		AA000001000000000000030C /* BakeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020C /* BakeHistoryView.swift */; };
+		AA000001000000000000030D /* RecipeWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020D /* RecipeWorkspaceView.swift */; };
+		AA000001000000000000030E /* BakeRecordDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020E /* BakeRecordDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +82,20 @@
 		AA000001000000000000003C /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = zh-Hans.lproj/Localizable.strings; sourceTree = "<group>"; };
 			AA000001000000000000003D /* BakingNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingNotificationService.swift; sourceTree = "<group>"; };
 			AA000001000000000000003E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA0000010000000000000201 /* AppNavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationController.swift; sourceTree = "<group>"; };
+		AA0000010000000000000202 /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
+		AA0000010000000000000203 /* GlobalHistoryPanLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHistoryPanLayer.swift; sourceTree = "<group>"; };
+		AA0000010000000000000204 /* KeyboardUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardUtilities.swift; sourceTree = "<group>"; };
+		AA0000010000000000000205 /* BakingThemeColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingThemeColors.swift; sourceTree = "<group>"; };
+		AA0000010000000000000206 /* MetricStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricStrip.swift; sourceTree = "<group>"; };
+		AA0000010000000000000207 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		AA0000010000000000000208 /* BakingDropdownComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingDropdownComponents.swift; sourceTree = "<group>"; };
+		AA0000010000000000000209 /* RecipeWorkflowBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeWorkflowBadge.swift; sourceTree = "<group>"; };
+		AA000001000000000000020A /* MaterialPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialPalette.swift; sourceTree = "<group>"; };
+		AA000001000000000000020B /* RecipeLibraryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryRow.swift; sourceTree = "<group>"; };
+		AA000001000000000000020C /* BakeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakeHistoryView.swift; sourceTree = "<group>"; };
+		AA000001000000000000020D /* RecipeWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeWorkspaceView.swift; sourceTree = "<group>"; };
+		AA000001000000000000020E /* BakeRecordDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakeRecordDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,12 +120,12 @@
 		AA0000010000000000000031 /* BakingJournal */ = {
 			isa = PBXGroup;
 			children = (
-					AA0000010000000000000011 /* BakingJournalApp.swift */,
-					AA000001000000000000003E /* Info.plist */,
-					AA0000010000000000000036 /* Localization */,
-				AA0000010000000000000033 /* Models */,
-				AA0000010000000000000034 /* Stores */,
-				AA0000010000000000000035 /* Views */,
+				AA0000010000000000000401 /* App */,
+				AA0000010000000000000402 /* Core */,
+				AA0000010000000000000403 /* Features */,
+				AA0000010000000000000404 /* SharedUI */,
+				AA0000010000000000000036 /* Localization */,
+				AA000001000000000000003E /* Info.plist */,
 				AA000001000000000000001B /* Assets.xcassets */,
 			);
 			path = BakingJournal;
@@ -129,20 +157,89 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		AA0000010000000000000034 /* Stores */ = {
+		AA0000010000000000000034 /* Store */ = {
 			isa = PBXGroup;
 			children = (
 				AA0000010000000000000013 /* RecipeStore.swift */,
-				AA0000010000000000000014 /* Formatters.swift */,
-				AA000001000000000000003D /* BakingNotificationService.swift */,
 			);
-			path = Stores;
+			path = Store;
 			sourceTree = "<group>";
 		};
-		AA0000010000000000000035 /* Views */ = {
+		AA000001000000000000040A /* Formatting */ = {
 			isa = PBXGroup;
 			children = (
+				AA0000010000000000000014 /* Formatters.swift */,
+			);
+			path = Formatting;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040B /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000003D /* BakingNotificationService.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000401 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000011 /* BakingJournalApp.swift */,
 				AA0000010000000000000015 /* RootView.swift */,
+				AA0000010000000000000405 /* Navigation */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000405 /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000201 /* AppNavigationController.swift */,
+				AA0000010000000000000202 /* AppRoute.swift */,
+				AA0000010000000000000203 /* GlobalHistoryPanLayer.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000402 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000033 /* Models */,
+				AA0000010000000000000034 /* Store */,
+				AA000001000000000000040A /* Formatting */,
+				AA000001000000000000040B /* Notifications */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000403 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000040C /* Home */,
+				AA000001000000000000040D /* RecipeFormula */,
+				AA000001000000000000040E /* RecipeSteps */,
+				AA000001000000000000040F /* RecipePreview */,
+				AA0000010000000000000410 /* Cooking */,
+				AA0000010000000000000411 /* Starter */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040C /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000001D /* HomeView.swift */,
+				AA000001000000000000020B /* RecipeLibraryRow.swift */,
+				AA000001000000000000020D /* RecipeWorkspaceView.swift */,
+				AA000001000000000000020C /* BakeHistoryView.swift */,
+				AA000001000000000000020E /* BakeRecordDetailView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040D /* RecipeFormula */ = {
+			isa = PBXGroup;
+			children = (
 				AA0000010000000000000016 /* FormulaView.swift */,
 				AA000001000000000000001F /* FormulaImportExport.swift */,
 				AA0000010000000000000021 /* FormulaMaterialComponents.swift */,
@@ -152,18 +249,83 @@
 				AA0000010000000000000025 /* FormulaCompactFields.swift */,
 				AA0000010000000000000026 /* BakingDragPayload.swift */,
 				AA0000010000000000000027 /* RecipeSourcePickerView.swift */,
-				AA0000010000000000000028 /* BakeRecipePickerView.swift */,
-				AA0000010000000000000029 /* StepSharedComponents.swift */,
 				AA0000010000000000000017 /* ItemEditorView.swift */,
-				AA0000010000000000000018 /* RecipePreviewView.swift */,
-				AA0000010000000000000019 /* StepsView.swift */,
-				AA000001000000000000001A /* CookView.swift */,
-				AA000001000000000000001C /* IconSystem.swift */,
-				AA000001000000000000001D /* HomeView.swift */,
-				AA000001000000000000002A /* StarterView.swift */,
-				AA000001000000000000001E /* BakingDesignSystem.swift */,
 			);
-			path = Views;
+			path = RecipeFormula;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040E /* RecipeSteps */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000019 /* StepsView.swift */,
+				AA0000010000000000000029 /* StepSharedComponents.swift */,
+			);
+			path = RecipeSteps;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040F /* RecipePreview */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000018 /* RecipePreviewView.swift */,
+			);
+			path = RecipePreview;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000410 /* Cooking */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000001A /* CookView.swift */,
+				AA0000010000000000000028 /* BakeRecipePickerView.swift */,
+			);
+			path = Cooking;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000411 /* Starter */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000002A /* StarterView.swift */,
+			);
+			path = Starter;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000404 /* SharedUI */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000001E /* BakingDesignSystem.swift */,
+				AA000001000000000000001C /* IconSystem.swift */,
+				AA0000010000000000000205 /* BakingThemeColors.swift */,
+				AA0000010000000000000204 /* KeyboardUtilities.swift */,
+				AA000001000000000000020A /* MaterialPalette.swift */,
+				AA0000010000000000000209 /* RecipeWorkflowBadge.swift */,
+				AA0000010000000000000412 /* Dropdown */,
+				AA0000010000000000000413 /* Metrics */,
+				AA0000010000000000000414 /* EmptyState */,
+			);
+			path = SharedUI;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000412 /* Dropdown */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000208 /* BakingDropdownComponents.swift */,
+			);
+			path = Dropdown;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000413 /* Metrics */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000206 /* MetricStrip.swift */,
+			);
+			path = Metrics;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000414 /* EmptyState */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000207 /* EmptyStateView.swift */,
+			);
+			path = EmptyState;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -263,6 +425,20 @@
 				AA0000010000000000000119 /* L10n.swift in Sources */,
 				AA000001000000000000011A /* BakingNotificationService.swift in Sources */,
 				AA000001000000000000011B /* StarterView.swift in Sources */,
+				AA0000010000000000000301 /* AppNavigationController.swift in Sources */,
+				AA0000010000000000000302 /* AppRoute.swift in Sources */,
+				AA0000010000000000000303 /* GlobalHistoryPanLayer.swift in Sources */,
+				AA0000010000000000000304 /* KeyboardUtilities.swift in Sources */,
+				AA0000010000000000000305 /* BakingThemeColors.swift in Sources */,
+				AA0000010000000000000306 /* MetricStrip.swift in Sources */,
+				AA0000010000000000000307 /* EmptyStateView.swift in Sources */,
+				AA0000010000000000000308 /* BakingDropdownComponents.swift in Sources */,
+				AA0000010000000000000309 /* RecipeWorkflowBadge.swift in Sources */,
+				AA000001000000000000030A /* MaterialPalette.swift in Sources */,
+				AA000001000000000000030B /* RecipeLibraryRow.swift in Sources */,
+				AA000001000000000000030C /* BakeHistoryView.swift in Sources */,
+				AA000001000000000000030D /* RecipeWorkspaceView.swift in Sources */,
+				AA000001000000000000030E /* BakeRecordDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
