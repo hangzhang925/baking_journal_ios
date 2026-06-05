@@ -3,6 +3,8 @@ import SwiftUI
 struct BakeRecipePickerView: View {
     @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
+    @State private var replacementRecipe: SavedRecipe?
+    @State private var isReplacementDialogPresented = false
 
     var body: some View {
         List {
@@ -13,10 +15,13 @@ struct BakeRecipePickerView: View {
                 } else {
                     ForEach(sortedRecipes) { recipe in
                         Button {
-                            store.loadRecipe(recipe)
-                            navigationController.push(.recipeWorkspace(.preview))
+                            select(recipe)
                         } label: {
-                            RecipeLibraryRow(recipe: recipe)
+                            RecipeLibraryRow(
+                                recipe: recipe,
+                                summary: store.summary(for: recipe),
+                                bakeCount: bakeCount(for: recipe)
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -33,11 +38,44 @@ struct BakeRecipePickerView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color.brandBackground)
+        .confirmationDialog(
+            BakingTerms.bakePickerReplaceActiveTitle,
+            isPresented: $isReplacementDialogPresented,
+            titleVisibility: .visible
+        ) {
+            Button(BakingTerms.bakePickerReplaceActiveConfirm, role: .destructive) {
+                if let replacementRecipe {
+                    startBake(with: replacementRecipe)
+                }
+            }
+            Button(BakingTerms.cancel, role: .cancel) {}
+        } message: {
+            Text(BakingTerms.bakePickerReplaceActiveMessage)
+        }
     }
 
     private var sortedRecipes: [SavedRecipe] {
         store.savedRecipes
             .filter { store.isReadyToBake($0) }
             .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    private func bakeCount(for recipe: SavedRecipe) -> Int {
+        store.bakeHistory.filter { $0.recipeID == recipe.id }.count
+    }
+
+    private func select(_ recipe: SavedRecipe) {
+        if store.hasActiveBakeInProgress {
+            replacementRecipe = recipe
+            isReplacementDialogPresented = true
+            return
+        }
+
+        startBake(with: recipe)
+    }
+
+    private func startBake(with recipe: SavedRecipe) {
+        store.loadRecipe(recipe)
+        navigationController.push(.cook)
     }
 }

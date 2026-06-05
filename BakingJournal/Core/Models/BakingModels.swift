@@ -82,6 +82,13 @@ enum ItemTag: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum StarterEditMode: String, Codable, CaseIterable, Identifiable {
+    case ratio
+    case weight
+
+    var id: String { rawValue }
+}
+
 enum TimeUnit: String, Codable, CaseIterable, Identifiable {
     case min
     case hr
@@ -124,6 +131,7 @@ struct RecipeItem: Identifiable, Codable, Equatable {
     var starterRatio: String?
     var starterWater: Double?
     var starterYeastWeight: Double?
+    var starterEditMode: StarterEditMode?
     var waterContentPct: Double?
     var eggCount: Double?
     var eggUnitWeight: Double?
@@ -179,9 +187,64 @@ enum RecipeWorkflowState: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum RecipeKind: String, Codable, CaseIterable, Identifiable {
+    case toast
+    case chiffon
+    case countryBread
+    case custom
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .toast:
+            return BakingTerms.recipeKindToast
+        case .chiffon:
+            return BakingTerms.recipeKindChiffon
+        case .countryBread:
+            return BakingTerms.recipeKindCountryBread
+        case .custom:
+            return BakingTerms.recipeKindCustom
+        }
+    }
+
+    static func inferred(name: String, items: [RecipeItem]) -> RecipeKind {
+        let normalizedName = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        if normalizedName.localizedCaseInsensitiveContains(BakingTerms.toastTemplateLabel)
+            || normalizedName.localizedCaseInsensitiveContains(BakingTerms.toastRecipeName) {
+            return .toast
+        }
+        if normalizedName.localizedCaseInsensitiveContains(BakingTerms.chiffonTemplateLabel)
+            || normalizedName.localizedCaseInsensitiveContains(BakingTerms.chiffonRecipeName) {
+            return .chiffon
+        }
+        if normalizedName.localizedCaseInsensitiveContains(BakingTerms.countryBreadTemplateLabel)
+            || normalizedName.localizedCaseInsensitiveContains(BakingTerms.countryBreadRecipeName) {
+            return .countryBread
+        }
+
+        let tags = Set(items.map(\.tag))
+        let ingredientNames = items.map(\.name).joined(separator: " ")
+        if tags.contains(.egg), ingredientNames.localizedCaseInsensitiveContains(BakingTerms.lowGlutenFlour) {
+            return .chiffon
+        }
+        if ingredientNames.localizedCaseInsensitiveContains(BakingTerms.wholeWheatFlour)
+            || ingredientNames.localizedCaseInsensitiveContains(BakingTerms.oliveOil) {
+            return .countryBread
+        }
+        if tags.contains(.butter), tags.contains(.sugar), tags.contains(.yeast) {
+            return .toast
+        }
+        return .custom
+    }
+}
+
 struct SavedRecipe: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
+    var kind: RecipeKind
+    var overallNotes: String
+    var stepText: String
     var items: [RecipeItem]
     var steps: [JournalStep]
     var workflowState: RecipeWorkflowState
@@ -191,6 +254,9 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
     init(
         id: UUID,
         name: String,
+        kind: RecipeKind,
+        overallNotes: String = "",
+        stepText: String = "",
         items: [RecipeItem],
         steps: [JournalStep],
         workflowState: RecipeWorkflowState,
@@ -199,6 +265,9 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
     ) {
         self.id = id
         self.name = name
+        self.kind = kind
+        self.overallNotes = overallNotes
+        self.stepText = stepText
         self.items = items
         self.steps = steps
         self.workflowState = workflowState
@@ -209,6 +278,9 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case id
         case name
+        case kind
+        case overallNotes
+        case stepText
         case items
         case steps
         case workflowState
@@ -221,6 +293,9 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         items = try container.decode([RecipeItem].self, forKey: .items)
+        kind = try container.decodeIfPresent(RecipeKind.self, forKey: .kind) ?? RecipeKind.inferred(name: name, items: items)
+        overallNotes = try container.decodeIfPresent(String.self, forKey: .overallNotes) ?? ""
+        stepText = try container.decodeIfPresent(String.self, forKey: .stepText) ?? ""
         steps = try container.decode([JournalStep].self, forKey: .steps)
         workflowState = try container.decodeIfPresent(RecipeWorkflowState.self, forKey: .workflowState) ?? .draft
         createdAt = try container.decode(Date.self, forKey: .createdAt)
@@ -266,7 +341,8 @@ enum StarterFeedingRatio: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct StarterProfile: Codable, Equatable {
+struct StarterProfile: Identifiable, Codable, Equatable {
+    var id: UUID
     var name: String
     var isContainerWeightEnabled: Bool
     var containerWeight: Double
@@ -277,6 +353,7 @@ struct StarterProfile: Codable, Equatable {
     var nextFeedingDate: Date
 
     init(
+        id: UUID = UUID(),
         name: String = BakingTerms.starterProfileDefaultName,
         isContainerWeightEnabled: Bool = false,
         containerWeight: Double = 0,
@@ -286,6 +363,7 @@ struct StarterProfile: Codable, Equatable {
         isReminderEnabled: Bool = false,
         nextFeedingDate: Date = Date()
     ) {
+        self.id = id
         self.name = name
         self.isContainerWeightEnabled = isContainerWeightEnabled
         self.containerWeight = containerWeight
@@ -294,5 +372,30 @@ struct StarterProfile: Codable, Equatable {
         self.feedingRatio = feedingRatio
         self.isReminderEnabled = isReminderEnabled
         self.nextFeedingDate = nextFeedingDate
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case isContainerWeightEnabled
+        case containerWeight
+        case measuredWeight
+        case lastFedAt
+        case feedingRatio
+        case isReminderEnabled
+        case nextFeedingDate
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decode(String.self, forKey: .name)
+        isContainerWeightEnabled = try container.decode(Bool.self, forKey: .isContainerWeightEnabled)
+        containerWeight = try container.decode(Double.self, forKey: .containerWeight)
+        measuredWeight = try container.decode(Double.self, forKey: .measuredWeight)
+        lastFedAt = try container.decode(Date.self, forKey: .lastFedAt)
+        feedingRatio = try container.decode(StarterFeedingRatio.self, forKey: .feedingRatio)
+        isReminderEnabled = try container.decode(Bool.self, forKey: .isReminderEnabled)
+        nextFeedingDate = try container.decode(Date.self, forKey: .nextFeedingDate)
     }
 }

@@ -19,61 +19,57 @@ struct RecipeSourcePickerView: View {
 
             List {
                 Section {
-                    Button {
+                    recipeSourceButton(
+                        icon: .start,
+                        title: BakingTerms.recipeSourceStartBlank,
+                        detail: BakingTerms.recipeSourceStartBlankDetail
+                    ) {
                         store.createDraftRecipe()
                         navigationController.push(.recipeWorkspace(.formula))
-                    } label: {
-                        RecipeSourceRow(
-                            icon: .start,
-                            title: BakingTerms.recipeSourceStartBlank,
-                            detail: BakingTerms.recipeSourceStartBlankDetail
-                        )
                     }
-                    .buttonStyle(.plain)
                 } header: {
-                    BakingLabel(text: BakingTerms.recipeSourceNewSection, role: .sectionHeader)
+                    RecipeSourceSectionHeader(title: BakingTerms.recipeSourceNewSection)
                 }
 
-                Section(BakingTerms.recipeSourceTemplatesSection) {
+                Section {
                     ForEach(RecipeStore.RecipeTemplate.allCases) { template in
-                        Button {
+                        recipeSourceButton(
+                            icon: presetIcon(for: template),
+                            title: template.label,
+                            detail: presetDetail(for: template)
+                        ) {
                             store.applyTemplate(template)
                             store.saveCurrentRecipe()
                             navigationController.push(.recipeWorkspace(.formula))
-                        } label: {
-                            RecipeSourceRow(
-                                icon: .recipe,
-                                title: template.label,
-                                detail: presetDetail(for: template)
-                            )
                         }
-                        .buttonStyle(.plain)
                     }
+                } header: {
+                    RecipeSourceSectionHeader(title: BakingTerms.recipeSourceTemplatesSection)
                 }
 
-                Section(BakingTerms.recipeSourceExistingSection) {
+                Section {
                     if sortedRecipes.isEmpty {
                         BakingEmptyState(title: BakingTerms.recipeSourceEmptySaved, systemImage: "book.closed")
                             .listRowBackground(Color.clear)
                     } else {
                         ForEach(sortedRecipes) { recipe in
-                            Button {
+                            recipeSourceButton(
+                                icon: BakingIcon.recipeKind(recipe.kind),
+                                title: recipe.name,
+                                detail: recipe.updatedAt.formatted(date: .abbreviated, time: .shortened)
+                            ) {
                                 store.createRecipeCopy(from: recipe)
                                 store.saveCurrentRecipe()
                                 navigationController.push(.recipeWorkspace(.formula))
-                            } label: {
-                                RecipeSourceRow(
-                                    icon: .recipe,
-                                    title: recipe.name,
-                                    detail: recipe.updatedAt.formatted(date: .abbreviated, time: .shortened)
-                                )
                             }
-                            .buttonStyle(.plain)
                         }
                     }
+                } header: {
+                    RecipeSourceSectionHeader(title: BakingTerms.recipeSourceExistingSection)
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .contentMargins(.top, BakingLayout.contentTopInset, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .background(Color.brandBackground)
         }
@@ -87,12 +83,51 @@ struct RecipeSourcePickerView: View {
     private func presetDetail(for template: RecipeStore.RecipeTemplate) -> String {
         switch template {
         case .toast:
-            return "吐司基础配方"
+            return BakingTerms.recipeSourceToastTemplateDetail
         case .chiffon:
-            return "戚风蛋糕基础配方"
+            return BakingTerms.recipeSourceChiffonTemplateDetail
         case .countryBread:
-            return "欧包基础配方"
+            return BakingTerms.recipeSourceCountryBreadTemplateDetail
         }
+    }
+
+    private func presetIcon(for template: RecipeStore.RecipeTemplate) -> BakingIcon {
+        switch template {
+        case .toast:
+            return .recipeToast
+        case .chiffon:
+            return .recipeCake
+        case .countryBread:
+            return .recipeCountryBread
+        }
+    }
+
+    private func recipeSourceButton(
+        icon: BakingIcon,
+        title: String,
+        detail: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            RecipeSourceRow(icon: icon, title: title, detail: detail)
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+        .listRowBackground(BakingSurface.rowBackground)
+    }
+}
+
+private struct RecipeSourceSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        BakingLabel(text: title, role: .sectionHeader)
+            .padding(.horizontal, BakingLayout.screenHorizontalInset)
+            .padding(.top, BakingSpace.xl)
+            .padding(.bottom, BakingSpace.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .textCase(nil)
+            .background(Color.brandBackground)
     }
 }
 
@@ -102,7 +137,7 @@ private struct RecipeSourceRow: View {
     let detail: String
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: BakingSpace.lg) {
             BakingMaterialIconBadge(icon: icon)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -119,9 +154,11 @@ private struct RecipeSourceRow: View {
 
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(Color.brandSecondaryText.opacity(0.72))
+                .foregroundStyle(Color.brandTertiaryText)
         }
-        .frame(minHeight: 56)
+        .frame(minHeight: BakingComponentMetrics.listRowMinHeight)
+        .padding(.horizontal, BakingLayout.screenHorizontalInset)
+        .padding(.vertical, BakingSpace.sm)
         .contentShape(Rectangle())
     }
 }

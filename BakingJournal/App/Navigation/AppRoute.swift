@@ -11,6 +11,8 @@ enum AppRoute: Hashable {
     case recipeWorkspace(RecipeWorkspaceStage)
     case recipeItemEditor(UUID)
     case cook
+    case toolbox
+    case kitchenTimer
     case bakeRecordDetail(UUID)
 }
 

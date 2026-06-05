@@ -4,6 +4,7 @@ enum RecipeWorkspaceStage: String, CaseIterable, Hashable, Identifiable {
     case preview
     case formula
     case steps
+    case history
 
     var id: String { rawValue }
 
@@ -12,14 +13,25 @@ enum RecipeWorkspaceStage: String, CaseIterable, Hashable, Identifiable {
         case .preview: BakingTerms.workspaceStagePreview
         case .formula: BakingTerms.workspaceStageFormula
         case .steps: BakingTerms.workspaceStageSteps
+        case .history: BakingTerms.workspaceStageHistory
         }
     }
 
-    var isPrimaryTab: Bool {
+    var icon: BakingToggleIcon {
         switch self {
-        case .preview: false
-        case .formula, .steps: true
+        case .preview:
+            return .baking(.preview)
+        case .formula:
+            return .baking(.recipe)
+        case .steps:
+            return .baking(.process)
+        case .history:
+            return .baking(.bakes)
         }
+    }
+
+    var segmentedOption: BakingSegmentedStageOption {
+        BakingSegmentedStageOption(id: id, icon: icon, title: title)
     }
 }
 
@@ -27,7 +39,8 @@ struct RecipeWorkspaceView: View {
     @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
     @State private var stage: RecipeWorkspaceStage
-    @State private var justSaved = false
+    @State private var pendingWorkspaceAction: WorkspaceConfirmationAction?
+    @State private var showingWorkspaceActions = false
 
     init(initialStage: RecipeWorkspaceStage = .formula) {
         _stage = State(initialValue: initialStage)
@@ -42,6 +55,28 @@ struct RecipeWorkspaceView: View {
             }
         }
         .background(Color.brandBackground)
+        .confirmationDialog(
+            pendingWorkspaceAction?.title ?? "",
+            isPresented: Binding(
+                get: { pendingWorkspaceAction != nil },
+                set: { if !$0 { pendingWorkspaceAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingWorkspaceAction {
+                Button(pendingWorkspaceAction.confirmTitle, role: pendingWorkspaceAction.role) {
+                    perform(pendingWorkspaceAction)
+                }
+            }
+
+            Button(BakingTerms.cancel, role: .cancel) {
+                pendingWorkspaceAction = nil
+            }
+        } message: {
+            if let pendingWorkspaceAction {
+                Text(pendingWorkspaceAction.message(recipeName: store.currentRecipeDisplayName))
+            }
+        }
     }
 
     @ViewBuilder
@@ -53,6 +88,8 @@ struct RecipeWorkspaceView: View {
             FormulaView(embedded: true)
         case .steps:
             StepsView(embedded: true)
+        case .history:
+            RecipeBakeHistoryStageView()
         }
     }
 
@@ -70,79 +107,225 @@ struct RecipeWorkspaceView: View {
                     }
                 },
                 trailing: {
-                    saveButton
+                    Button {
+                        showingWorkspaceActions = true
+                    } label: {
+                        BakingTopSystemIconButtonLabel(systemImage: "ellipsis", tint: .brandText)
+                    }
+                    .buttonStyle(BakingPressFeedbackButtonStyle())
+                    .accessibilityLabel(BakingTerms.moreActions)
+                    .popover(isPresented: $showingWorkspaceActions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                        BakingDropdownPopover(width: 164) {
+                            workspaceActionRow(
+                                action: store.isReadyToBake ? .startBake : .reviewBeforeBake,
+                                icon: .bakes,
+                                iconColor: .brandPrimary
+                            )
+
+                            workspaceActionRow(
+                                action: .copyRecipe,
+                                icon: .copy,
+                                iconColor: .brandText
+                            )
+
+                            workspaceActionRow(
+                                action: .deleteRecipe,
+                                icon: .delete,
+                                iconColor: BakingComponentTheme.action(role: .destructive).foreground,
+                                foreground: BakingComponentTheme.action(role: .destructive).foreground,
+                                isEnabled: currentRecipe != nil
+                            )
+                        }
+                    }
                 }
             )
             .padding(.horizontal, -14)
 
-            HStack(spacing: BakingSpace.sm) {
-                ForEach(RecipeWorkspaceStage.allCases) { stage in
-                    workspaceStageButton(stage)
-                }
+            BakingSegmentedStageControl(
+                selectedID: stage.id,
+                options: RecipeWorkspaceStage.allCases.map(\.segmentedOption),
+                accessibilityLabel: BakingTerms.workspaceStagePicker
+            ) { selectedID in
+                guard let selectedStage = RecipeWorkspaceStage(rawValue: selectedID) else { return }
+                stage = selectedStage
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(BakingTerms.workspaceStagePicker)
-
         }
         .padding(.horizontal, 16)
         .padding(.top, 0)
-        .padding(.bottom, 8)
+        .padding(.bottom, BakingSpace.xs)
         .background(Color.brandBackground)
     }
 
-    private func workspaceStageButton(_ nextStage: RecipeWorkspaceStage) -> some View {
+    private var currentRecipe: SavedRecipe? {
+        guard let currentRecipeID = store.currentRecipeID else { return nil }
+        return store.savedRecipes.first { $0.id == currentRecipeID }
+    }
+
+    private func workspaceActionRow(
+        action: WorkspaceConfirmationAction,
+        icon: BakingIcon,
+        iconColor: Color,
+        foreground: Color = .brandText,
+        isEnabled: Bool = true
+    ) -> some View {
         Button {
-            withAnimation(BakingMotion.standard) {
-                stage = nextStage
-            }
+            showingWorkspaceActions = false
+            pendingWorkspaceAction = action
         } label: {
-            workspaceStageButtonLabel(nextStage)
-                .frame(maxWidth: nextStage.isPrimaryTab ? .infinity : nil)
-                .frame(width: nextStage.isPrimaryTab ? nil : 72)
-                .frame(height: nextStage.isPrimaryTab ? 38 : 34)
-                .background(
-                    RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous)
-                        .fill(stage == nextStage ? Color.brandPrimary.opacity(0.12) : Color.brandSurface.opacity(0.92))
+            BakingDropdownRow(title: action.menuTitle, foreground: foreground) {
+                BakingIconView(
+                    icon: icon,
+                    size: BakingTouchTarget.dropdownIconGlyph,
+                    color: iconColor
                 )
-                .overlay {
-                    RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous)
-                        .stroke(stage == nextStage ? Color.brandPrimary.opacity(0.24) : Color.brandPrimary.opacity(0.08), lineWidth: 0.6)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+    }
+
+    private func perform(_ action: WorkspaceConfirmationAction) {
+        pendingWorkspaceAction = nil
+        switch action {
+        case .startBake:
+            navigationController.push(.cook)
+        case .reviewBeforeBake:
+            stage = .steps
+        case .copyRecipe:
+            store.copyCurrentRecipe()
+            stage = .formula
+        case .deleteRecipe:
+            if let currentRecipe {
+                store.deleteRecipe(currentRecipe)
+            }
+            navigationController.popToHome()
+        }
+    }
+}
+
+private enum WorkspaceConfirmationAction: Identifiable {
+    case startBake
+    case reviewBeforeBake
+    case copyRecipe
+    case deleteRecipe
+
+    var id: String {
+        switch self {
+        case .startBake:
+            return "startBake"
+        case .reviewBeforeBake:
+            return "reviewBeforeBake"
+        case .copyRecipe:
+            return "copyRecipe"
+        case .deleteRecipe:
+            return "deleteRecipe"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .startBake:
+            return BakingTerms.startBakeConfirmationTitle
+        case .reviewBeforeBake:
+            return BakingTerms.reviewBeforeBakeConfirmationTitle
+        case .copyRecipe:
+            return BakingTerms.copyRecipeConfirmationTitle
+        case .deleteRecipe:
+            return BakingTerms.deleteRecipeConfirmationTitle
+        }
+    }
+
+    func message(recipeName: String) -> String {
+        switch self {
+        case .startBake:
+            return BakingTerms.startBakeConfirmationMessage
+        case .reviewBeforeBake:
+            return BakingTerms.reviewBeforeBakeConfirmationMessage
+        case .copyRecipe:
+            return BakingTerms.copyRecipeConfirmationMessage
+        case .deleteRecipe:
+            return BakingTerms.deleteRecipeConfirmationMessage(recipeName)
+        }
+    }
+
+    var confirmTitle: String {
+        switch self {
+        case .startBake:
+            return BakingTerms.startBake
+        case .reviewBeforeBake:
+            return BakingTerms.viewIncompleteSteps
+        case .copyRecipe:
+            return BakingTerms.copyRecipe
+        case .deleteRecipe:
+            return BakingTerms.deleteRecipeConfirmationButton
+        }
+    }
+
+    var menuTitle: String {
+        switch self {
+        case .startBake, .reviewBeforeBake:
+            return BakingTerms.bakeAction
+        case .copyRecipe:
+            return BakingTerms.copy
+        case .deleteRecipe:
+            return BakingTerms.delete
+        }
+    }
+
+    var role: ButtonRole? {
+        switch self {
+        case .deleteRecipe:
+            return .destructive
+        default:
+            return nil
+        }
+    }
+}
+
+private struct RecipeBakeHistoryStageView: View {
+    @EnvironmentObject private var navigationController: AppNavigationController
+    @EnvironmentObject private var store: RecipeStore
+
+    var body: some View {
+        BakingLibraryList {
+            Section {
+                if recipeHistory.isEmpty {
+                    BakingEmptyState(title: BakingTerms.noRecords, systemImage: "clock.arrow.circlepath")
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(recipeHistory) { record in
+                        Button {
+                            if record.id == store.activeBakeRecordID && record.completedAt == nil {
+                                navigationController.push(.cook)
+                            } else {
+                                navigationController.push(.bakeRecordDetail(record.id))
+                            }
+                        } label: {
+                            BakeHistoryRow(record: record, icon: recipeIcon)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                        .listRowBackground(BakingSurface.rowBackground)
+                    }
                 }
-        }
-        .buttonStyle(BakingPressFeedbackButtonStyle())
-        .accessibilityLabel(nextStage.title)
-    }
-
-    @ViewBuilder
-    private func workspaceStageButtonLabel(_ nextStage: RecipeWorkspaceStage) -> some View {
-        let tint = stage == nextStage ? Color.brandPrimary : Color.brandSecondaryText
-        switch nextStage {
-        case .preview:
-            BakingIconView(icon: .preview, size: BakingTouchTarget.secondaryActionGlyph, color: tint)
-        case .formula, .steps:
-            Text(nextStage.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(tint)
+            }
+            .listRowBackground(BakingSurface.rowBackground)
         }
     }
 
-    private var saveButton: some View {
-        BakingIconButton(
-            icon: .save,
-            accessibilityLabel: justSaved ? BakingTerms.saved : BakingTerms.save,
-            role: justSaved ? .success : .primary
-        ) {
-            store.saveCurrentRecipe()
-            flashSavedState()
-        }
+    private var recipeHistory: [BakeRecord] {
+        guard let currentRecipeID = store.currentRecipeID else { return [] }
+        return store.bakeHistory
+            .filter { $0.recipeID == currentRecipeID }
+            .sorted { $0.startedAt > $1.startedAt }
     }
 
-    private func flashSavedState() {
-        justSaved = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.2))
-            justSaved = false
+    private var recipeIcon: BakingIcon {
+        guard let currentRecipeID = store.currentRecipeID,
+              let recipe = store.savedRecipes.first(where: { $0.id == currentRecipeID }) else {
+            return .recipe
         }
+        return BakingIcon.recipeKind(recipe.kind)
     }
 }
 

@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Baking Journal Caramel Theme Reference</title>
+  <style>
+    :root {
+      --background: #fffdf8;
+      --surface: #fbf4ea;
+      --surface-strong: #f3e5d0;
+      --primary: #a86f2a;
+      --primary-light: #e8c98f;
+      --primary-dark: #6f471c;
+      --text-primary: #17130d;
+      --text-secondary: #7d7162;
+      --hydration-blue: #3d8791;
+      --success-green: #5f7f52;
+      --divider: #e5d8c7;
+      --shadow: rgba(111, 71, 28, 0.13);
+      --phone-border: rgba(23, 19, 13, 0.12);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-primary);
+      background: var(--background);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 18% 10%, rgba(232, 201, 143, 0.22), transparent 28%),
+        linear-gradient(180deg, #fffdf8 0%, #f8efe2 100%);
+    }
+
+    .page {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 34px 22px 54px;
+    }
+
+    .intro {
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) minmax(280px, 420px);
+      gap: 26px;
+      align-items: end;
+      margin-bottom: 26px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(32px, 5vw, 58px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .intro p {
+      max-width: 680px;
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .tokens {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .token {
+      min-height: 58px;
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(111, 71, 28, 0.13);
+      background: rgba(255, 253, 248, 0.72);
+    }
+
+    .token strong,
+    .token span {
+      display: block;
+      letter-spacing: 0;
+    }
+
+    .token strong {
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .token span {
+      margin-top: 4px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .token.primary {
+      color: #fffdf8;
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .token.primary span {
+      color: rgba(255, 253, 248, 0.82);
+    }
+
+    .stage {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(300px, 1fr);
+      gap: 28px;
+      align-items: start;
+    }
+
+    .phone-frame {
+      width: min(100%, 390px);
+      margin: 0 auto;
+      padding: 10px;
+      border-radius: 42px;
+      background: #17130d;
+      box-shadow: 0 24px 58px rgba(111, 71, 28, 0.24);
+    }
+
+    .phone {
+      overflow: hidden;
+      height: 844px;
+      border-radius: 34px;
+      border: 1px solid var(--phone-border);
+      background: var(--background);
+    }
+
+    .status {
+      height: 36px;
+      padding: 13px 22px 0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .screen {
+      height: calc(100% - 36px);
+      display: flex;
+      flex-direction: column;
+      background: var(--background);
+    }
+
+    .content {
+      flex: 1;
+      overflow: hidden;
+      padding: 0 18px 18px;
+    }
+
+    .topbar {
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--text-primary);
+    }
+
+    .icon-button.primary {
+      color: var(--primary);
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 6px 0 18px;
+    }
+
+    .tab {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 22px;
+      border: 1px solid var(--divider);
+      color: var(--text-secondary);
+      background: rgba(255, 253, 248, 0.76);
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .tab.active {
+      color: #fffdf8;
+      border-color: var(--primary);
+      background: var(--primary);
+      box-shadow: 0 8px 18px rgba(168, 111, 42, 0.22);
+    }
+
+    .screen-title {
+      margin: 0 0 14px;
+      font-size: 32px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .metric {
+      min-height: 72px;
+      padding: 12px 12px 10px;
+      border-radius: 13px;
+      background: var(--surface-strong);
+      border: 1px solid rgba(229, 216, 199, 0.72);
+    }
+
+    .metric.water {
+      color: var(--hydration-blue);
+      background: rgba(61, 135, 145, 0.08);
+      border-color: rgba(61, 135, 145, 0.18);
+    }
+
+    .metric.success {
+      color: var(--success-green);
+    }
+
+    .metric-label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .metric-value {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 23px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .card {
+      border-radius: 18px;
+      border: 1px solid rgba(229, 216, 199, 0.78);
+      background: var(--surface);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.72) inset;
+    }
+
+    .card + .card {
+      margin-top: 10px;
+    }
+
+    .card-header {
+      padding: 14px 16px 2px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .row {
+      min-height: 72px;
+      display: grid;
+      grid-template-columns: 40px 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 16px;
+    }
+
+    .row + .row {
+      border-top: 1px solid var(--divider);
+      margin-left: 64px;
+      padding-left: 0;
+    }
+
+    .badge {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      color: var(--primary-dark);
+      background: var(--primary-light);
+    }
+
+    .row-title {
+      font-size: 20px;
+      font-weight: 850;
+    }
+
+    .row-percent {
+      color: var(--primary);
+      font-size: 18px;
+      font-weight: 850;
+    }
+
+    .row-percent.water,
+    .row-value.water {
+      color: var(--hydration-blue);
+    }
+
+    .row-value {
+      min-width: 54px;
+      text-align: right;
+      color: var(--text-primary);
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .unit {
+      margin-left: 3px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .bottom-bar {
+      height: 84px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-items: start;
+      padding: 10px 26px 0;
+      border-top: 1px solid rgba(229, 216, 199, 0.72);
+      background: rgba(255, 253, 248, 0.94);
+    }
+
+    .bottom-item {
+      height: 48px;
+      display: grid;
+      place-items: center;
+      color: var(--text-primary);
+    }
+
+    .bottom-item.active {
+      color: var(--primary);
+    }
+
+    .primary-action {
+      position: absolute;
+      right: 26px;
+      bottom: 106px;
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      border: 0;
+      appearance: none;
+      color: #fffdf8;
+      background: var(--primary);
+      box-shadow: 0 13px 24px rgba(168, 111, 42, 0.25);
+    }
+
+    .phone-wrap {
+      position: relative;
+    }
+
+    .notes {
+      display: grid;
+      gap: 14px;
+    }
+
+    .note {
+      padding: 18px 18px 17px;
+      border-radius: 18px;
+      border: 1px solid rgba(111, 71, 28, 0.13);
+      background: rgba(255, 253, 248, 0.72);
+    }
+
+    .note h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    .note p {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .swatch-strip {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      overflow: hidden;
+      min-height: 62px;
+      border-radius: 16px;
+      border: 1px solid rgba(111, 71, 28, 0.13);
+    }
+
+    .swatch {
+      min-height: 62px;
+    }
+
+    .icon {
+      width: 24px;
+      height: 24px;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .icon.small {
+      width: 20px;
+      height: 20px;
+    }
+
+    @media (max-width: 820px) {
+      .intro,
+      .stage {
+        grid-template-columns: 1fr;
+      }
+
+      .page {
+        padding-inline: 14px;
+      }
+
+      .tokens {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 430px) {
+      .phone-frame {
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .phone {
+        height: 820px;
+        border-radius: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="intro" aria-label="焦糖主题说明">
+      <div>
+        <h1>Caramel Anchor</h1>
+        <p>保留温暖、柔软、iOS 原生的底色，把记忆点集中到 active tab、底部 active icon 和主操作。页面不需要变重，只需要让 #A86F2A 成为用户能马上记住的品牌锚点。</p>
+      </div>
+      <div class="tokens" aria-label="主题色票">
+        <div class="token primary"><strong>Primary</strong><span>#A86F2A</span></div>
+        <div class="token" style="background:#fffdf8"><strong>Background</strong><span>#FFFDF8</span></div>
+        <div class="token" style="background:#fbf4ea"><strong>Surface</strong><span>#FBF4EA</span></div>
+        <div class="token" style="background:#f3e5d0"><strong>Surface Strong</strong><span>#F3E5D0</span></div>
+      </div>
+    </section>
+
+    <section class="stage" aria-label="主题预览">
+      <div class="phone-wrap">
+        <div class="phone-frame">
+          <article class="phone" aria-label="配方预览页面焦糖主题">
+            <div class="status">
+              <span>9:41</span>
+              <span>5G  100%</span>
+            </div>
+            <div class="screen">
+              <div class="content">
+                <header class="topbar">
+                  <div class="icon-button" aria-label="返回">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
+                  </div>
+                  <div class="icon-button primary" aria-label="更多">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                  </div>
+                </header>
+
+                <nav class="tabs" aria-label="配方工作流">
+                  <div class="tab active">
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M6 4h9l3 3v13H6z"></path><path d="M14 4v4h4"></path><path d="M9 13h6"></path></svg>
+                    预览
+                  </div>
+                  <div class="tab">
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M7 4h10v16H7z"></path><path d="M10 8h4"></path><path d="M10 12h4"></path><path d="M10 16h2"></path></svg>
+                    配方
+                  </div>
+                  <div class="tab">
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4z"></path><path d="m4 12 8 4 8-4"></path><path d="m4 17 8 4 8-4"></path></svg>
+                    步骤
+                  </div>
+                </nav>
+
+                <h2 class="screen-title">今日欧包</h2>
+
+                <section class="meta-grid" aria-label="制作数据">
+                  <div class="metric">
+                    <span class="metric-label">预计耗时</span>
+                    <span class="metric-value">35 min</span>
+                  </div>
+                  <div class="metric">
+                    <span class="metric-label">面团</span>
+                    <span class="metric-value">1.45 kg</span>
+                  </div>
+                  <div class="metric water">
+                    <span class="metric-label">含水</span>
+                    <span class="metric-value">102.5%</span>
+                  </div>
+                </section>
+
+                <h3 class="section-title">材料</h3>
+
+                <section class="card" aria-label="主面粉">
+                  <div class="card-header">面粉</div>
+                  <div class="row">
+                    <div class="badge">
+                      <svg class="icon small" viewBox="0 0 24 24"><path d="M12 20V5"></path><path d="M8 7c-2 0-3 1-3 3 3 0 5-1 7-3"></path><path d="M16 7c2 0 3 1 3 3-3 0-5-1-7-3"></path><path d="M8 12c-2 0-3 1-3 3 3 0 5-1 7-3"></path><path d="M16 12c2 0 3 1 3 3-3 0-5-1-7-3"></path></svg>
+                    </div>
+                    <div class="row-title">面粉</div>
+                    <div></div>
+                    <div class="row-value">500 <span class="unit">g</span></div>
+                  </div>
+                </section>
+
+                <section class="card" aria-label="材料列表">
+                  <div class="card-header">材料</div>
+                  <div class="row">
+                    <div class="badge">
+                      <svg class="icon small" viewBox="0 0 24 24"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"></path></svg>
+                    </div>
+                    <div class="row-title">水</div>
+                    <div class="row-percent water">70%</div>
+                    <div class="row-value water">350 <span class="unit">g</span></div>
+                  </div>
+                  <div class="row">
+                    <div class="badge">
+                      <svg class="icon small" viewBox="0 0 24 24"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"></path></svg>
+                    </div>
+                    <div class="row-title">水</div>
+                    <div class="row-percent water">10%</div>
+                    <div class="row-value water">50 <span class="unit">g</span></div>
+                  </div>
+                  <div class="row">
+                    <div class="badge">
+                      <svg class="icon small" viewBox="0 0 24 24"><path d="m7 8 4-4 4 4-4 4z"></path><path d="m13 16 4-4 4 4-4 4z"></path><path d="m3 16 4-4 4 4-4 4z"></path></svg>
+                    </div>
+                    <div class="row-title">盐</div>
+                    <div class="row-percent">2%</div>
+                    <div class="row-value">10 <span class="unit">g</span></div>
+                  </div>
+                  <div class="row">
+                    <div class="badge">
+                      <svg class="icon small" viewBox="0 0 24 24"><path d="m7 8 4-4 4 4-4 4z"></path><path d="m13 16 4-4 4 4-4 4z"></path><path d="m3 16 4-4 4 4-4 4z"></path></svg>
+                    </div>
+                    <div class="row-title">盐</div>
+                    <div class="row-percent">2%</div>
+                    <div class="row-value">10 <span class="unit">g</span></div>
+                  </div>
+                </section>
+              </div>
+
+              <button class="primary-action" aria-label="开始制作">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+              </button>
+
+              <nav class="bottom-bar" aria-label="底部导航">
+                <div class="bottom-item">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg>
+                </div>
+                <div class="bottom-item active">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M7 4h10v16H7z"></path><path d="M10 8h4"></path><path d="M10 12h4"></path><path d="M10 16h2"></path></svg>
+                </div>
+                <div class="bottom-item">
+                  <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"></circle><path d="M12 13V8"></path><path d="m12 13 3 2"></path><path d="M9 3h6"></path></svg>
+                </div>
+                <div class="bottom-item">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M7 4h10v16H7z"></path><path d="M10 8h4"></path><path d="M10 12h4"></path><path d="m10 16 2-2 2 2"></path></svg>
+                </div>
+              </nav>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <aside class="notes" aria-label="评估摘要">
+        <div class="swatch-strip" aria-label="完整色带">
+          <div class="swatch" style="background:#fffdf8"></div>
+          <div class="swatch" style="background:#fbf4ea"></div>
+          <div class="swatch" style="background:#f3e5d0"></div>
+          <div class="swatch" style="background:#e8c98f"></div>
+          <div class="swatch" style="background:#a86f2a"></div>
+          <div class="swatch" style="background:#6f471c"></div>
+          <div class="swatch" style="background:#3d8791"></div>
+          <div class="swatch" style="background:#5f7f52"></div>
+        </div>
+
+        <div class="note">
+          <h2>判断</h2>
+          <p>#A86F2A 比当前柔咖啡更有识别度，但仍然属于烘焙语境，不会跳成橙色电商风。它适合承担品牌锚点，尤其是 tab selected、primary action、关键 icon。</p>
+        </div>
+
+        <div class="note">
+          <h2>收紧方式</h2>
+          <p>大面积背景继续轻：#FFFDF8、#FBF4EA、#F3E5D0。焦糖棕只出现在“当前所在位置”和“可以继续推进的动作”上，避免全屏变重。</p>
+        </div>
+
+        <div class="note">
+          <h2>保留的功能色</h2>
+          <p>含水仍用 #3D8791，成功/发酵完成仍用 #5F7F52。它们不要和 primary 抢角色，只在数据语义明确时出现。</p>
+        </div>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 import OSLog
 
@@ -26,10 +27,10 @@ struct FormulaView: View {
     @State private var pendingDeleteItem: RecipeItem?
     @State private var showingDeleteConfirmation = false
     @State private var editingItemID: UUID?
+    @State private var itemEditorMeasuredContentHeight: CGFloat = 0
     @StateObject private var dropdownPresenter = DropdownPresenter()
 
     private let reorderCoordinateSpace = "formulaReorderSpace"
-    private let tableHorizontalInset = BakingLayout.screenHorizontalInset + BakingSpace.xxl
 
     var body: some View {
         Group {
@@ -45,29 +46,34 @@ struct FormulaView: View {
 
     private var content: some View {
         ZStack(alignment: .topLeading) {
-            ScrollView {
-                LazyVStack(spacing: BakingLayout.cardStackSpacing) {
-                    recipeHeader
-                        .padding(.horizontal, BakingLayout.screenHorizontalInset)
-                        .padding(.top, BakingLayout.contentTopInset)
+            VStack(spacing: 0) {
+                ScrollView {
+                    LazyVStack(spacing: BakingSpace.lg) {
+                        RecipeMetricsOverviewCard(
+                            summary: store.summary,
+                            items: store.items,
+                            flourContribution: store.flourContribution,
+                            waterContribution: store.waterContribution
+                        )
 
-                    ForEach(displayCategories) { category in
-                        categorySection(category)
+                        ForEach(displayCategories) { category in
+                            categorySection(category)
+                        }
                     }
+                    .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                    .padding(.top, BakingLayout.contentTopInset)
+                    .padding(.bottom, 178)
                 }
-                .padding(.bottom, 178)
+                .onPreferenceChange(ReorderRowFramePreferenceKey.self) { frames in
+                    itemRowFrames = frames
+                }
+                .scrollDismissesKeyboard(.interactively)
             }
-            .onPreferenceChange(ReorderRowFramePreferenceKey.self) { frames in
-                itemRowFrames = frames
-            }
-            .scrollDismissesKeyboard(.interactively)
             .background(Color.brandBackground)
 
             if let activeItem {
                 FormulaItemDisplayRow(item: activeItem)
                     .frame(width: activeItemFrame?.width)
-                    .background(Color.brandSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: BakingRadius.prominentCard, style: .continuous))
                     .reorderLiftedAppearance()
                     .offset(activeItemOverlayOffset)
                     .transaction { transaction in
@@ -130,11 +136,11 @@ struct FormulaView: View {
         ) { result in
             importRecipe(result)
         }
-        .alert("文件操作失败", isPresented: Binding(
+        .alert(BakingTerms.formulaFileOperationFailed, isPresented: Binding(
             get: { fileError != nil },
             set: { if !$0 { fileError = nil } }
         )) {
-            Button("好", role: .cancel) { fileError = nil }
+            Button(BakingTerms.ok, role: .cancel) { fileError = nil }
         } message: {
             Text(fileError ?? "")
         }
@@ -176,26 +182,14 @@ struct FormulaView: View {
             )
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
-        .accessibilityLabel("更多")
+        .accessibilityLabel(BakingTerms.moreActions)
         .popover(isPresented: $showingToolbarActions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             BakingDropdownPopover(width: 188) {
                 Button {
                     showingToolbarActions = false
-                    store.saveCurrentRecipe()
-                } label: {
-                    BakingDropdownRow(title: "保存到我的配方") {
-                        Image(systemName: "bookmark")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.brandPrimary)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    showingToolbarActions = false
                     exportRecipe()
                 } label: {
-                    BakingDropdownRow(title: "导出 JSON") {
+                    BakingDropdownRow(title: BakingTerms.formulaExportJSON) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Color.brandPrimary)
@@ -207,7 +201,7 @@ struct FormulaView: View {
                     showingToolbarActions = false
                     importingRecipe = true
                 } label: {
-                    BakingDropdownRow(title: "导入 JSON") {
+                    BakingDropdownRow(title: BakingTerms.formulaImportJSON) {
                         Image(systemName: "square.and.arrow.down")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Color.brandPrimary)
@@ -218,45 +212,8 @@ struct FormulaView: View {
         }
     }
 
-    private var recipeHeader: some View {
-        VStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(BakingTerms.recipeNameLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.brandSecondaryText)
-
-                HStack(spacing: 8) {
-                    BakingTopIconButtonLabel(icon: .edit, tint: .brandPrimary, glyphSize: BakingTouchTarget.secondaryActionGlyph)
-
-                    BakingInlineTextField(
-                        text: Binding(
-                            get: { store.recipeName },
-                            set: { store.recipeName = $0 }
-                        ),
-                        placeholder: BakingTerms.unnamedRecipe,
-                        font: .systemFont(ofSize: 22, weight: .semibold)
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
-
-                    Spacer(minLength: BakingSpace.sm)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .bakingFieldSurface(
-                    background: Color.brandBackground.opacity(0.88),
-                    stroke: Color.brandPrimary.opacity(0.14),
-                    radius: BakingRadius.card
-                )
-            }
-
-            CompactRecipeMetrics(summary: store.summary)
-        }
-        .padding(10)
-        .bakingCard()
-    }
-
     private func categorySection(_ category: ItemCategory) -> some View {
-        VStack(spacing: BakingSpace.sm) {
+        VStack(spacing: 0) {
             let categoryItems = displayedItems(for: category)
             HStack(spacing: 6) {
                 HStack(spacing: 4) {
@@ -267,28 +224,27 @@ struct FormulaView: View {
                     }
                 }
                 Spacer()
-                AddItemControl(category: category, onOpenEditor: presentItemEditor)
+                HStack(spacing: BakingSpace.xs) {
+                    BakingSectionEditButton(accessibilityLabel: BakingTerms.formulaEditMaterials) {
+                        enterItemListEditing()
+                    }
+
+                    AddItemControl(category: category, onOpenEditor: presentItemEditor)
+                }
             }
-            .padding(.horizontal, tableHorizontalInset + BakingSpace.sm)
+            .padding(.horizontal, BakingSpace.md)
+            .padding(.top, BakingSpace.md)
+            .padding(.bottom, categoryItems.isEmpty ? 0 : BakingSpace.xs)
 
             if categoryItems.isEmpty {
-                Text("还没有材料")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(BakingTerms.formulaEmptyMaterials)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, BakingSpace.xxl)
+                    .padding(.horizontal, BakingSpace.md)
                     .padding(.vertical, BakingSpace.xl)
-                    .background(Color.brandSurface.opacity(0.75))
-                    .clipShape(RoundedRectangle(cornerRadius: BakingRadius.prominentCard, style: .continuous))
-                    .padding(.horizontal, tableHorizontalInset)
             } else {
                 VStack(spacing: 0) {
-                    FormulaIngredientTableHeader(showsPercentage: category != .flour)
-
-                    Divider()
-                        .overlay(Color.brandPrimary.opacity(0.08))
-                        .padding(.leading, FormulaItemDisplayRow.separatorLeadingInset)
-
                     ForEach(Array(categoryItems.enumerated()), id: \.element.id) { index, item in
                         formulaItemRow(item, in: category)
                             .opacity(activeItemID == item.id ? ReorderMotion.previewOpacity : 1)
@@ -297,15 +253,14 @@ struct FormulaView: View {
 
                         if index < categoryItems.count - 1 {
                             Divider()
-                                .overlay(Color.brandPrimary.opacity(0.08))
+                                .overlay(BakingSurfaceTheme.separator)
                                 .padding(.leading, FormulaItemDisplayRow.separatorLeadingInset)
                         }
                     }
                 }
-                .bakingCard(background: Color.brandSurface.opacity(0.92), stroke: Color.brandPrimary.opacity(0.07))
-                .padding(.horizontal, tableHorizontalInset)
             }
         }
+        .bakingCard()
     }
 
     private var displayCategories: [ItemCategory] {
@@ -513,6 +468,12 @@ struct FormulaView: View {
         }
     }
 
+    private func enterItemListEditing() {
+        withAnimation(ReorderMotion.animation) {
+            isItemListEditing = true
+        }
+    }
+
     private func presentItemEditor(_ item: RecipeItem) {
         Self.reorderLog.info("present editor item=\(item.id.uuidString, privacy: .public) active=\(activeItemID?.uuidString ?? "nil", privacy: .public) editing=\(isItemListEditing, privacy: .public)")
         editingItemID = item.id
@@ -534,12 +495,20 @@ struct FormulaView: View {
         if let editingItem {
             ItemEditorSheetView(item: editingItem) {
                 editingItemID = nil
+            } onContentHeightChange: { height in
+                itemEditorMeasuredContentHeight = height
             }
             .id(editingItem.id)
             .environmentObject(store)
-            .presentationDetents([.height(430)])
+            .presentationDetents([.height(itemEditorSheetHeight(for: editingItem))])
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.brandBackground)
+            .onAppear {
+                itemEditorMeasuredContentHeight = 0
+            }
+            .onChange(of: editingItem.id) { _, _ in
+                itemEditorMeasuredContentHeight = 0
+            }
         } else {
             BakingEmptyState(title: BakingTerms.formulaItemMissing, systemImage: "exclamationmark.triangle")
                 .presentationDetents([.medium])
@@ -551,6 +520,24 @@ struct FormulaView: View {
     private var editingItem: RecipeItem? {
         guard let editingItemID else { return nil }
         return store.items.first { $0.id == editingItemID }
+    }
+
+    private func itemEditorSheetHeight(for item: RecipeItem) -> CGFloat {
+        BakingPopupSheetMetrics.detentHeight(
+            for: itemEditorSheetSize(for: item),
+            measuredContentHeight: itemEditorMeasuredContentHeight,
+            screenHeight: itemEditorScreenHeight
+        )
+    }
+
+    private func itemEditorSheetSize(for item: RecipeItem) -> BakingPopupSheetSize {
+        item.category == .starter || item.tag == .egg ? .expanded : .compact
+    }
+
+    private var itemEditorScreenHeight: CGFloat? {
+        UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.screen.bounds.height }
+            .first
     }
 
     private func requestDeleteItem(_ item: RecipeItem) {
@@ -633,12 +620,16 @@ struct FormulaView: View {
                         dropdownPresenter.dismiss()
                         item.action()
                     } label: {
-                        BakingDropdownRow(title: item.title, isSelected: item.isSelected) {
-                            if let icon = item.icon {
-                                BakingIconView(icon: icon, size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
-                            } else {
-                                Color.clear
+                        if menu.reservesLeadingIconSlot {
+                            BakingDropdownRow(title: item.title, isSelected: item.isSelected) {
+                                if let icon = item.icon {
+                                    BakingIconView(icon: icon, size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
+                                } else {
+                                    Color.clear
+                                }
                             }
+                        } else {
+                            BakingDropdownTextRow(title: item.title, isSelected: item.isSelected)
                         }
                     }
                     .buttonStyle(.plain)
@@ -685,7 +676,7 @@ private struct BakerPercentageInfoButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("百分比说明")
+        .accessibilityLabel(BakingTerms.formulaBakerPercentageInfoAccessibility)
         .popover(isPresented: $showingInfo, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             BakerPercentageTooltip()
                 .presentationCompactAdaptation(.popover)
@@ -701,29 +692,20 @@ private struct BakerPercentageTooltip: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Color.brandPrimary)
                     .frame(width: 22, height: 22)
-                    .background(Color.brandPrimary.opacity(0.10))
+                    .background(BakingSurfaceTheme.theme(for: .selected).background)
                     .clipShape(Circle())
 
-                Text("基于总面粉")
-                    .font(.subheadline.weight(.semibold))
+                Text(BakingTerms.formulaBakerPercentageInfoTitle)
+                    .font(BakingTypography.appPrimaryText)
                     .foregroundStyle(Color.brandText)
             }
 
-            Text("包含直接添加的面粉，也包含种面里的面粉。")
-                .font(.caption)
+            Text(BakingTerms.formulaBakerPercentageInfoBody)
+                .font(BakingTypography.appSecondaryText)
                 .foregroundStyle(Color.brandSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
-        .frame(width: 220, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
-                .fill(Color.brandSurface.opacity(0.98))
-                .overlay {
-                    RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
-                        .stroke(Color.brandPrimary.opacity(0.10), lineWidth: 0.6)
-                }
-                .shadow(color: Color.black.opacity(0.07), radius: 18, x: 0, y: 8)
-        )
+        .bakingPopoverSurface(width: BakingComponentMetrics.popoverCompactWidth)
     }
 }

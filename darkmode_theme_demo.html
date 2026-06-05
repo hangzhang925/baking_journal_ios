@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Baking Journal Theme Compare</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      background: #000000;
+      color: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #000000;
+    }
+
+    .page {
+      width: min(1320px, 100%);
+      margin: 0 auto;
+      padding: 30px 18px 38px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      color: #ffffff;
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.05;
+      font-weight: 780;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      max-width: 920px;
+      margin-bottom: 24px;
+    }
+
+    .intro p,
+    .theme-note p {
+      margin: 0;
+      color: #ffffff;
+      line-height: 1.6;
+    }
+
+    .intro p {
+      font-size: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+
+    .theme-note {
+      min-height: 116px;
+      padding: 0 4px 14px;
+    }
+
+    .theme-note h2 {
+      margin: 0 0 8px;
+      color: #ffffff;
+      font-size: 18px;
+      line-height: 1.25;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .theme-note p {
+      font-size: 14px;
+    }
+
+    .phone {
+      position: relative;
+      max-width: 392px;
+      min-height: 770px;
+      margin: 0 auto;
+      padding: 20px 18px 18px;
+      border: 1px solid var(--device-border);
+      border-radius: 42px;
+      background: var(--bg);
+      color: var(--ink);
+      box-shadow: var(--phone-shadow), inset 0 0 0 9px var(--inner-stroke);
+      overflow: hidden;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      width: 118px;
+      height: 22px;
+      transform: translateX(-50%);
+      border-radius: 0 0 18px 18px;
+      background: var(--notch);
+      z-index: 2;
+    }
+
+    .phone * {
+      color: var(--ink);
+    }
+
+    .statusbar {
+      position: relative;
+      z-index: 3;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .topbar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+    }
+
+    svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.35;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .stage-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 14px 0 20px;
+    }
+
+    .stage {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      font-size: 15px;
+      font-weight: 760;
+    }
+
+    .stage.active span,
+    .stage.active svg {
+      color: var(--accent);
+      stroke: var(--accent);
+    }
+
+    .stage svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .stage-indicator {
+      height: 3px;
+      width: 28px;
+      margin: -12px 0 18px 22px;
+      border-radius: 99px;
+      background: var(--accent);
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .title-field {
+      flex: 1;
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      background: var(--surface);
+      font-size: 23px;
+      font-weight: 820;
+      box-shadow: inset 0 1px 0 var(--surface-glint);
+    }
+
+    .draft {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 44px;
+      padding: 0 4px;
+      font-size: 16px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .draft svg,
+    .badge svg {
+      color: var(--accent);
+      stroke: var(--accent);
+    }
+
+    .draft svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-bottom: 1px solid var(--divider);
+      padding-bottom: 18px;
+      margin-bottom: 20px;
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 0 12px;
+      border-left: 1px solid var(--divider);
+    }
+
+    .metric:first-child {
+      border-left: 0;
+      padding-left: 0;
+    }
+
+    .metric-label {
+      font-size: 13px;
+      font-weight: 740;
+      margin-bottom: 3px;
+      white-space: nowrap;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+    }
+
+    .accent-text,
+    .percent {
+      color: var(--accent);
+    }
+
+    .water-value {
+      color: var(--water);
+    }
+
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 22px;
+      font-weight: 850;
+    }
+
+    .ingredient-list {
+      padding-bottom: 84px;
+    }
+
+    .ingredient {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) 70px 70px;
+      gap: 10px;
+      align-items: center;
+      min-height: 74px;
+      border-bottom: 1px solid color-mix(in srgb, var(--divider) 74%, transparent);
+    }
+
+    .badge {
+      width: 38px;
+      height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      background: var(--badge);
+      box-shadow: inset 0 1px 0 var(--surface-glint);
+    }
+
+    .badge svg {
+      width: 21px;
+      height: 21px;
+    }
+
+    .name {
+      min-width: 0;
+      font-size: 18px;
+      font-weight: 830;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sub {
+      margin-top: 3px;
+      font-size: 14px;
+      font-weight: 650;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .percent,
+    .grams {
+      text-align: right;
+      font-size: 18px;
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .unit {
+      margin-left: 2px;
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .bottom-tabs {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      min-height: 88px;
+      padding: 10px 10px 16px;
+      border-top: 1px solid var(--divider);
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(14px);
+    }
+
+    .tab {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .tab.active::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      width: 28px;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .tab.active svg {
+      color: var(--accent);
+      stroke: var(--accent);
+    }
+
+    .tab svg {
+      width: 25px;
+      height: 25px;
+    }
+
+    .tokens {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 7px;
+      max-width: 392px;
+      margin: 14px auto 0;
+    }
+
+    .token {
+      height: 24px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.16);
+    }
+
+    @media (max-width: 1180px) {
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+      }
+
+      .theme-note {
+        min-height: auto;
+        max-width: 640px;
+        margin: 0 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="intro">
+      <h1>Baking Journal Theme Compare</h1>
+      <p>这版保持 light mode 黑字、dark mode 白字。顶部 tab 默认也是黑/白，只有选中态和强调数据使用 primary，方便直接比较深咖啡、暖橙、亮金品牌色三个方向。</p>
+    </section>
+
+    <section id="themes" class="grid" aria-label="Theme comparison"></section>
+  </main>
+
+  <template id="theme-template">
+    <article>
+      <div class="theme-note">
+        <h2></h2>
+        <p></p>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>11:21</span><span>•••  ◜</span></div>
+        <div class="topbar">
+          <button class="icon-button" aria-label="Back"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button class="icon-button" aria-label="More"><svg viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg></button>
+        </div>
+        <div class="stage-tabs">
+          <div class="stage active"><svg viewBox="0 0 24 24"><path d="M7 4h7l3 3v13H7z"/><path d="M14 4v4h4"/></svg><span>预览</span></div>
+          <div class="stage"><svg viewBox="0 0 24 24"><path d="M8 4h8v16H8z"/><path d="M10 8h4M10 12h4M10 16h3"/></svg><span>配方</span></div>
+          <div class="stage"><svg viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4 8-4z"/><path d="m4 12 8 4 8-4"/><path d="m4 17 8 4 8-4"/></svg><span>步骤</span></div>
+          <div class="stage"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M8 14h8M8 17h5"/></svg><span>记录</span></div>
+        </div>
+        <div class="stage-indicator"></div>
+        <div class="title-row">
+          <div class="title-field">阿斯顿</div>
+          <div class="draft"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>Draft</div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">面团</div><div class="metric-value">1.646 kg</div></div>
+          <div class="metric"><div class="metric-label">面粉</div><div class="metric-value accent-text">550 g</div></div>
+          <div class="metric"><div class="metric-label">含水</div><div class="metric-value water-value">117.6%</div></div>
+        </div>
+        <h3 class="section-title">材料</h3>
+        <div class="ingredient-list">
+          <div class="ingredient"><div class="badge"><svg viewBox="0 0 24 24"><path d="M12 20V8"/><path d="M8 10c-2-2-2-4 0-6 3 1 4 3 4 6"/><path d="M16 10c2-2 2-4 0-6-3 1-4 3-4 6"/></svg></div><div><div class="name">面粉</div></div><div></div><div class="grams">500 <span class="unit">g</span></div></div>
+          <div class="ingredient"><div class="badge"><svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="16" rx="2"/><path d="M10 8h4M10 12h4"/></svg></div><div><div class="name">鲁邦种</div><div class="sub">50 g 粉 / 50 g 水</div></div><div class="percent">18.2 <span class="unit">%</span></div><div class="grams">100 <span class="unit">g</span></div></div>
+          <div class="ingredient"><div class="badge"><svg viewBox="0 0 24 24"><path d="M12 3s6 7 6 12a6 6 0 0 1-12 0c0-5 6-12 6-12z"/></svg></div><div><div class="name">水</div></div><div class="percent water-value">63.6 <span class="unit">%</span></div><div class="grams water-value">350 <span class="unit">g</span></div></div>
+          <div class="ingredient"><div class="badge"><svg viewBox="0 0 24 24"><path d="m8 8 8 8M16 8l-8 8"/><rect x="5" y="5" width="5" height="5" rx="1"/><rect x="14" y="14" width="5" height="5" rx="1"/></svg></div><div><div class="name">盐</div></div><div class="percent">1.8 <span class="unit">%</span></div><div class="grams">10 <span class="unit">g</span></div></div>
+          <div class="ingredient"><div class="badge"><svg viewBox="0 0 24 24"><path d="M12 3s6 7 6 12a6 6 0 0 1-12 0c0-5 6-12 6-12z"/></svg></div><div><div class="name">鸡蛋</div><div class="sub">1 个 / 水 38 g</div></div><div class="percent">9.1 <span class="unit">%</span></div><div class="grams">50 <span class="unit">g</span></div></div>
+        </div>
+        <div class="bottom-tabs">
+          <div class="tab active"><svg viewBox="0 0 24 24"><path d="M8 4h8v16H8z"/><path d="M10 8h4M10 12h4M10 16h3"/></svg><span>配方</span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="3"/><path d="M8 18v2h8v-2"/></svg><span>记录</span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="15" rx="2"/><path d="M9 9h6M9 13h6"/></svg><span>酵种</span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3"/></svg><span>设置</span></div>
+        </div>
+      </div>
+      <div class="tokens"></div>
+    </article>
+  </template>
+
+  <script>
+    const themes = [
+      {
+        title: "Light：白底黑字 + 深咖啡",
+        note: "浅色里深咖啡很稳，像烘焙、纸张、焦糖边缘。这里它适合当 primary，因为背景足够亮。",
+        vars: {
+          "--bg": "#fff7e8",
+          "--surface": "#fff1d0",
+          "--ink": "#111111",
+          "--accent": "#5b2708",
+          "--divider": "#d4a25e",
+          "--water": "#287681",
+          "--badge": "#edc676",
+          "--notch": "#eadfcf",
+          "--device-border": "rgba(0,0,0,.12)",
+          "--inner-stroke": "rgba(255,255,255,.35)",
+          "--surface-glint": "rgba(255,255,255,.18)",
+          "--phone-shadow": "0 24px 55px rgba(0,0,0,.18)"
+        },
+        tokens: ["#fff7e8", "#fff1d0", "#111111", "#5b2708", "#d4a25e", "#287681"]
+      },
+      {
+        title: "Dark：黑底白字 + 暖橙",
+        note: "识别度最高，底部和顶部选中非常清楚。缺点是更活泼，手作烘焙的黑金感会弱一点。",
+        vars: {
+          "--bg": "#000000",
+          "--surface": "#151210",
+          "--ink": "#ffffff",
+          "--accent": "#ff944d",
+          "--divider": "#3a2b22",
+          "--water": "#65dce8",
+          "--badge": "#342216",
+          "--notch": "#050505",
+          "--device-border": "rgba(255,255,255,.14)",
+          "--inner-stroke": "rgba(255,255,255,.035)",
+          "--surface-glint": "rgba(255,255,255,.08)",
+          "--phone-shadow": "0 24px 60px rgba(0,0,0,.46)"
+        },
+        tokens: ["#000000", "#151210", "#ffffff", "#ff944d", "#3a2b22", "#65dce8"]
+      },
+      {
+        title: "Dark：黑底白字 + 亮金 primary",
+        note: "更接近现代品牌色：黑底下高识别、选中态清楚，同时还保留蜂蜜、焦糖、烘焙的暖感。",
+        vars: {
+          "--bg": "#000000",
+          "--surface": "#14100c",
+          "--ink": "#ffffff",
+          "--accent": "#f4a43a",
+          "--divider": "#3c2d18",
+          "--water": "#6fd4df",
+          "--badge": "#2f2413",
+          "--notch": "#050505",
+          "--device-border": "rgba(255,255,255,.14)",
+          "--inner-stroke": "rgba(255,255,255,.035)",
+          "--surface-glint": "rgba(255,255,255,.08)",
+          "--phone-shadow": "0 24px 60px rgba(0,0,0,.46)"
+        },
+        tokens: ["#000000", "#14100c", "#ffffff", "#f4a43a", "#3c2d18", "#6fd4df"]
+      }
+    ];
+
+    const root = document.querySelector("#themes");
+    const template = document.querySelector("#theme-template");
+
+    themes.forEach((theme) => {
+      const node = template.content.cloneNode(true);
+      const article = node.querySelector("article");
+      const phone = node.querySelector(".phone");
+      node.querySelector("h2").textContent = theme.title;
+      node.querySelector("p").textContent = theme.note;
+      Object.entries(theme.vars).forEach(([name, value]) => phone.style.setProperty(name, value));
+      const tokens = node.querySelector(".tokens");
+      theme.tokens.forEach((color) => {
+        const token = document.createElement("div");
+        token.className = "token";
+        token.style.background = color;
+        tokens.append(token);
+      });
+      root.append(article);
+    });
+  </script>
+</body>
+</html>

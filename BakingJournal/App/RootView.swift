@@ -20,15 +20,19 @@ struct RootView: View {
                     navigationController.setHistorySwipeSuppressed(isSuppressed)
                 }
                 .safeAreaInset(edge: .bottom) {
-                    BakingTabBar(
-                        selection: Binding(
-                            get: { navigationController.selectedTab },
-                            set: { navigationController.selectTab($0) }
-                        ),
-                        isStarterReminderDue: store.isStarterReminderDue
-                    )
-                    .ignoresSafeArea(.keyboard, edges: .bottom)
+                    Color.clear
+                        .frame(height: RootTabBarMetrics.contentInsetHeight)
                 }
+
+                BakingTabBar(
+                    selection: Binding(
+                        get: { navigationController.selectedTab },
+                        set: { navigationController.selectTab($0) }
+                    ),
+                    isStarterReminderDue: store.isStarterReminderDue
+                )
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .ignoresSafeArea(.keyboard, edges: .bottom)
 
                 GlobalHistoryPanLayer(
                     width: proxy.size.width,
@@ -39,4 +43,8 @@ struct RootView: View {
             }
         }
     }
+}
+
+private enum RootTabBarMetrics {
+    static let contentInsetHeight = BakingComponentMetrics.tabItemHeight + BakingSpace.xxs * 2
 }

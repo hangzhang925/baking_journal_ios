@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct EggMiniRecipeEditor: View {
     @EnvironmentObject private var store: RecipeStore
@@ -6,169 +7,119 @@ struct EggMiniRecipeEditor: View {
     let canRemove: Bool
     @Binding var name: String
 
-    private let wholeEggUnitWeight = 50.0
-    private let eggTypeWaterContent: [String: Double] = [
-        BakingTerms.wholeEgg: 75,
-        BakingTerms.beatenEgg: 75,
-        BakingTerms.yolk: 48,
-        BakingTerms.white: 88
-    ]
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
+        VStack(spacing: 0) {
+            EggTableRow {
+                HStack(spacing: BakingSpace.sm) {
+                    BakingIconView(
+                        icon: BakingIcon.material(for: currentItem),
+                        size: BakingComponentMetrics.popupIconGlyph,
+                        color: currentItem.materialPalette.tint
+                    )
+                    .frame(
+                        width: BakingComponentMetrics.popupIconSurface,
+                        height: BakingComponentMetrics.popupIconSurface
+                    )
+                    .background(currentItem.materialPalette.iconSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
+
+                    BakingLabel(text: BakingTerms.egg, role: .inputLabel)
+                        .lineLimit(1)
+
+                    PopupAttributeIcon(
+                        icon: .water,
+                        color: .waterText,
+                        background: Color.waterSurface.opacity(0.9)
+                    )
+                }
+            } trailing: {
                 EggTypePicker(
                     selection: Binding(
                         get: { currentEggType },
-                        set: { updateEggType($0) }
+                        set: { store.updateEggType($0, for: currentItem) }
                     )
                 )
-
-                if isWholeEgg {
-                    EggCountSelector(
-                        count: Binding(
-                            get: { max(0, currentItem.eggCount ?? wholeEggCountFallback) },
-                            set: { updateWholeEggCount($0) }
-                        )
-                    )
-
-                    Spacer(minLength: 0)
-
-                    CompactInfoBadge(icon: "scalemass", text: BakingFormat.weight(currentItem.weight))
-                    CompactInfoBadge(icon: "drop.fill", text: BakingFormat.weight(store.waterContribution(currentItem)), isWater: true)
-                } else {
-                    Spacer(minLength: 0)
-
-                    EggWeightInputBadge(
-                        value: Binding(
-                            get: { currentItem.weight },
-                            set: { updateLiquidEggWeight($0) }
-                        )
-                    )
-
-                    CompactInfoBadge(icon: "drop.fill", text: BakingFormat.weight(store.waterContribution(currentItem)), isWater: true)
-                }
             }
 
-            Text(waterContentExplanation)
-                .font(.caption2)
-                .foregroundStyle(Color.brandSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            EggTableDivider()
+
+            EggTableRow(title: BakingTerms.formulaFieldName) {
+                BakingInlineTextField(
+                    text: $name,
+                    placeholder: BakingTerms.egg,
+                    color: UIColor(Color.brandText),
+                    font: BakingTypography.popupInputValueUIFont,
+                    textAlignment: .right
+                )
+                .bakingFittedInputField(.long)
+            }
+
+            EggTableDivider()
+
+            EggTableRow(title: BakingTerms.formulaTableWeight) {
+                InlineNumberField(
+                    value: Binding(
+                        get: { currentItem.weight },
+                        set: { store.updateEggWeight(currentItem, weight: $0) }
+                    ),
+                    unit: BakingTerms.unitGram,
+                    font: .callout,
+                    color: .brandText,
+                    fieldWidth: 52,
+                    totalWidth: BakingCompactInputFieldSize.short.width,
+                    height: BakingComponentMetrics.compactInputFieldHeight
+                )
+            }
+
+            EggTableDivider()
+
+            EggTableRow(title: BakingTerms.formulaTablePercentage) {
+                BakingPercentageField(
+                    value: Binding(
+                        get: { percent },
+                        set: { store.updateItemPercent(currentItem, percent: $0) }
+                    ),
+                    maxValue: 100,
+                    precision: 1,
+                    font: BakingTypography.rowMeta,
+                    valueFont: BakingTypography.popupNumericInputValue,
+                    color: .brandText,
+                    fieldWidth: 46,
+                    totalWidth: BakingCompactInputFieldSize.short.width,
+                    height: BakingComponentMetrics.compactInputFieldHeight
+                )
+            }
+
+            EggTableDivider()
+
+            EggWaterSummaryRow(
+                waterPercent: displayWaterPercent,
+                waterWeight: store.waterContribution(currentItem)
+            )
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.brandBackground.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .bakingCard()
+        .onAppear {
+            if name.isEmpty {
+                name = BakingTerms.egg
+            }
+        }
     }
 
     private var currentItem: RecipeItem {
         store.items.first { $0.id == item.id } ?? item
     }
 
-    private func updateEgg(count: Double, unitWeight: Double) {
-        var next = currentItem
-        next.eggCount = max(0, count)
-        next.eggUnitWeight = max(0, unitWeight)
-        next.weight = (next.eggCount ?? 0) * (next.eggUnitWeight ?? 45)
-        store.updateItem(next)
-    }
-
-    private func updateWholeEggCount(_ count: Double) {
-        var next = currentItem
-        let roundedCount = max(0, count.rounded())
-        next.eggType = BakingTerms.wholeEgg
-        next.name = BakingTerms.eggDisplayName(BakingTerms.wholeEgg)
-        next.waterContentPct = eggTypeWaterContent[BakingTerms.wholeEgg]
-        next.eggCount = roundedCount
-        next.eggUnitWeight = wholeEggUnitWeight
-        next.weight = roundedCount * wholeEggUnitWeight
-        store.updateItem(next)
+    private var currentEggType: String {
+        let type = currentItem.eggType ?? BakingTerms.beatenEgg
+        return RecipeStore.eggOptions.contains(type) ? type : BakingTerms.beatenEgg
     }
 
     private var displayWaterPercent: Double {
-        eggTypeWaterContent[currentEggType] ?? currentItem.waterContentPct ?? 75
+        RecipeStore.waterContent(forEggType: currentEggType)
     }
 
-    private var currentEggType: String {
-        let type = currentItem.eggType ?? BakingTerms.wholeEgg
-        return RecipeStore.eggOptions.contains(type) ? type : BakingTerms.wholeEgg
-    }
-
-    private var isWholeEgg: Bool {
-        currentEggType == BakingTerms.wholeEgg
-    }
-
-    private var wholeEggCountFallback: Double {
-        let unitWeight = currentItem.eggUnitWeight ?? wholeEggUnitWeight
-        guard unitWeight > 0 else { return 1 }
-        return max(1, (currentItem.weight / unitWeight).rounded())
-    }
-
-    private var waterContentExplanation: String {
-        BakingTerms.formulaEggWaterContentNote(
-            type: BakingTerms.eggDisplayName(currentEggType),
-            percent: BakingFormat.number(displayWaterPercent, precision: 0)
-        )
-    }
-
-    private func updateLiquidEggWeight(_ weight: Double) {
-        var next = currentItem
-        next.weight = max(0, weight)
-        next.eggCount = nil
-        next.eggUnitWeight = nil
-        store.updateItem(next)
-    }
-
-    private func updateEggType(_ type: String) {
-        var next = currentItem
-        next.eggType = type
-        next.name = BakingTerms.eggDisplayName(type)
-        next.waterContentPct = eggTypeWaterContent[type] ?? 75
-
-        if type == BakingTerms.wholeEgg {
-            let count = next.eggCount ?? max(1, (next.weight / wholeEggUnitWeight).rounded())
-            next.eggCount = count
-            next.eggUnitWeight = wholeEggUnitWeight
-            next.weight = count * wholeEggUnitWeight
-        } else {
-            next.eggCount = nil
-            next.eggUnitWeight = nil
-            if next.weight == 0 {
-                next.weight = 50
-            }
-        }
-
-        store.updateItem(next)
-    }
-}
-
-private struct EggWeightInputBadge: View {
-    @Binding var value: Double
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "scalemass")
-                .font(.caption2.weight(.semibold))
-
-            BakingNumericTextField(
-                value: $value,
-                fractionDigits: 0...0,
-                color: UIColor(Color.brandText),
-                font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold),
-                textAlignment: .right
-            )
-            .frame(width: 42)
-
-            Text(BakingTerms.unitGram)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandSecondaryText)
-        }
-        .foregroundStyle(Color.brandText)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(minWidth: 84, minHeight: BakingTouchTarget.secondaryActionVisual)
-        .background(Color.brandPrimary.opacity(0.075))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    private var percent: Double {
+        store.summary.flourWeight > 0 ? currentItem.weight / store.summary.flourWeight * 100 : 0
     }
 }
 
@@ -182,8 +133,9 @@ private struct EggTypePicker: View {
             dropdownPresenter.present(
                 ActiveDropdownMenu(
                     frame: triggerFrame,
-                    width: 148,
+                    width: 156,
                     alignment: .leading,
+                    reservesLeadingIconSlot: false,
                     items: RecipeStore.eggOptions.map { option in
                         DropdownMenuItem(title: BakingTerms.eggDisplayName(option), isSelected: option == selection) {
                             selection = option
@@ -192,7 +144,10 @@ private struct EggTypePicker: View {
                 )
             )
         } label: {
-            RectangularDropdownTrigger(title: BakingTerms.eggDisplayName(selection))
+            RectangularDropdownTrigger(
+                title: BakingTerms.eggDisplayName(selection),
+                width: 156
+            )
         }
         .buttonStyle(.plain)
         .zIndex(3)
@@ -210,71 +165,67 @@ private struct EggTypePicker: View {
     }
 }
 
-private struct EggCountSelector: View {
-    @Binding var count: Double
-    @State private var showingPicker = false
+private struct EggWaterSummaryRow: View {
+    let waterPercent: Double
+    let waterWeight: Double
 
     var body: some View {
-        Button {
-            showingPicker = true
-        } label: {
-            HStack(spacing: 0) {
-                Text("\(Int(count.rounded()))")
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(Color.brandText)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(width: 44, alignment: .center)
-            .background(Color.brandPrimary.opacity(0.075))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.brandPrimary.opacity(0.10), lineWidth: 0.5)
-            }
+        HStack(alignment: .center, spacing: BakingSpace.sm) {
+            BakingInlineMetricLabel(
+                title: BakingTerms.formulaWaterContent,
+                value: BakingFormat.number(waterPercent, precision: 0),
+                unit: "%",
+                role: .success
+            )
+
+            Spacer(minLength: BakingSpace.sm)
+
+            BakingInlineMetricLabel(
+                title: BakingTerms.formulaWaterContribution,
+                value: BakingFormat.number(waterWeight, precision: 0),
+                unit: BakingTerms.unitGram,
+                role: .success
+            )
         }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showingPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-            EggCountWheelPopover(count: $count)
-        }
+        .padding(.horizontal, BakingSpace.md)
+        .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
     }
 }
 
-private struct EggCountWheelPopover: View {
-    @Binding var count: Double
-    @Environment(\.dismiss) private var dismiss
+private struct EggTableRow<Leading: View, Trailing: View>: View {
+    @ViewBuilder let leading: () -> Leading
+    @ViewBuilder let trailing: () -> Trailing
+
+    init(@ViewBuilder leading: @escaping () -> Leading, @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.leading = leading
+        self.trailing = trailing
+    }
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    BakingSystemIconButtonLabel(
-                        systemImage: "checkmark",
-                        visualSize: BakingTouchTarget.secondaryActionVisual,
-                        font: .subheadline.weight(.semibold)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("完成")
-            }
-
-            Picker("鸡蛋个数", selection: Binding(
-                get: { Int(max(1, count.rounded())) },
-                set: { count = Double($0) }
-            )) {
-                ForEach(1...10, id: \.self) { value in
-                    Text("\(value)").tag(value)
-                }
-            }
-            .pickerStyle(.wheel)
-            .labelsHidden()
-            .frame(width: 88, height: 120)
+        HStack(alignment: .center, spacing: BakingSpace.sm) {
+            leading()
+                .frame(minWidth: BakingComponentMetrics.popupLabelWidth, alignment: .leading)
+            Spacer(minLength: 0)
+            trailing()
         }
-        .padding(12)
-        .presentationCompactAdaptation(.popover)
-        .background(Color.brandSurface)
+        .padding(.horizontal, BakingSpace.md)
+        .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
+    }
+}
+
+private extension EggTableRow where Leading == BakingLabel, Trailing: View {
+    init(title: String, @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.leading = {
+            BakingLabel(text: title, role: .popupRowLabel)
+        }
+        self.trailing = trailing
+    }
+}
+
+private struct EggTableDivider: View {
+    var body: some View {
+        Divider()
+            .overlay(BakingSurfaceTheme.separator)
+            .padding(.leading, BakingSpace.md)
     }
 }

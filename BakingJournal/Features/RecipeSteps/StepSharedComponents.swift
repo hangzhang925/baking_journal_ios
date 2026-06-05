@@ -46,7 +46,7 @@ extension View {
     func reorderLiftedAppearance() -> some View {
         self
             .scaleEffect(ReorderMotion.liftScale)
-            .shadow(color: Color.black.opacity(0.14), radius: ReorderMotion.liftShadowRadius, x: 0, y: ReorderMotion.liftShadowY)
+            .bakingLiftedShadow()
     }
 }
 
@@ -58,10 +58,10 @@ struct StepsMetricPill: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.caption2)
+                .font(BakingTypography.appSecondaryText)
                 .foregroundStyle(Color.brandSecondaryText)
             Text(value)
-                .font(.subheadline.monospacedDigit().weight(.semibold))
+                .font(BakingTypography.tableNumber)
                 .foregroundStyle(accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -69,8 +69,7 @@ struct StepsMetricPill: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.brandBackground.opacity(0.75))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .bakingReadOnlySurface()
     }
 }
 
@@ -78,8 +77,8 @@ struct StepValuePill: View {
     let icon: String?
     let text: String
     let accent: Color
-    var background: Color = Color.brandPrimary.opacity(0.075)
-    var stroke: Color = Color.brandPrimary.opacity(0.10)
+    var background: Color = BakingSurfaceTheme.theme(for: .inputSurface).background
+    var stroke: Color = BakingSurfaceTheme.theme(for: .inputSurface).stroke
     var width: CGFloat = 62
 
     var body: some View {
@@ -89,16 +88,16 @@ struct StepValuePill: View {
                     .font(.caption2.weight(.semibold))
             }
             Text(text)
-                .font(.callout.monospacedDigit().weight(.semibold))
+                .font(BakingTypography.tableNumber)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
         }
         .foregroundStyle(accent)
-        .frame(width: width, height: 30)
+        .frame(width: width, height: BakingComponentMetrics.compactPillHeight)
         .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous)
                 .stroke(stroke, lineWidth: 0.5)
         }
     }
@@ -108,7 +107,7 @@ struct TemperatureUnitCompactPicker: View {
     @Binding var selection: TemperatureUnit
 
     var body: some View {
-        Picker("温标", selection: $selection) {
+        Picker(BakingTerms.stepsTemperatureUnit, selection: $selection) {
             ForEach(TemperatureUnit.allCases) { unit in
                 Text(unit.rawValue).tag(unit)
             }
@@ -116,7 +115,7 @@ struct TemperatureUnitCompactPicker: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .frame(width: 110)
-        .accessibilityLabel("温标")
+        .accessibilityLabel(BakingTerms.stepsTemperatureUnit)
     }
 }
 
@@ -131,24 +130,19 @@ struct TemperatureUnitFlipButton: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Color.brandPrimary)
                     .frame(width: 22, height: 22)
-                    .background(Color.brandPrimary.opacity(0.10))
+                    .background(BakingSurfaceTheme.theme(for: .selected).background)
                     .clipShape(Circle())
 
                 Text(unit.rawValue)
-                    .font(.callout.monospacedDigit().weight(.bold))
+                    .font(BakingTypography.tableNumber)
                     .foregroundStyle(Color.brandText)
                     .frame(width: 18)
             }
             .frame(width: 82, height: 38)
-            .background(Color.brandSurface)
-            .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous)
-                    .stroke(Color.brandPrimary.opacity(0.10), lineWidth: 0.6)
-            }
+            .bakingSurface(.nestedChip)
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
-        .accessibilityLabel("切换温标")
+        .accessibilityLabel(BakingTerms.stepsSwitchTemperatureUnit)
         .accessibilityValue(unit.rawValue)
     }
 }
@@ -161,7 +155,7 @@ struct BakingTemperatureEditorRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(title)
-                .font(.subheadline)
+                .font(BakingTypography.appPrimaryText)
 
             Spacer()
 
@@ -169,7 +163,7 @@ struct BakingTemperatureEditorRow: View {
                 value: $value,
                 fractionDigits: 0...0,
                 color: UIColor(Color.brandText),
-                font: .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+                font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
             )
             .frame(width: 74)
             .padding(.horizontal, 6)

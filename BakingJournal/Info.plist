@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Baking Journal</string>
+	<string>Bready</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.food-and-drink</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Bready uses alarms to alert you when a kitchen timer finishes.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>
@@ -47,7 +49,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Baking Journal Step Material Payload</string>
+			<string>Bready Step Material Payload</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.hang.bakingjournal.step-material</string>
 			<key>UTTypeTagSpecification</key>

@@ -3,6 +3,11 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
+    @State private var recipeStatusFilter: RecipeLibraryStatusFilter = .all
+    @State private var recipeModifiedSort: RecipeModifiedSort = .newestFirst
+    @State private var recipeSearchText = ""
+    @State private var recipePendingDeletion: SavedRecipe?
+    @State private var showingDeleteRecipeConfirmation = false
 
     var body: some View {
         tabContent(navigationController.selectedTab)
@@ -17,14 +22,14 @@ struct HomeView: View {
     @ViewBuilder
     private func tabContent(_ tab: HomeTab) -> some View {
         switch tab {
-        case .home:
-            HomeFeedPlaceholderView()
         case .formula:
             recipeLibraryTab
         case .history:
             BakeHistoryView()
         case .starter:
             StarterView()
+        case .settings:
+            SettingsTabView()
         }
     }
 
@@ -41,18 +46,56 @@ struct HomeView: View {
             RecipeItemEditorRouteView(itemID: itemID)
         case .cook:
             CookView()
+        case .toolbox:
+            ToolboxView()
+        case .kitchenTimer:
+            KitchenTimerView()
         case .bakeRecordDetail(let recordID):
             BakeRecordDetailView(recordID: recordID)
         }
     }
 
     private var recipeLibraryTab: some View {
-        VStack(spacing: 0) {
-            BakingTopActionRow(trailing: {
-                recipeActionsMenu
-            })
-
+        BakingLibraryListShell(
+            searchText: $recipeSearchText,
+            searchPrompt: BakingTerms.recipeSearchPrompt,
+            clearSearchAccessibilityLabel: BakingTerms.clearRecipeSearch,
+            filters: { recipeFilterControls },
+            action: { recipeActionsMenu }
+        ) {
             recipeLibrary
+        }
+    }
+
+    private var recipeFilterControls: some View {
+        HStack(spacing: BakingSpace.xs) {
+            Button {
+                recipeStatusFilter = recipeStatusFilter.next
+            } label: {
+                BakingIconButtonLabel(
+                    icon: recipeStatusFilter.icon,
+                    role: .primary,
+                    size: .primary,
+                    isSelected: recipeStatusFilter != .all
+                )
+            }
+            .buttonStyle(BakingPressFeedbackButtonStyle())
+            .accessibilityLabel(BakingTerms.recipeStatusFilter)
+            .accessibilityValue(recipeStatusFilter.accessibilityValue)
+
+            Button {
+                recipeModifiedSort = recipeModifiedSort.toggled
+            } label: {
+                BakingIconButtonLabel(
+                    icon: recipeModifiedSort.icon,
+                    role: .secondary,
+                    size: .primary,
+                    isSelected: recipeModifiedSort == .oldestFirst
+                )
+            }
+            .buttonStyle(BakingPressFeedbackButtonStyle())
+            .accessibilityLabel(BakingTerms.recipeSortModified)
+            .accessibilityValue(recipeModifiedSort.accessibilityValue)
         }
     }
 
@@ -67,14 +110,15 @@ struct HomeView: View {
     }
 
     private var recipeLibrary: some View {
-        List {
-            if store.hasActiveBakeInProgress {
+        BakingLibraryList {
+            if store.hasActiveBakeInProgress, let activeRecipe {
                 Section {
                     Button {
                         navigationController.push(.cook)
                     } label: {
                         ActiveBakeResumeRow(
                             recipeName: store.activeBakeRecord?.recipeSnapshotName ?? store.currentRecipeDisplayName,
+                            updatedAt: activeRecipe.updatedAt,
                             stepName: store.currentCookStep?.name ?? BakingTerms.continueBake,
                             stepIndex: store.cookState.currentIndex,
                             totalSteps: store.steps.count
@@ -84,7 +128,7 @@ struct HomeView: View {
                 } header: {
                     Text(BakingTerms.activeBakeSection)
                 }
-                .listRowBackground(BakingSurface.cardBackground)
+                .listRowBackground(BakingSurface.selectedRowBackground)
             }
 
             Section {
@@ -92,26 +136,31 @@ struct HomeView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 220)
                         .listRowBackground(Color.clear)
-                } else if sortedRecipes.isEmpty {
+                } else if recipeLibraryCandidates.isEmpty {
                     BakingEmptyState(title: BakingTerms.noRecipes, systemImage: "book.closed")
                         .listRowBackground(Color.clear)
+                } else if displayedRecipes.isEmpty {
+                    BakingEmptyState(title: BakingTerms.noMatchingRecipes, systemImage: "line.3.horizontal.decrease.circle")
+                        .listRowBackground(Color.clear)
                 } else {
-                    ForEach(sortedRecipes) { recipe in
+                    ForEach(displayedRecipes) { recipe in
                         Button {
-                            if store.hasActiveBakeInProgress, recipe.id == store.currentRecipeID {
-                                navigationController.push(.recipeWorkspace(.preview))
-                            } else {
-                                store.loadRecipe(recipe)
-                                navigationController.push(.recipeWorkspace(.preview))
-                            }
+                            store.loadRecipe(recipe)
+                            navigationController.push(.recipeWorkspace(.preview))
                         } label: {
-                            RecipeLibraryRow(recipe: recipe)
+                            RecipeLibraryRow(
+                                recipe: recipe,
+                                summary: store.summary(for: recipe),
+                                bakeCount: bakeCount(for: recipe)
+                            )
                         }
                         .buttonStyle(.plain)
-                        .listRowBackground(BakingSurface.cardBackground)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                        .listRowBackground(BakingSurface.rowBackground)
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
-                                store.deleteRecipe(recipe)
+                                recipePendingDeletion = recipe
+                                showingDeleteRecipeConfirmation = true
                             } label: {
                                 Label(BakingTerms.delete, systemImage: "trash")
                             }
@@ -119,40 +168,173 @@ struct HomeView: View {
                     }
                 }
             }
-            .listRowBackground(BakingSurface.cardBackground)
+            .listRowBackground(BakingSurface.rowBackground)
         }
-        .listStyle(.insetGrouped)
-        .contentMargins(.top, BakingLayout.contentTopInset, for: .scrollContent)
-        .scrollContentBackground(.hidden)
-        .background(Color.brandBackground)
+        .confirmationDialog(
+            BakingTerms.deleteRecipeConfirmationTitle,
+            isPresented: $showingDeleteRecipeConfirmation,
+            titleVisibility: .visible,
+            presenting: recipePendingDeletion
+        ) { recipe in
+            Button(BakingTerms.deleteRecipeConfirmationButton, role: .destructive) {
+                store.deleteRecipe(recipe)
+                recipePendingDeletion = nil
+            }
+            Button(BakingTerms.cancel, role: .cancel) {
+                recipePendingDeletion = nil
+            }
+        } message: { recipe in
+            Text(BakingTerms.deleteRecipeConfirmationMessage(recipe.name))
+        }
+        .onChange(of: showingDeleteRecipeConfirmation) { _, isPresented in
+            if !isPresented {
+                recipePendingDeletion = nil
+            }
+        }
     }
 
-    private var sortedRecipes: [SavedRecipe] {
-        store.savedRecipes.sorted { $0.updatedAt > $1.updatedAt }
+    private var displayedRecipes: [SavedRecipe] {
+        let filteredByStatus = recipeLibraryCandidates.filter { recipe in
+            recipeStatusFilter.includes(recipe)
+        }
+        let trimmedSearch = recipeSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filteredByName = trimmedSearch.isEmpty ? filteredByStatus : filteredByStatus.filter { recipe in
+            recipe.name.localizedStandardContains(trimmedSearch)
+        }
+        return filteredByName.sorted { lhs, rhs in
+            switch recipeModifiedSort {
+            case .newestFirst:
+                return lhs.updatedAt > rhs.updatedAt
+            case .oldestFirst:
+                return lhs.updatedAt < rhs.updatedAt
+            }
+        }
+    }
+
+    private var activeRecipe: SavedRecipe? {
+        guard store.hasActiveBakeInProgress,
+              let currentRecipeID = store.currentRecipeID else {
+            return nil
+        }
+        return store.savedRecipes.first { $0.id == currentRecipeID }
+    }
+
+    private var recipeLibraryCandidates: [SavedRecipe] {
+        guard store.hasActiveBakeInProgress,
+              let currentRecipeID = store.currentRecipeID else {
+            return store.savedRecipes
+        }
+        return store.savedRecipes.filter { $0.id != currentRecipeID }
+    }
+
+    private func bakeCount(for recipe: SavedRecipe) -> Int {
+        store.bakeHistory.filter { $0.recipeID == recipe.id }.count
     }
 }
 
-enum HomeTab {
-    case home
-    case formula
-    case history
-    case starter
+private enum RecipeLibraryStatusFilter {
+    case all
+    case ready
+    case draft
 
-    var title: String {
+    var next: RecipeLibraryStatusFilter {
         switch self {
-        case .home: BakingTerms.homeTabTitle
-        case .formula: BakingTerms.recipeTabTitle
-        case .history: BakingTerms.bakeHistoryTabTitle
-        case .starter: BakingTerms.starterTabTitle
+        case .all:
+            return .ready
+        case .ready:
+            return .draft
+        case .draft:
+            return .all
         }
     }
 
     var icon: BakingIcon {
         switch self {
-        case .home: .home
+        case .all:
+            return .filterAll
+        case .ready:
+            return .complete
+        case .draft:
+            return .edit
+        }
+    }
+
+    var accessibilityValue: String {
+        switch self {
+        case .all:
+            return BakingTerms.recipeStatusFilterAll
+        case .ready:
+            return RecipeWorkflowState.ready.label
+        case .draft:
+            return RecipeWorkflowState.draft.label
+        }
+    }
+
+    func includes(_ recipe: SavedRecipe) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .ready:
+            return recipe.workflowState == .ready
+        case .draft:
+            return recipe.workflowState == .draft
+        }
+    }
+}
+
+private enum RecipeModifiedSort {
+    case newestFirst
+    case oldestFirst
+
+    var icon: BakingIcon {
+        switch self {
+        case .newestFirst:
+            return .sortNewest
+        case .oldestFirst:
+            return .sortOldest
+        }
+    }
+
+    var toggled: RecipeModifiedSort {
+        switch self {
+        case .newestFirst:
+            return .oldestFirst
+        case .oldestFirst:
+            return .newestFirst
+        }
+    }
+
+    var accessibilityValue: String {
+        switch self {
+        case .newestFirst:
+            return BakingTerms.recipeSortModifiedNewest
+        case .oldestFirst:
+            return BakingTerms.recipeSortModifiedOldest
+        }
+    }
+}
+
+enum HomeTab {
+    case formula
+    case history
+    case starter
+    case settings
+
+    var title: String {
+        switch self {
+        case .formula: BakingTerms.recipeTabTitle
+        case .history: BakingTerms.bakeHistoryTabTitle
+        case .starter: BakingTerms.starterTabTitle
+        case .settings: BakingTerms.settingsTabTitle
+        }
+    }
+
+    var icon: BakingIcon {
+        switch self {
         case .formula: .recipe
-        case .history: .timer
+        case .history: .bakes
         case .starter: .starter
+        case .settings: .settings
         }
     }
 }
@@ -161,7 +343,7 @@ struct BakingTabBar: View {
     @Binding var selection: HomeTab
     let isStarterReminderDue: Bool
 
-    private let tabs: [HomeTab] = [.home, .formula, .history, .starter]
+    private let tabs: [HomeTab] = [.formula, .history, .starter, .settings]
 
     var body: some View {
         HStack(spacing: 0) {
@@ -181,13 +363,13 @@ struct BakingTabBar: View {
             }
         }
         .padding(.horizontal, BakingSpace.lg)
-        .padding(.top, BakingSpace.xs)
-        .padding(.bottom, BakingSpace.xs)
+        .padding(.top, BakingSpace.xxs)
+        .padding(.bottom, BakingSpace.xxs)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background(BakingSurface.bottomBarBackground)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.brandPrimary.opacity(0.08))
+                .fill(BakingSurfaceTheme.separator)
                 .frame(height: 0.6)
         }
     }
@@ -199,49 +381,124 @@ private struct BakingTabItem: View {
     let showsBadge: Bool
 
     var body: some View {
-        BakingTabIconLabel(
-            icon: tab.icon,
-            isSelected: isSelected,
-            showsBadge: showsBadge
-        )
+        VStack(spacing: 0) {
+            BakingTabIconLabel(
+                icon: tab.icon,
+                isSelected: isSelected,
+                showsBadge: showsBadge
+            )
+
+            Text(tab.title)
+                .font(BakingTypography.tabCaption)
+                .foregroundStyle(isSelected ? BakingNavigationItemTheme.selectedTextColor : BakingNavigationItemTheme.defaultTextColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.tabItemHeight)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(isSelected ? BakingNavigationItemTheme.selectedTextColor : Color.clear)
+                .frame(height: BakingComponentMetrics.stageIndicatorHeight)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tab.title)
     }
 }
 
-private struct HomeFeedPlaceholderView: View {
+private struct SettingsTabView: View {
+    @EnvironmentObject private var navigationController: AppNavigationController
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: BakingSpace.sm) {
-                BakingMaterialIconBadge(
-                    icon: .home,
-                    size: BakingTouchTarget.materialBadge,
-                    iconSize: BakingTouchTarget.materialBadgeGlyph,
-                    color: .brandPrimary,
-                    background: Color.brandPrimary.opacity(0.10)
-                )
-
-                Text(BakingTerms.homeFeedPlaceholderTitle)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(Color.brandText)
-
-                Text(BakingTerms.homeFeedPlaceholderBody)
-                    .font(.callout)
-                    .foregroundStyle(Color.brandSecondaryText)
-                    .multilineTextAlignment(.center)
+        List {
+            Section {
+                Button {
+                    navigationController.push(.toolbox)
+                } label: {
+                    SettingsNavigationRow(
+                        icon: .toolbox,
+                        title: BakingTerms.toolboxTitle,
+                        detail: BakingTerms.settingsToolboxDetail
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.toolboxTitle)
+            } header: {
+                Text(BakingTerms.settingsSectionTools)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, BakingSpace.xxl)
-            .padding(.vertical, 48)
-            .bakingCard()
-            .padding(.horizontal, BakingLayout.screenHorizontalInset)
-            .padding(.top, BakingLayout.contentTopInset)
         }
+        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color.brandBackground)
     }
 }
 
+private struct ToolboxView: View {
+    @EnvironmentObject private var navigationController: AppNavigationController
+
+    var body: some View {
+        List {
+            Section {
+                Button {
+                    navigationController.push(.kitchenTimer)
+                } label: {
+                    SettingsNavigationRow(
+                        icon: .timer,
+                        title: BakingTerms.kitchenTimerTitle,
+                        detail: BakingTerms.toolboxKitchenTimerDetail
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.kitchenTimerOpenAccessibility)
+            } header: {
+                Text(BakingTerms.toolboxSectionTools)
+            }
+        }
+        .navigationTitle(BakingTerms.toolboxTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color.brandBackground)
+    }
+}
+
+private struct SettingsNavigationRow: View {
+    let icon: BakingIcon
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            BakingMaterialIconBadge(
+                icon: icon,
+                color: .brandPrimary,
+                background: BakingSurfaceTheme.theme(for: .inputSurface).background
+            )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandText)
+
+                Text(detail)
+                    .font(BakingTypography.appSecondaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: BakingSpace.sm)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.brandTertiaryText)
+        }
+        .frame(minHeight: 56)
+        .contentShape(Rectangle())
+    }
+}
+
 private struct ActiveBakeResumeRow: View {
     let recipeName: String
+    let updatedAt: Date
     let stepName: String
     let stepIndex: Int
     let totalSteps: Int
@@ -251,28 +508,40 @@ private struct ActiveBakeResumeRow: View {
             BakingMaterialIconBadge(
                 icon: .start,
                 color: .brandPrimary,
-                background: Color.brandPrimary.opacity(0.10)
+                background: BakingSurfaceTheme.theme(for: .inputSurface).background
             )
 
             VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: BakingSpace.xs) {
+                    Text(BakingTerms.activeBakeSection)
+                        .font(BakingTypography.rowMeta)
+                        .foregroundStyle(Color.brandPrimary)
+                        .lineLimit(1)
+
+                    Text(BakingTerms.recipeMetadataLine(
+                        BakingTerms.recipeUpdatedAt,
+                        updatedAt.formatted(date: .numeric, time: .omitted)
+                    ))
+                    .font(BakingTypography.rowMeta)
+                    .foregroundStyle(Color.brandSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.86)
+                }
+
                 Text(recipeName)
-                    .font(.body.weight(.semibold))
+                    .font(BakingTypography.rowTitle)
                     .foregroundStyle(Color.brandText)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
                 Text(BakingTerms.activeBakeProgress(stepIndex: stepIndex + 1, totalSteps: totalSteps, stepName: stepName))
-                    .font(.caption)
+                    .font(BakingTypography.rowMeta)
                     .foregroundStyle(Color.brandSecondaryText)
                     .lineLimit(1)
             }
-
-            Spacer()
-
-            Text(BakingTerms.continueAction)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandPrimary)
         }
-        .frame(minHeight: 56)
+        .frame(minHeight: 64)
+        .padding(.vertical, BakingSpace.xs)
         .contentShape(Rectangle())
     }
 }

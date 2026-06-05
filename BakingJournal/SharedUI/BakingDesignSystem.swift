@@ -62,7 +62,15 @@ enum BakingLayout {
 
 enum BakingSurface {
     static let cardBackground: Color = .brandSurface
-    static let cardStroke: Color = Color.brandPrimary.opacity(0.08)
+    static let cardStroke: Color = .brandDivider
+    static let rowBackground: Color = .brandBackground
+    static let sectionRowBackground: Color = .brandSurface
+    static let fieldBackground: Color = .brandFieldSurface
+    static let fieldStroke: Color = .brandFieldStroke
+    static let selectedRowBackground: Color = .selectedSurface
+    static let selectedStroke: Color = .selectedSurfaceStroke
+    static let warmHairline: Color = Color.brandDivider
+    static let bottomBarBackground: Color = .brandBackground
 }
 
 enum BakingRadius {
@@ -81,11 +89,11 @@ enum BakingMotion {
 
 enum BakingTouchTarget {
     static let primaryAction: CGFloat = 44
-    static let primaryActionVisual: CGFloat = 38
-    static let primaryActionGlyph: CGFloat = 21
-    static let secondaryAction: CGFloat = 40
-    static let secondaryActionVisual: CGFloat = 34
-    static let secondaryActionGlyph: CGFloat = 18
+    static let primaryActionVisual: CGFloat = 42
+    static let primaryActionGlyph: CGFloat = 27
+    static let secondaryAction: CGFloat = 44
+    static let secondaryActionVisual: CGFloat = 38
+    static let secondaryActionGlyph: CGFloat = 22
     static let inlineIconSurface: CGFloat = 30
     static let inlineIconGlyph: CGFloat = 20
     static let dropdownIconSurface: CGFloat = 28
@@ -93,7 +101,7 @@ enum BakingTouchTarget {
     static let materialBadge: CGFloat = 42
     static let materialBadgeGlyph: CGFloat = 24
     static let tabIconSurface: CGFloat = 32
-    static let tabIconGlyph: CGFloat = 22
+    static let tabIconGlyph: CGFloat = 29
     static let slideActionTrack: CGFloat = 52
     static let slideActionThumb: CGFloat = 44
     static let slideActionGlyph: CGFloat = 20
@@ -169,27 +177,40 @@ enum BakingControlSize {
 }
 
 enum BakingTypography {
+    static let appPrimaryText: Font = .subheadline.weight(.semibold)
+    static let appSecondaryText: Font = .caption.weight(.medium)
     static let screenTitle: Font = .title3.weight(.semibold)
-    static let sectionTitle: Font = .subheadline.weight(.semibold)
-    static let rowTitle: Font = .body.weight(.semibold)
-    static let rowValue: Font = .subheadline.weight(.semibold)
-    static let rowMeta: Font = .caption.weight(.semibold)
-    static let fieldLabel: Font = .caption.weight(.semibold)
-    static let inputLabel: Font = .callout.weight(.semibold)
-    static let inputValue: Font = .title3.monospacedDigit().weight(.bold)
-    static let readOnlyLabel: Font = .caption2.weight(.semibold)
-    static let readOnlyValue: Font = .title3.monospacedDigit().weight(.semibold)
-    static let helperText: Font = .caption2.weight(.medium)
+    static let sectionTitle: Font = .headline.weight(.semibold)
+    static let rowTitle: Font = appPrimaryText
+    static let rowValue: Font = appPrimaryText
+    static let rowMeta: Font = appSecondaryText.weight(.semibold)
+    static let fieldLabel: Font = appSecondaryText.weight(.semibold)
+    static let inputLabel: Font = appPrimaryText
+    static let inputValue: Font = appPrimaryText.monospacedDigit().weight(.bold)
+    static let compactInputValue: Font = .system(size: 18, weight: .semibold)
+    static let compactNumericInputValue: Font = .system(size: 18, weight: .semibold, design: .monospaced)
+    static let compactInputValueUIFont = UIFont.systemFont(ofSize: 18, weight: .semibold)
+    static let compactNumericInputValueUIFont = UIFont.monospacedDigitSystemFont(ofSize: 18, weight: .semibold)
+    static let popupInputValue: Font = appPrimaryText
+    static let popupNumericInputValue: Font = tableNumber
+    static let popupInputValueUIFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
+    static let popupNumericInputValueUIFont = UIFont.monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
+    static let readOnlyLabel: Font = appSecondaryText.weight(.semibold)
+    static let readOnlyValue: Font = appPrimaryText.monospacedDigit().weight(.bold)
+    static let helperText: Font = appSecondaryText
     static let iconCaption: Font = .caption2.weight(.medium)
-    static let tableHeader: Font = .caption2.weight(.semibold)
-    static let tableCell: Font = .callout.weight(.medium)
-    static let tableNumber: Font = .callout.monospacedDigit().weight(.semibold)
-    static let actionLabel: Font = .callout.weight(.semibold)
+    static let tabCaption: Font = .caption2.weight(.semibold)
+    static let stageTabLabel: Font = appPrimaryText
+    static let tableHeader: Font = appSecondaryText.weight(.semibold)
+    static let tableCell: Font = appPrimaryText
+    static let tableNumber: Font = appPrimaryText.monospacedDigit().weight(.bold)
+    static let actionLabel: Font = appPrimaryText
 }
 
 enum BakingLabelRole {
     case sectionHeader
     case fieldLabel
+    case popupRowLabel
     case inputLabel
     case readOnlyLabel
     case helperText
@@ -198,6 +219,13 @@ enum BakingLabelRole {
 }
 
 enum BakingSurfaceKind {
+    case sectionCard
+    case insetSurface
+    case nestedChip
+    case inputSurface
+    case waterSurface
+    case popoverSurface
+    case destructive
     case card
     case compactCard
     case field
@@ -206,6 +234,140 @@ enum BakingSurfaceKind {
     case focused
     case warning
     case success
+    case primaryAction
+}
+
+enum BakingComponentMetrics {
+    static let listRowMinHeight: CGFloat = 72
+    static let tabItemHeight: CGFloat = 56
+    static let tabSelectedSurfaceWidth: CGFloat = 58
+    static let tabSelectedSurfaceHeight: CGFloat = 40
+    static let stageItemHeight: CGFloat = 36
+    static let stageInlineIcon: CGFloat = BakingTouchTarget.tabIconGlyph
+    static let stageIndicatorWidth: CGFloat = 28
+    static let stageIndicatorHeight: CGFloat = 2
+    static let statusCapsuleWidth: CGFloat = 132
+    static let statusCapsuleHeight: CGFloat = 44
+    static let statusCapsuleIconSlot: CGFloat = 24
+    static let statusCapsuleIconGlyph: CGFloat = 20
+    static let statusCapsuleTextSlot: CGFloat = 58
+    static let statusCapsuleChevronSlot: CGFloat = 14
+    static let titleInputMinHeight: CGFloat = 44
+    static let compactFieldHeight: CGFloat = 38
+    static let compactPillHeight: CGFloat = 30
+    static let optionChipHeight: CGFloat = 40
+    static let dropdownTriggerWidth: CGFloat = 104
+    static let compactOptionWidth: CGFloat = 58
+    static let materialChipWidth: CGFloat = 72
+    static let materialChipIcon: CGFloat = 18
+    static let materialChipIconGlyph: CGFloat = 13
+    static let inlineIconCornerRadius: CGFloat = 9
+    static let compactIconCornerRadius: CGFloat = 6
+    static let popupIconSurface: CGFloat = 34
+    static let popupIconGlyph: CGFloat = 22
+    static let popupAttributeIconSurface: CGFloat = 22
+    static let popupAttributeIconGlyph: CGFloat = 14
+    static let popupInputHeight: CGFloat = 38
+    static let popupContentLeadingInset: CGFloat = 52
+    static let popupLabelWidth: CGFloat = 52
+    static let popupFormWidth: CGFloat = 292
+    static let popupNameFieldWidth: CGFloat = 232
+    static let popupNumericFieldWidth: CGFloat = 84
+    static let popupTableRowMinHeight: CGFloat = 54
+    static let popupTableMetricRowMinHeight: CGFloat = 62
+    static let popupTableMetricCellMinWidth: CGFloat = 118
+    static let compactInputFieldHeight: CGFloat = 38
+    static let compactInputShortFieldWidth: CGFloat = 96
+    static let compactInputMediumFieldWidth: CGFloat = 136
+    static let compactInputLongFieldWidth: CGFloat = 188
+    static let compactNameInputFieldWidth: CGFloat = compactInputLongFieldWidth
+    static let compactRecipeTitleInputFieldWidth: CGFloat = 236
+    static let compactPercentInputFieldWidth: CGFloat = compactInputShortFieldWidth
+    static let compactWeightInputFieldWidth: CGFloat = compactInputShortFieldWidth
+    static let popoverCompactWidth: CGFloat = 220
+    static let popoverMediumWidth: CGFloat = 292
+    static let temperaturePopoverWidth: CGFloat = 148
+    static let temperatureScrollerHeight: CGFloat = 214
+    static let temperatureOptionHeight: CGFloat = 40
+    static let notesEditorMinHeight: CGFloat = 260
+}
+
+enum BakingPopupSheetSize {
+    case compact
+    case expanded
+
+    var defaultHeight: CGFloat {
+        switch self {
+        case .compact:
+            return BakingPopupSheetMetrics.compactDefaultHeight
+        case .expanded:
+            return BakingPopupSheetMetrics.expandedDefaultHeight
+        }
+    }
+}
+
+enum BakingPopupSheetMetrics {
+    static let compactDefaultHeight: CGFloat = 280
+    static let notesEditorDefaultHeight: CGFloat = 390
+    static let expandedDefaultHeight: CGFloat = 720
+    static let maximumScreenRatio: CGFloat = 0.96
+
+    static var topChromeHeight: CGFloat {
+        BakingTouchTarget.iconButton + BakingSpace.xs * 2
+    }
+
+    static func detentHeight(
+        for size: BakingPopupSheetSize,
+        measuredContentHeight: CGFloat,
+        screenHeight: CGFloat? = nil
+    ) -> CGFloat {
+        let defaultHeight = size.defaultHeight
+        let cappedDefaultHeight = capped(defaultHeight, screenHeight: screenHeight)
+        guard measuredContentHeight > 0 else { return cappedDefaultHeight }
+
+        let contentHeight = measuredContentHeight + topChromeHeight + BakingSpace.md
+        let expandedHeight = max(cappedDefaultHeight, ceil(contentHeight))
+        return capped(expandedHeight, screenHeight: screenHeight)
+    }
+
+    private static func capped(_ height: CGFloat, screenHeight: CGFloat?) -> CGFloat {
+        guard let screenHeight else { return height }
+        let maximumHeight = screenHeight * maximumScreenRatio
+        return min(height, maximumHeight)
+    }
+}
+
+enum BakingCompactInputFieldSize {
+    case short
+    case medium
+    case long
+
+    var width: CGFloat {
+        switch self {
+        case .short:
+            return BakingComponentMetrics.compactInputShortFieldWidth
+        case .medium:
+            return BakingComponentMetrics.compactInputMediumFieldWidth
+        case .long:
+            return BakingComponentMetrics.compactInputLongFieldWidth
+        }
+    }
+}
+
+enum BakingShadow {
+    static let popoverColor: Color = Color.black.opacity(0.07)
+    static let popoverRadius: CGFloat = 18
+    static let popoverY: CGFloat = 8
+    static let liftedColor: Color = Color.black.opacity(0.12)
+    static let liftedRadius: CGFloat = 18
+    static let liftedY: CGFloat = 9
+}
+
+enum BakingNavigationItemTheme {
+    static let selectedIconColor: Color = .brandPrimary
+    static let selectedTextColor: Color = .brandPrimary
+    static let defaultIconColor: Color = .brandSecondaryText
+    static let defaultTextColor: Color = .brandSecondaryText
 }
 
 struct BakingSurfaceTheme {
@@ -216,6 +378,55 @@ struct BakingSurfaceTheme {
 
     static func theme(for kind: BakingSurfaceKind) -> BakingSurfaceTheme {
         switch kind {
+        case .sectionCard:
+            BakingSurfaceTheme(
+                background: BakingSurface.cardBackground,
+                stroke: BakingSurface.cardStroke,
+                radius: BakingRadius.prominentCard,
+                lineWidth: 0.6
+            )
+        case .insetSurface:
+            BakingSurfaceTheme(
+                background: BakingSurface.sectionRowBackground,
+                stroke: BakingSurface.warmHairline,
+                radius: BakingRadius.card,
+                lineWidth: 0.5
+            )
+        case .nestedChip:
+            BakingSurfaceTheme(
+                background: Color.materialChipSurface,
+                stroke: BakingSurface.warmHairline,
+                radius: BakingRadius.compactCard,
+                lineWidth: 0.6
+            )
+        case .inputSurface:
+            BakingSurfaceTheme(
+                background: BakingSurface.fieldBackground,
+                stroke: BakingSurface.fieldStroke,
+                radius: BakingRadius.field,
+                lineWidth: 0.6
+            )
+        case .waterSurface:
+            BakingSurfaceTheme(
+                background: Color.waterSurfaceStrong.opacity(0.42),
+                stroke: Color.brandSea.opacity(0.16),
+                radius: BakingRadius.compactCard,
+                lineWidth: 0.6
+            )
+        case .popoverSurface:
+            BakingSurfaceTheme(
+                background: Color.brandBackground,
+                stroke: BakingSurface.warmHairline,
+                radius: BakingRadius.popover,
+                lineWidth: 0.6
+            )
+        case .destructive:
+            BakingSurfaceTheme(
+                background: BakingSurface.selectedRowBackground,
+                stroke: Color.brandPrimary.opacity(0.28),
+                radius: BakingRadius.card,
+                lineWidth: 0.7
+            )
         case .card:
             BakingSurfaceTheme(
                 background: BakingSurface.cardBackground,
@@ -232,36 +443,36 @@ struct BakingSurfaceTheme {
             )
         case .field:
             BakingSurfaceTheme(
-                background: Color.brandPrimary.opacity(0.075),
-                stroke: Color.brandPrimary.opacity(0.12),
+                background: BakingSurface.fieldBackground,
+                stroke: BakingSurface.fieldStroke,
                 radius: BakingRadius.field,
                 lineWidth: 0.6
             )
         case .readOnly:
             BakingSurfaceTheme(
-                background: Color.brandBackground.opacity(0.58),
-                stroke: Color.brandPrimary.opacity(0.06),
+                background: BakingSurface.cardBackground,
+                stroke: BakingSurface.cardStroke,
                 radius: BakingRadius.field,
                 lineWidth: 0.5
             )
         case .selected:
             BakingSurfaceTheme(
-                background: Color.brandPrimary.opacity(0.11),
-                stroke: Color.brandPrimary.opacity(0.24),
+                background: BakingSurface.selectedRowBackground,
+                stroke: BakingSurface.selectedStroke,
                 radius: BakingRadius.card,
                 lineWidth: 0.7
             )
         case .focused:
             BakingSurfaceTheme(
-                background: Color.brandPrimary.opacity(0.095),
-                stroke: Color.brandPrimary.opacity(0.34),
+                background: BakingSurface.selectedRowBackground,
+                stroke: BakingSurface.selectedStroke,
                 radius: BakingRadius.field,
                 lineWidth: 0.9
             )
         case .warning:
             BakingSurfaceTheme(
-                background: Color.brandPrimary.opacity(0.08),
-                stroke: Color.brandPrimary.opacity(0.22),
+                background: BakingSurface.selectedRowBackground,
+                stroke: BakingSurface.selectedStroke,
                 radius: BakingRadius.card,
                 lineWidth: 0.7
             )
@@ -272,7 +483,18 @@ struct BakingSurfaceTheme {
                 radius: BakingRadius.card,
                 lineWidth: 0.7
             )
+        case .primaryAction:
+            BakingSurfaceTheme(
+                background: Color.brandPrimary,
+                stroke: Color.brandPrimary,
+                radius: BakingRadius.card,
+                lineWidth: 0.7
+            )
         }
+    }
+
+    static var separator: Color {
+        BakingSurface.warmHairline
     }
 }
 
@@ -286,6 +508,8 @@ struct BakingLabelTheme {
             BakingLabelTheme(font: BakingTypography.sectionTitle, color: .brandSecondaryText)
         case .fieldLabel:
             BakingLabelTheme(font: BakingTypography.fieldLabel, color: .brandSecondaryText)
+        case .popupRowLabel:
+            BakingLabelTheme(font: BakingTypography.appPrimaryText, color: .brandSecondaryText)
         case .inputLabel:
             BakingLabelTheme(font: BakingTypography.inputLabel, color: .brandText)
         case .readOnlyLabel:
@@ -317,9 +541,9 @@ struct BakingComponentTheme {
                 selectedForeground: .brandPrimary,
                 disabledForeground: .brandSecondaryText.opacity(0.45),
                 background: .clear,
-                selectedBackground: Color.brandPrimary.opacity(0.12),
+                selectedBackground: BakingSurface.selectedRowBackground,
                 stroke: .clear,
-                selectedStroke: Color.brandPrimary.opacity(0.24)
+                selectedStroke: BakingSurface.selectedStroke
             )
         case .secondary:
             BakingComponentTheme(
@@ -327,9 +551,9 @@ struct BakingComponentTheme {
                 selectedForeground: .brandPrimary,
                 disabledForeground: .brandSecondaryText.opacity(0.45),
                 background: .clear,
-                selectedBackground: Color.brandPrimary.opacity(0.10),
+                selectedBackground: BakingSurface.selectedRowBackground,
                 stroke: .clear,
-                selectedStroke: Color.brandPrimary.opacity(0.18)
+                selectedStroke: BakingSurface.selectedStroke
             )
         case .tertiary:
             BakingComponentTheme(
@@ -337,9 +561,9 @@ struct BakingComponentTheme {
                 selectedForeground: .brandText,
                 disabledForeground: .brandSecondaryText.opacity(0.38),
                 background: .clear,
-                selectedBackground: Color.brandBackground.opacity(0.68),
+                selectedBackground: BakingSurface.fieldBackground,
                 stroke: .clear,
-                selectedStroke: Color.brandPrimary.opacity(0.08)
+                selectedStroke: BakingSurface.warmHairline
             )
         case .success:
             BakingComponentTheme(
@@ -357,9 +581,9 @@ struct BakingComponentTheme {
                 selectedForeground: .brandPrimary,
                 disabledForeground: .brandSecondaryText.opacity(0.45),
                 background: .clear,
-                selectedBackground: Color.brandPrimary.opacity(0.12),
+                selectedBackground: BakingSurface.selectedRowBackground,
                 stroke: .clear,
-                selectedStroke: Color.brandPrimary.opacity(0.24)
+                selectedStroke: BakingSurface.selectedStroke
             )
         }
     }
@@ -376,9 +600,9 @@ enum BakingFormTheme {
     static let labelColor: Color = .brandText
     static let valueColor: Color = .brandText
     static let secondaryValueColor: Color = .brandSecondaryText
-    static let rowBackground: Color = .brandSurface
-    static let fieldBackground: Color = Color.brandBackground.opacity(0.72)
-    static let fieldStroke: Color = Color.brandPrimary.opacity(0.10)
+    static let rowBackground: Color = BakingSurface.rowBackground
+    static let fieldBackground: Color = BakingSurface.fieldBackground
+    static let fieldStroke: Color = BakingSurface.fieldStroke
 }
 
 enum BakingValueKind {
@@ -408,37 +632,36 @@ struct BakingValueTheme {
         for kind: BakingValueKind,
         role: BakingComponentRole = .secondary
     ) -> BakingValueTheme {
-        let roleTheme = BakingComponentTheme.action(role: role)
         switch kind {
         case .editable:
             return BakingValueTheme(
                 valueFont: BakingTypography.inputValue,
-                unitFont: .caption.weight(.semibold),
-                valueColor: roleTheme.foreground,
+                unitFont: BakingTypography.rowMeta,
+                valueColor: Color.brandText,
                 unitColor: Color.brandSecondaryText,
                 alignment: .trailing
             )
         case .readOnly:
             return BakingValueTheme(
                 valueFont: BakingTypography.readOnlyValue,
-                unitFont: .caption2.weight(.semibold),
-                valueColor: roleTheme.foreground,
+                unitFont: BakingTypography.rowMeta,
+                valueColor: Color.brandText,
                 unitColor: Color.brandSecondaryText.opacity(0.82),
                 alignment: .trailing
             )
         case .metric:
             return BakingValueTheme(
-                valueFont: .title3.monospacedDigit().weight(.semibold),
-                unitFont: .caption.weight(.semibold),
-                valueColor: roleTheme.foreground,
+                valueFont: BakingTypography.tableNumber,
+                unitFont: BakingTypography.rowMeta,
+                valueColor: Color.brandText,
                 unitColor: Color.brandSecondaryText,
                 alignment: .leading
             )
         case .tableNumber:
             return BakingValueTheme(
                 valueFont: BakingTypography.tableNumber,
-                unitFont: .caption.weight(.semibold),
-                valueColor: roleTheme.foreground,
+                unitFont: BakingTypography.rowMeta,
+                valueColor: Color.brandText,
                 unitColor: Color.brandSecondaryText,
                 alignment: .trailing
             )
@@ -456,9 +679,9 @@ enum BakingTableTheme {
     static let headerColor: Color = .brandSecondaryText
     static let cellColor: Color = .brandText
     static let secondaryCellColor: Color = .brandSecondaryText
-    static let rowBackground: Color = .brandSurface
-    static let selectedRowBackground: Color = Color.brandPrimary.opacity(0.08)
-    static let rowStroke: Color = Color.brandPrimary.opacity(0.08)
+    static let rowBackground: Color = BakingSurface.rowBackground
+    static let selectedRowBackground: Color = BakingSurface.selectedRowBackground
+    static let rowStroke: Color = .clear
 }
 
 extension View {
@@ -485,8 +708,8 @@ extension View {
     }
 
     func bakingFieldSurface(
-        background: Color = Color.brandPrimary.opacity(0.075),
-        stroke: Color = Color.brandPrimary.opacity(0.10),
+        background: Color = BakingSurface.fieldBackground,
+        stroke: Color = BakingSurface.fieldStroke,
         radius: CGFloat = BakingRadius.field
     ) -> some View {
         self
@@ -496,6 +719,32 @@ extension View {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .stroke(stroke, lineWidth: 0.5)
             }
+    }
+
+    func bakingFittedInputField(
+        width: CGFloat,
+        height: CGFloat = BakingComponentMetrics.compactInputFieldHeight,
+        alignment: Alignment = .trailing,
+        kind: BakingSurfaceKind = .field
+    ) -> some View {
+        self
+            .padding(.horizontal, BakingSpace.sm)
+            .frame(width: width, height: height, alignment: alignment)
+            .bakingSurface(kind)
+    }
+
+    func bakingFittedInputField(
+        _ size: BakingCompactInputFieldSize,
+        height: CGFloat = BakingComponentMetrics.compactInputFieldHeight,
+        alignment: Alignment = .trailing,
+        kind: BakingSurfaceKind = .field
+    ) -> some View {
+        bakingFittedInputField(
+            width: size.width,
+            height: height,
+            alignment: alignment,
+            kind: kind
+        )
     }
 
     func bakingSurface(_ kind: BakingSurfaceKind) -> some View {
@@ -508,6 +757,61 @@ extension View {
                     .stroke(theme.stroke, lineWidth: theme.lineWidth)
             }
     }
+
+    func bakingSectionCard() -> some View {
+        bakingSurface(.sectionCard)
+    }
+
+    func bakingInsetSurface() -> some View {
+        bakingSurface(.insetSurface)
+    }
+
+    func bakingReadOnlySurface() -> some View {
+        bakingSurface(.readOnly)
+    }
+
+    func bakingSelectedSurface() -> some View {
+        bakingSurface(.selected)
+    }
+
+    func bakingMaterialCard(palette: MaterialPalette, isSelected: Bool = false) -> some View {
+        bakingCard(
+            background: isSelected ? palette.selectedChipSurface : palette.chipSurface,
+            radius: BakingRadius.compactCard,
+            stroke: isSelected ? palette.tint.opacity(0.34) : palette.chipStroke,
+            lineWidth: isSelected ? 0.9 : 0.6
+        )
+    }
+
+    func bakingTitleInputSurface() -> some View {
+        self
+            .frame(minHeight: BakingComponentMetrics.titleInputMinHeight)
+            .bakingSurface(.inputSurface)
+    }
+
+    func bakingPopoverSurface(width: CGFloat? = nil) -> some View {
+        let theme = BakingSurfaceTheme.theme(for: .popoverSurface)
+        return self
+            .frame(width: width)
+            .background(
+                RoundedRectangle(cornerRadius: theme.radius, style: .continuous)
+                    .fill(theme.background)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: theme.radius, style: .continuous)
+                            .stroke(theme.stroke, lineWidth: theme.lineWidth)
+                    }
+                    .shadow(
+                        color: BakingShadow.popoverColor,
+                        radius: BakingShadow.popoverRadius,
+                        x: 0,
+                        y: BakingShadow.popoverY
+                    )
+            )
+    }
+
+    func bakingLiftedShadow() -> some View {
+        shadow(color: BakingShadow.liftedColor, radius: BakingShadow.liftedRadius, x: 0, y: BakingShadow.liftedY)
+    }
 }
 
 struct BakingSystemIconButtonLabel: View {
@@ -515,7 +819,7 @@ struct BakingSystemIconButtonLabel: View {
     var tint: Color = .brandPrimary
     var background: Color = .clear
     var visualSize: CGFloat = BakingTouchTarget.toolbarVisual
-    var font: Font = .body.weight(.semibold)
+    var font: Font = .system(size: BakingTouchTarget.primaryActionGlyph, weight: .semibold)
     var shape: BakingIconButtonShape = .circle
 
     var body: some View {
@@ -541,6 +845,23 @@ struct BakingSystemIconButtonLabel: View {
     }
 }
 
+struct BakingSectionEditButton: View {
+    let accessibilityLabel: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            BakingSystemIconButtonLabel(
+                systemImage: "minus",
+                visualSize: BakingTouchTarget.secondaryActionVisual,
+                font: .caption.weight(.bold)
+            )
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
 struct BakingTopIconButtonLabel: View {
     let icon: BakingIcon
     var tint: Color = .brandText
@@ -557,7 +878,7 @@ struct BakingTopIconButtonLabel: View {
 struct BakingTopSystemIconButtonLabel: View {
     let systemImage: String
     var tint: Color = .brandText
-    var font: Font = .body.weight(.semibold)
+    var font: Font = .system(size: BakingTouchTarget.primaryActionGlyph, weight: .semibold)
 
     var body: some View {
         Image(systemName: systemImage)
@@ -576,13 +897,14 @@ struct BakingIconButtonLabel: View {
     var isSelected = false
     var tintOverride: Color? = nil
     var showsBadge = false
+    var iconVariant: BakingIconVariant = .outline
 
     var body: some View {
         let theme = BakingComponentTheme.action(role: role)
         let tint = tintOverride ?? (isSelected ? theme.selectedForeground : theme.foreground)
 
         ZStack(alignment: .topTrailing) {
-            BakingIconView(icon: icon, size: size.iconSize, color: tint)
+            BakingIconView(icon: icon, size: size.iconSize, color: tint, variant: iconVariant)
                 .frame(width: size.visualSize, height: size.visualSize)
 
             if showsBadge {
@@ -624,13 +946,447 @@ struct BakingIconButton: View {
     }
 }
 
+struct BakingDisclosureHeader: View {
+    let title: String
+    let value: String
+    var showsValue = true
+    let systemImage: String
+    let isExpanded: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: BakingSpace.sm) {
+                Image(systemName: systemImage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.brandPrimary)
+                    .frame(width: BakingTouchTarget.inlineIconSurface, height: BakingTouchTarget.inlineIconSurface)
+                    .bakingSurface(.inputSurface)
+
+                Text(title)
+                    .font(BakingTypography.sectionTitle)
+                    .foregroundStyle(Color.brandText)
+
+                Spacer(minLength: BakingSpace.sm)
+
+                if showsValue {
+                    Text(value)
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(Color.brandSecondaryText)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: 132, alignment: .trailing)
+                }
+
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color.brandPrimary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .frame(width: 18, height: 18)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+enum BakingToggleIcon {
+    case baking(BakingIcon)
+    case system(String)
+}
+
+struct BakingIconToggleLabel: View {
+    let offIcon: BakingToggleIcon
+    let onIcon: BakingToggleIcon
+    let isOn: Bool
+    var role: BakingComponentRole = .primary
+    var size: BakingControlSize = .primary
+    var systemFont: Font = .body.weight(.semibold)
+
+    var body: some View {
+        let theme = BakingComponentTheme.action(role: role)
+        let tint = isOn ? theme.selectedForeground : theme.foreground
+        let background = isOn ? theme.selectedBackground : BakingSurface.fieldBackground
+        let stroke = isOn ? theme.selectedStroke : BakingSurface.warmHairline
+
+        iconView(isOn ? onIcon : offIcon, tint: tint)
+            .frame(width: size.visualSize, height: size.visualSize)
+            .background(background)
+            .clipShape(Circle())
+            .overlay {
+                Circle()
+                    .stroke(stroke, lineWidth: 0.7)
+            }
+            .frame(width: size.hitTarget, height: size.hitTarget)
+            .contentShape(Rectangle())
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func iconView(_ icon: BakingToggleIcon, tint: Color) -> some View {
+        switch icon {
+        case .baking(let bakingIcon):
+            BakingIconView(icon: bakingIcon, size: size.iconSize, color: tint)
+        case .system(let systemImage):
+            Image(systemName: systemImage)
+                .font(systemFont)
+                .foregroundStyle(tint)
+        }
+    }
+}
+
+struct BakingIconToggle: View {
+    @Binding var isOn: Bool
+    let offIcon: BakingToggleIcon
+    let onIcon: BakingToggleIcon
+    let accessibilityLabel: String
+    var accessibilityValue: String? = nil
+    var role: BakingComponentRole = .primary
+    var size: BakingControlSize = .primary
+    var systemFont: Font = .body.weight(.semibold)
+
+    var body: some View {
+        Button {
+            withAnimation(BakingMotion.quick) {
+                isOn.toggle()
+            }
+        } label: {
+            BakingIconToggleLabel(
+                offIcon: offIcon,
+                onIcon: onIcon,
+                isOn: isOn,
+                role: role,
+                size: size,
+                systemFont: systemFont
+            )
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue ?? "")
+    }
+}
+
+struct BakingSegmentedIconToggle: View {
+    @Binding var isOn: Bool
+    let offIcon: BakingToggleIcon
+    let onIcon: BakingToggleIcon
+    let offLabel: String
+    let onLabel: String
+    let accessibilityLabel: String
+    var accessibilityHint: String? = nil
+    var offRole: BakingComponentRole = .primary
+    var onRole: BakingComponentRole = .success
+    var systemFont: Font = .caption.weight(.bold)
+
+    var body: some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 0) {
+                segment(icon: offIcon, isSelected: !isOn, role: offRole) {
+                    setSelection(false)
+                }
+
+                segment(icon: onIcon, isSelected: isOn, role: onRole) {
+                    setSelection(true)
+                }
+            }
+            .padding(3)
+            .frame(width: 78, height: 38)
+            .background(BakingSurface.fieldBackground)
+            .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous)
+                    .stroke(BakingSurface.warmHairline, lineWidth: 0.7)
+            }
+
+            Text(isOn ? onLabel : offLabel)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(isOn ? BakingComponentTheme.action(role: onRole).selectedForeground : BakingComponentTheme.action(role: offRole).selectedForeground)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(isOn ? onLabel : offLabel)
+        .accessibilityHint(accessibilityHint ?? "")
+    }
+
+    private func setSelection(_ nextValue: Bool) {
+        guard nextValue != isOn else { return }
+        withAnimation(BakingMotion.quick) {
+            isOn = nextValue
+        }
+    }
+
+    private func segment(icon: BakingToggleIcon, isSelected: Bool, role: BakingComponentRole, action: @escaping () -> Void) -> some View {
+        let theme = BakingComponentTheme.action(role: role)
+        let tint = isSelected ? theme.selectedForeground : Color.brandSecondaryText
+        let background = isSelected ? theme.selectedBackground : Color.clear
+        let stroke = isSelected ? theme.selectedStroke : Color.clear
+
+        return Button(action: action) {
+            toggleIcon(icon, tint: tint)
+                .frame(width: 33, height: 30)
+                .background(background)
+                .clipShape(RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous)
+                        .stroke(stroke, lineWidth: 0.7)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+    }
+
+    @ViewBuilder
+    private func toggleIcon(_ icon: BakingToggleIcon, tint: Color) -> some View {
+        switch icon {
+        case .baking(let bakingIcon):
+            BakingIconView(icon: bakingIcon, size: BakingTouchTarget.dropdownIconGlyph, color: tint)
+        case .system(let systemImage):
+            Image(systemName: systemImage)
+                .font(systemFont)
+                .foregroundStyle(tint)
+        }
+    }
+}
+
+struct BakingSegmentedStageOption: Identifiable {
+    let id: String
+    let icon: BakingToggleIcon
+    let title: String
+}
+
+struct BakingSegmentedStageControl: View {
+    let selectedID: String
+    let options: [BakingSegmentedStageOption]
+    let accessibilityLabel: String
+    var iconSize: CGFloat = BakingComponentMetrics.stageInlineIcon
+    var minHeight: CGFloat = BakingComponentMetrics.stageItemHeight
+    var labelFont: Font = BakingTypography.stageTabLabel
+    var onSelect: (String) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options) { option in
+                Button {
+                    guard option.id != selectedID else { return }
+                    withAnimation(BakingMotion.standard) {
+                        onSelect(option.id)
+                    }
+                } label: {
+                    BakingSegmentedStageButtonLabel(
+                        option: option,
+                        isSelected: option.id == selectedID,
+                        iconSize: iconSize,
+                        minHeight: minHeight,
+                        labelFont: labelFont
+                    )
+                }
+                .buttonStyle(BakingPressFeedbackButtonStyle())
+                .accessibilityLabel(option.title)
+                .accessibilityAddTraits(option.id == selectedID ? .isSelected : [])
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(selectedOption?.title ?? "")
+    }
+
+    private var selectedOption: BakingSegmentedStageOption? {
+        options.first { $0.id == selectedID }
+    }
+}
+
+private struct BakingSegmentedStageButtonLabel: View {
+    let option: BakingSegmentedStageOption
+    let isSelected: Bool
+    let iconSize: CGFloat
+    let minHeight: CGFloat
+    let labelFont: Font
+
+    var body: some View {
+        let tint = isSelected ? BakingNavigationItemTheme.selectedIconColor : BakingNavigationItemTheme.defaultIconColor
+        let labelColor = isSelected ? BakingNavigationItemTheme.selectedTextColor : BakingNavigationItemTheme.defaultTextColor
+
+        VStack(spacing: BakingSpace.xxs) {
+            HStack(spacing: BakingSpace.xs) {
+                stageIcon(option.icon, tint: tint, variant: isSelected ? .selected : .outline)
+                    .frame(
+                        width: iconSize,
+                        height: iconSize
+                    )
+
+                Text(option.title)
+                    .font(labelFont)
+                    .foregroundStyle(labelColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity, minHeight: minHeight - BakingComponentMetrics.stageIndicatorHeight)
+            .contentShape(Rectangle())
+        }
+        .frame(maxWidth: .infinity, minHeight: minHeight)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(isSelected ? BakingNavigationItemTheme.selectedTextColor : Color.clear)
+                .frame(height: BakingComponentMetrics.stageIndicatorHeight)
+        }
+        .contentShape(Rectangle())
+        .animation(BakingMotion.quick, value: isSelected)
+    }
+
+    @ViewBuilder
+    private func stageIcon(_ icon: BakingToggleIcon, tint: Color, variant: BakingIconVariant) -> some View {
+        switch icon {
+        case .baking(let bakingIcon):
+            BakingIconView(icon: bakingIcon, size: iconSize, color: tint, variant: variant)
+        case .system(let systemImage):
+            Image(systemName: systemImage)
+                .font(.system(size: iconSize, weight: .semibold))
+                .foregroundStyle(tint)
+        }
+    }
+}
+
+struct BakingStatusCapsuleOption: Identifiable {
+    let id: String
+    let icon: BakingToggleIcon
+    let title: String
+    var role: BakingComponentRole = .primary
+}
+
+struct BakingStatusCapsuleMenu: View {
+    let selectedID: String
+    let options: [BakingStatusCapsuleOption]
+    let accessibilityLabel: String
+    var systemFont: Font = .caption.weight(.bold)
+    var onSelect: (String) -> Void
+
+    @State private var showingOptions = false
+
+    var body: some View {
+        Button {
+            showingOptions = true
+        } label: {
+            currentCapsule
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .popover(isPresented: $showingOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            BakingDropdownPopover(width: 168) {
+                ForEach(options) { option in
+                    let optionTheme = BakingComponentTheme.action(role: option.role)
+                    Button {
+                        showingOptions = false
+                        onSelect(option.id)
+                    } label: {
+                        BakingDropdownRow(
+                            title: option.title,
+                            isSelected: option.id == selectedID,
+                            selectionTint: optionTheme.selectedForeground
+                        ) {
+                            statusIcon(
+                                option.icon,
+                                tint: iconTint(for: option),
+                                glyphSize: BakingComponentMetrics.statusCapsuleIconGlyph,
+                                systemFont: .system(size: BakingComponentMetrics.statusCapsuleIconGlyph, weight: .semibold)
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(selectedOption.title)
+    }
+
+    private var selectedOption: BakingStatusCapsuleOption {
+        options.first { $0.id == selectedID } ?? options[0]
+    }
+
+    private func iconTint(for option: BakingStatusCapsuleOption) -> Color {
+        BakingComponentTheme.action(role: option.role).selectedForeground
+    }
+
+    private var currentCapsule: some View {
+        let theme = BakingComponentTheme.action(role: selectedOption.role)
+        return HStack(spacing: 6) {
+            statusIcon(
+                selectedOption.icon,
+                tint: theme.selectedForeground,
+                glyphSize: BakingComponentMetrics.statusCapsuleIconGlyph,
+                systemFont: .system(size: BakingComponentMetrics.statusCapsuleIconGlyph, weight: .semibold)
+            )
+            .frame(
+                width: BakingComponentMetrics.statusCapsuleIconSlot,
+                height: BakingComponentMetrics.statusCapsuleIconSlot,
+                alignment: .center
+            )
+
+            Text(selectedOption.title)
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(Color.brandText)
+                .lineLimit(1)
+                .frame(width: BakingComponentMetrics.statusCapsuleTextSlot, alignment: .leading)
+
+            Image(systemName: "chevron.down")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Color.brandSecondaryText)
+                .frame(
+                    width: BakingComponentMetrics.statusCapsuleChevronSlot,
+                    height: BakingComponentMetrics.statusCapsuleChevronSlot,
+                    alignment: .center
+                )
+        }
+        .frame(
+            width: BakingComponentMetrics.statusCapsuleWidth,
+            height: BakingComponentMetrics.statusCapsuleHeight
+        )
+        .background(statusCapsuleBackground)
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous)
+                .stroke(statusCapsuleStroke, lineWidth: 0.8)
+        }
+        .frame(minWidth: 44, minHeight: BakingTouchTarget.primaryAction)
+        .contentShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
+    }
+
+    private var statusCapsuleBackground: Color {
+        Color.brandBackground
+    }
+
+    private var statusCapsuleStroke: Color {
+        BakingSurface.warmHairline
+    }
+
+    @ViewBuilder
+    private func statusIcon(
+        _ icon: BakingToggleIcon,
+        tint: Color,
+        glyphSize: CGFloat = BakingTouchTarget.dropdownIconGlyph,
+        systemFont: Font? = nil
+    ) -> some View {
+        switch icon {
+        case .baking(let bakingIcon):
+            BakingIconView(icon: bakingIcon, size: glyphSize, color: tint)
+        case .system(let systemImage):
+            Image(systemName: systemImage)
+                .font(systemFont ?? self.systemFont)
+                .foregroundStyle(tint)
+        }
+    }
+}
+
 struct BakingSystemIconButton: View {
     let systemImage: String
     let accessibilityLabel: String
     var role: BakingComponentRole = .secondary
     var size: BakingControlSize = .primary
     var isSelected = false
-    var font: Font = .body.weight(.semibold)
+    var font: Font = .system(size: BakingTouchTarget.primaryActionGlyph, weight: .semibold)
     var action: () -> Void
 
     var body: some View {
@@ -657,14 +1413,29 @@ struct BakingTabIconLabel: View {
     var showsBadge = false
 
     var body: some View {
-        BakingIconButtonLabel(
-            icon: icon,
-            role: isSelected ? .primary : .secondary,
-            size: .primary,
-            isSelected: isSelected,
-            tintOverride: isSelected ? .brandPrimary : .brandText,
-            showsBadge: showsBadge
+        let tint = isSelected ? BakingNavigationItemTheme.selectedIconColor : BakingNavigationItemTheme.defaultIconColor
+
+        ZStack(alignment: .topTrailing) {
+            BakingIconView(
+                icon: icon,
+                size: BakingTouchTarget.tabIconGlyph,
+                color: tint,
+                variant: isSelected ? .selected : .outline
+            )
+            .frame(width: BakingTouchTarget.iconButton, height: BakingTouchTarget.iconButton)
+
+            if showsBadge {
+                Circle()
+                    .fill(BakingNavigationItemTheme.selectedIconColor)
+                    .frame(width: 7, height: 7)
+                    .offset(x: -6, y: 6)
+            }
+        }
+        .frame(
+            width: BakingComponentMetrics.tabSelectedSurfaceWidth,
+            height: BakingTouchTarget.iconButton
         )
+        .animation(BakingMotion.quick, value: isSelected)
     }
 }
 
@@ -736,6 +1507,88 @@ struct BakingReadOnlyValue: View {
     }
 }
 
+struct BakingInlineMetricLabel: View {
+    let title: String
+    let value: String
+    var unit: String? = nil
+    var role: BakingComponentRole = .secondary
+    var width: CGFloat? = nil
+
+    var body: some View {
+        let theme = inlineTheme
+
+        HStack(alignment: .firstTextBaseline, spacing: BakingSpace.xs) {
+            if !title.isEmpty {
+                BakingLabel(text: title, role: .readOnlyLabel)
+                    .foregroundStyle(theme.labelColor)
+            }
+
+            BakingNumericValue(
+                value: value,
+                unit: unit,
+                kind: .readOnly,
+                role: role,
+                valueColor: theme.valueColor,
+                unitColor: theme.valueColor
+            )
+        }
+        .padding(.horizontal, BakingSpace.md)
+        .frame(width: width, alignment: title.isEmpty ? .trailing : .leading)
+        .frame(minHeight: BakingComponentMetrics.compactPillHeight)
+        .background(theme.background)
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous)
+                .stroke(theme.stroke, lineWidth: 0.5)
+        }
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var inlineTheme: (background: Color, stroke: Color, labelColor: Color, valueColor: Color) {
+        let theme = BakingInlineLabelTheme.theme(for: role)
+        return (
+            background: theme.background,
+            stroke: theme.stroke,
+            labelColor: theme.labelColor,
+            valueColor: theme.valueColor
+        )
+    }
+}
+
+struct BakingInlineLabelTheme {
+    let background: Color
+    let stroke: Color
+    let labelColor: Color
+    let valueColor: Color
+
+    static func theme(for role: BakingComponentRole) -> BakingInlineLabelTheme {
+        switch role {
+        case .primary:
+            BakingInlineLabelTheme(
+                background: BakingSurface.selectedRowBackground,
+                stroke: BakingSurface.selectedStroke,
+                labelColor: .brandText,
+                valueColor: .brandText
+            )
+        case .success:
+            BakingInlineLabelTheme(
+                background: Color.waterSurfaceStrong.opacity(0.42),
+                stroke: Color.waterSurfaceStrong,
+                labelColor: .waterText,
+                valueColor: .waterText
+            )
+        default:
+            BakingInlineLabelTheme(
+                background: Color.brandFieldSurface.opacity(0.42),
+                stroke: BakingSurface.cardStroke,
+                labelColor: .brandSecondaryText,
+                valueColor: .brandText
+            )
+        }
+    }
+}
+
 struct BakingMetricValue: View {
     let title: String
     let value: String
@@ -759,6 +1612,53 @@ struct BakingMetricValue: View {
     }
 }
 
+struct BakingSearchField: View {
+    @Binding var text: String
+    let prompt: String
+    let clearAccessibilityLabel: String
+
+    var body: some View {
+        HStack(spacing: BakingSpace.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(Color.brandSecondaryText)
+                .accessibilityHidden(true)
+
+            TextField(prompt, text: $text)
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(Color.brandText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Color.brandSecondaryText)
+                        .frame(width: BakingTouchTarget.secondaryAction, height: BakingTouchTarget.secondaryAction)
+                        .contentShape(Rectangle())
+                        .accessibilityHidden(true)
+                }
+                .buttonStyle(BakingPressFeedbackButtonStyle())
+                .accessibilityLabel(clearAccessibilityLabel)
+            }
+        }
+        .padding(.leading, BakingSpace.xxl)
+        .padding(.trailing, text.isEmpty ? BakingSpace.xxl : BakingSpace.xs)
+        .frame(minHeight: BakingTouchTarget.primaryAction)
+        .background(Color.brandBackground)
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous)
+                .stroke(BakingSurface.warmHairline, lineWidth: 0.7)
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
 struct BakingActionButton: View {
     let title: String
     let accessibilityLabel: String
@@ -773,7 +1673,7 @@ struct BakingActionButton: View {
         Button(action: action) {
             Text(title)
                 .font(BakingTypography.actionLabel)
-                .foregroundStyle(isDisabled ? theme.disabledForeground : theme.foreground)
+                .foregroundStyle(foregroundColor(theme: theme, isDisabled: isDisabled))
                 .frame(maxWidth: .infinity)
                 .frame(height: BakingTouchTarget.primaryAction)
                 .contentShape(RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous))
@@ -795,8 +1695,13 @@ struct BakingActionButton: View {
         case .success:
             .success
         default:
-            role == .primary ? .selected : .readOnly
+            role == .primary ? .primaryAction : .readOnly
         }
+    }
+
+    private func foregroundColor(theme: BakingComponentTheme, isDisabled: Bool) -> Color {
+        guard !isDisabled else { return theme.disabledForeground }
+        return role == .primary ? .brandOnPrimary : theme.foreground
     }
 }
 
@@ -818,7 +1723,7 @@ struct BakingBottomActionButton: View {
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.top, BakingSpace.sm)
         .padding(.bottom, BakingSpace.sm)
-        .background(.bar)
+        .background(BakingSurface.bottomBarBackground)
     }
 }
 
@@ -933,7 +1838,7 @@ struct BakingNumberInputRow: View {
                     fractionDigits: fractionDigits,
                     minValue: minValue,
                     color: UIColor(state == .disabled ? Color.brandSecondaryText : Color.brandText),
-                    font: .monospacedDigitSystemFont(ofSize: 18, weight: .semibold),
+                    font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold),
                     isEnabled: state != .disabled
                 )
                 .frame(width: 82)
@@ -1030,6 +1935,57 @@ struct BakingDateTimeRow: View {
     }
 }
 
+struct BakingTimePickerPopover: View {
+    @Binding var date: Date
+
+    var body: some View {
+        BakingWheelTimePicker(date: $date)
+            .frame(height: 180)
+            .frame(width: BakingComponentMetrics.popoverMediumWidth)
+            .padding(.horizontal, BakingSpace.lg)
+            .padding(.vertical, BakingSpace.sm)
+            .bakingPopoverSurface(width: BakingComponentMetrics.popoverMediumWidth)
+    }
+}
+
+private struct BakingWheelTimePicker: UIViewRepresentable {
+    @Binding var date: Date
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(date: $date)
+    }
+
+    func makeUIView(context: Context) -> UIDatePicker {
+        let picker = UIDatePicker()
+        picker.datePickerMode = .time
+        picker.preferredDatePickerStyle = .wheels
+        picker.minuteInterval = 1
+        picker.date = date
+        picker.tintColor = UIColor(Color.brandPrimary)
+        picker.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .valueChanged)
+        return picker
+    }
+
+    func updateUIView(_ uiView: UIDatePicker, context: Context) {
+        if abs(uiView.date.timeIntervalSince(date)) > 0.5 {
+            uiView.date = date
+        }
+        uiView.tintColor = UIColor(Color.brandPrimary)
+    }
+
+    final class Coordinator: NSObject {
+        @Binding var date: Date
+
+        init(date: Binding<Date>) {
+            _date = date
+        }
+
+        @objc func changed(_ sender: UIDatePicker) {
+            date = sender.date
+        }
+    }
+}
+
 struct BakingTableRow<Content: View>: View {
     var isSelected = false
     @ViewBuilder let content: () -> Content
@@ -1088,6 +2044,7 @@ struct BakingTable<Header: View, Rows: View>: View {
             header()
 
             Divider()
+                .opacity(0)
                 .overlay(BakingTableTheme.rowStroke)
 
             rows()
@@ -1128,8 +2085,8 @@ struct BakingEmptyState: View {
 struct BakingQuantityColumn: View {
     let value: String
     let unit: String
-    var valueFont: Font = .callout.monospacedDigit().weight(.semibold)
-    var unitFont: Font = .caption.weight(.semibold)
+    var valueFont: Font = BakingTypography.tableNumber
+    var unitFont: Font = BakingTypography.rowMeta
     var valueColor: Color = .brandText
     var unitColor: Color? = .brandSecondaryText
     var valueWidth: CGFloat = 54
@@ -1158,21 +2115,23 @@ struct BakingQuantityColumn: View {
 
 struct BakingPercentColumn: View {
     let value: String
-    var color: Color = .brandPrimary
+    var valueFont: Font = BakingTypography.tableNumber
+    var unitFont: Font = BakingTypography.rowMeta
+    var color: Color = .brandText
     var unitColor: Color? = .brandSecondaryText
     var width: CGFloat = 60
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             Text(value)
-                .font(.callout.monospacedDigit().weight(.semibold))
+                .font(valueFont)
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity, alignment: .trailing)
 
             Text("%")
-                .font(.caption.weight(.semibold))
+                .font(unitFont)
                 .foregroundStyle(unitColor ?? color)
         }
         .frame(width: width, alignment: .leading)
@@ -1242,11 +2201,11 @@ struct BakingConfirmationDialog: View {
             VStack(alignment: .leading, spacing: BakingSpace.xxl) {
                 VStack(alignment: .leading, spacing: BakingSpace.sm) {
                     Text(title)
-                        .font(.headline.weight(.semibold))
+                        .font(BakingTypography.sectionTitle)
                         .foregroundStyle(Color.brandText)
 
                     Text(message)
-                        .font(.callout)
+                        .font(BakingTypography.appPrimaryText)
                         .foregroundStyle(Color.brandSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1254,7 +2213,7 @@ struct BakingConfirmationDialog: View {
                 HStack(spacing: BakingSpace.sm) {
                     Button(action: onCancel) {
                         Text(cancelTitle)
-                            .font(.callout.weight(.semibold))
+                            .font(BakingTypography.appPrimaryText)
                             .foregroundStyle(Color.brandSecondaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: BakingTouchTarget.primaryAction)
@@ -1265,7 +2224,7 @@ struct BakingConfirmationDialog: View {
 
                     Button(action: onConfirm) {
                         Text(confirmTitle)
-                            .font(.callout.weight(.semibold))
+                            .font(BakingTypography.appPrimaryText)
                             .foregroundStyle(confirmTint)
                             .frame(maxWidth: .infinity)
                             .frame(height: BakingTouchTarget.primaryAction)
@@ -1278,9 +2237,9 @@ struct BakingConfirmationDialog: View {
             .padding(BakingSpace.xxl)
             .frame(maxWidth: 320)
             .bakingCard(
-                background: Color.brandSurface,
+                background: Color.brandBackground,
                 radius: BakingRadius.popover,
-                stroke: Color.brandPrimary.opacity(0.12),
+                stroke: BakingSurface.warmHairline,
                 lineWidth: 0.8
             )
             .shadow(color: Color.black.opacity(0.12), radius: 24, y: 14)
@@ -1310,6 +2269,8 @@ struct BakingInlineTextField: UIViewRepresentable {
     var font: UIFont = .preferredFont(forTextStyle: .body)
     var textAlignment: NSTextAlignment = .left
     var returnKeyType: UIReturnKeyType = .done
+    var minimumScaleFactor: CGFloat = 0.72
+    var maxLength: Int? = 32
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -1327,6 +2288,8 @@ struct BakingInlineTextField: UIViewRepresentable {
         textField.delegate = context.coordinator
         textField.tintColor = UIColor(Color.brandPrimary)
         textField.clearButtonMode = .never
+        textField.adjustsFontSizeToFitWidth = true
+        textField.minimumFontSize = font.pointSize * minimumScaleFactor
         textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         textField.addTarget(context.coordinator, action: #selector(Coordinator.textDidChange(_:)), for: .editingChanged)
         return textField
@@ -1339,6 +2302,8 @@ struct BakingInlineTextField: UIViewRepresentable {
         uiView.font = font
         uiView.textAlignment = textAlignment
         uiView.returnKeyType = returnKeyType
+        uiView.adjustsFontSizeToFitWidth = true
+        uiView.minimumFontSize = font.pointSize * minimumScaleFactor
         if !uiView.isFirstResponder, uiView.text != text {
             uiView.text = text
         }
@@ -1352,13 +2317,40 @@ struct BakingInlineTextField: UIViewRepresentable {
         }
 
         @objc func textDidChange(_ textField: UITextField) {
-            parent.text = textField.text ?? ""
+            let currentText = textField.text ?? ""
+            if textField.markedTextRange != nil {
+                parent.text = currentText
+                return
+            }
+            let limitedText = parent.limited(currentText)
+            if limitedText != currentText {
+                textField.text = limitedText
+            }
+            parent.text = limitedText
         }
 
         func textFieldShouldReturn(_ textField: UITextField) -> Bool {
             textField.resignFirstResponder()
             return true
         }
+
+        func textField(
+            _ textField: UITextField,
+            shouldChangeCharactersIn range: NSRange,
+            replacementString string: String
+        ) -> Bool {
+            guard let maxLength = parent.maxLength else { return true }
+            guard textField.markedTextRange == nil else { return true }
+            let currentText = textField.text ?? ""
+            guard let textRange = Range(range, in: currentText) else { return true }
+            let proposedText = currentText.replacingCharacters(in: textRange, with: string)
+            return proposedText.count <= maxLength
+        }
+    }
+
+    private func limited(_ value: String) -> String {
+        guard let maxLength, value.count > maxLength else { return value }
+        return String(value.prefix(maxLength))
     }
 }
 
@@ -1368,7 +2360,7 @@ struct BakingNumericTextField: UIViewRepresentable {
     var minValue: Double = 0
     var maxValue: Double? = nil
     var color: UIColor = UIColor(Color.brandText)
-    var font: UIFont = .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+    var font: UIFont = .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
     var textAlignment: NSTextAlignment = .right
     var adjustsFontSizeToFitWidth = true
     var isEnabled = true
@@ -1563,6 +2555,7 @@ struct BakingPercentageField: View {
     var maxValue: Double = 100
     var precision: Int = 1
     var font: Font = .subheadline
+    var valueFont: Font? = nil
     var color: Color = .brandPrimary
     var fieldWidth: CGFloat = 34
     var totalWidth: CGFloat? = 62
@@ -1584,7 +2577,7 @@ struct BakingPercentageField: View {
                     .frame(width: fieldWidth, alignment: .trailing)
                 Text("%")
                     .font(font)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.brandSecondaryText)
             }
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
@@ -1606,7 +2599,7 @@ struct BakingPercentageField: View {
                 maxValue: maxValue,
                 precision: precision,
                 tint: color,
-                surface: Color.brandPrimary.opacity(0.075)
+                surface: BakingSurface.fieldBackground
             )
             .presentationBackground(.clear)
         }
@@ -1632,10 +2625,14 @@ struct BakingPercentageField: View {
     }
 
     private var effectiveMaxValue: Double {
-        min(max(0, maxValue), 100)
+        max(0, maxValue)
     }
 
     private var displayFont: Font {
+        if let valueFont {
+            return valueFont
+        }
+
         switch font {
         case .callout:
             return .callout.monospacedDigit().weight(.semibold)
@@ -1654,7 +2651,7 @@ struct BakingCenteredPercentagePicker: View {
     var maxValue: Double = 100
     var precision: Int = 1
     var tint: Color = .brandPrimary
-    var surface: Color = Color.brandPrimary.opacity(0.075)
+    var surface: Color = BakingSurface.fieldBackground
 
     var body: some View {
         ZStack {
@@ -1683,7 +2680,7 @@ struct BakingPercentagePickerCard: View {
     var maxValue: Double = 100
     var precision: Int = 1
     var tint: Color = .brandPrimary
-    var surface: Color = Color.brandPrimary.opacity(0.075)
+    var surface: Color = BakingSurface.fieldBackground
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1706,10 +2703,10 @@ struct BakingPercentagePickerCard: View {
         .frame(width: 304)
         .background(
             RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
-                .fill(Color.brandSurface.opacity(0.98))
+                .fill(Color.brandBackground)
                 .overlay {
                     RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
-                        .stroke(Color.brandPrimary.opacity(0.08), lineWidth: 0.6)
+                        .stroke(BakingSurface.warmHairline, lineWidth: 0.6)
                 }
                 .shadow(color: Color.black.opacity(0.06), radius: 20, x: 0, y: 10)
         )
@@ -1723,7 +2720,7 @@ struct BakingPercentagePickerCard: View {
     }
 
     private var effectiveMaxValue: Double {
-        min(max(0, maxValue), 100)
+        max(0, maxValue)
     }
 
     private func clamped(_ nextValue: Double) -> Double {
@@ -1736,28 +2733,29 @@ struct BakingPercentagePickerControl: View {
     var maxValue: Double = 100
     var precision: Int = 1
     var tint: Color = .brandPrimary
-    var surface: Color = Color.brandPrimary.opacity(0.075)
+    var surface: Color = BakingSurface.fieldBackground
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+            HStack(alignment: .center, spacing: 4) {
                 BakingNumericTextField(
                     value: sliderBinding,
                     fractionDigits: 0...1,
                     maxValue: effectiveMaxValue,
                     color: UIColor(tint),
-                    font: .monospacedDigitSystemFont(ofSize: 20, weight: .bold),
+                    font: .monospacedDigitSystemFont(ofSize: 18, weight: .semibold),
                     textAlignment: .right
                 )
-                .frame(width: 56)
+                .frame(width: 50, height: BakingComponentMetrics.compactInputFieldHeight)
                 Text("%")
-                    .font(.headline.weight(.semibold))
+                    .font(BakingTypography.rowMeta)
                     .foregroundStyle(Color.brandSecondaryText)
+                    .frame(height: BakingComponentMetrics.compactInputFieldHeight, alignment: .center)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 8)
+            .frame(width: BakingCompactInputFieldSize.short.width, height: BakingComponentMetrics.compactInputFieldHeight)
             .background(surface)
-            .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
 
             HStack(spacing: BakingSpace.sm) {
                 stepButton(
@@ -1790,6 +2788,7 @@ struct BakingPercentagePickerControl: View {
                 }
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
         .onChange(of: maxValue) { _, _ in
             value = clamped(value)
         }
@@ -1828,7 +2827,7 @@ struct BakingPercentagePickerControl: View {
     }
 
     private var effectiveMaxValue: Double {
-        min(max(0, maxValue), 100)
+        max(0, maxValue)
     }
 
     private var step: Double {
@@ -1856,8 +2855,8 @@ struct BakingSlideActionBar: View {
     let accessibilityLabel: String
     var direction: BakingSlideActionDirection = .leadingToTrailing
     var tint: Color = .brandPrimary
-    var trackBackground: Color = .brandSurface
-    var trackAccent: Color = Color.brandPrimary.opacity(0.12)
+    var trackBackground: Color = BakingSurface.fieldBackground
+    var trackAccent: Color = BakingSurface.selectedRowBackground
     var onComplete: () -> Void
 
     @State private var progress: CGFloat = 0
@@ -2032,7 +3031,7 @@ struct BakingMaterialIconBadge: View {
     var size: CGFloat = BakingTouchTarget.materialBadge
     var iconSize: CGFloat = BakingTouchTarget.materialBadgeGlyph
     var color: Color = .brandPrimary
-    var background: Color = Color.brandPrimary.opacity(0.10)
+    var background: Color = BakingSurface.selectedRowBackground
 
     var body: some View {
         ZStack {
@@ -2050,9 +3049,9 @@ struct BakingSwipeToDeleteRow<Content: View>: View {
     let onDelete: () -> Void
     var onOpenChanged: (Bool) -> Void = { _ in }
     var closeToken: Int = 0
-    var deleteConfirmationTitle = "删除这个项目？"
-    var deleteConfirmationMessage = "删除后无法撤销。"
-    var deleteButtonTitle = "删除"
+    var deleteConfirmationTitle = BakingTerms.delete
+    var deleteConfirmationMessage = BakingTerms.delete
+    var deleteButtonTitle = BakingTerms.delete
     @ViewBuilder let content: () -> Content
     @State private var offset: CGFloat = 0
     @State private var isHorizontalSwipeActive = false
@@ -2153,7 +3152,7 @@ struct BakingSwipeToDeleteRow<Content: View>: View {
                 closeSwipe()
                 onDelete()
             }
-            Button("取消", role: .cancel) {}
+            Button(BakingTerms.cancel, role: .cancel) {}
         } message: {
             Text(deleteConfirmationMessage)
         }
@@ -2165,11 +3164,11 @@ struct BakingSwipeToDeleteRow<Content: View>: View {
         } label: {
             ZStack(alignment: .trailing) {
                 RoundedRectangle(cornerRadius: BakingRadius.prominentCard, style: .continuous)
-                    .fill(Color.brandPrimary)
+                    .fill(BakingSurfaceTheme.theme(for: .destructive).background)
 
                 Image(systemName: "trash")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.brandPrimary)
                     .frame(width: actionWidth, height: buttonSize.height)
             }
             .frame(width: deleteActionWidth)
@@ -2177,7 +3176,7 @@ struct BakingSwipeToDeleteRow<Content: View>: View {
             .contentShape(RoundedRectangle(cornerRadius: BakingRadius.prominentCard, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("删除")
+        .accessibilityLabel(BakingTerms.delete)
         .padding(.trailing, 3)
     }
 

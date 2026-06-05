@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Baking Journal Milk Bread Theme</title>
+  <style>
+    :root {
+      --page: #ffffff;
+      --text: #0c0b09;
+      --secondary: #746c61;
+      --tertiary: #a39a8d;
+      --hairline: rgba(87, 64, 37, 0.13);
+      --section: #fbf6ee;
+      --section-strong: #f3eadc;
+      --field: #eee4d6;
+      --primary: #8a6a3f;
+      --primary-soft: #eadcc6;
+      --primary-pressed: #dfcbaa;
+      --water: #336f7a;
+      --water-soft: #dcebed;
+      --flour-soft: #f2e7d3;
+      --butter-soft: #f1dfb0;
+      --dark-page: #000000;
+      --dark-section: #15120e;
+      --dark-field: #211b14;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      background: #f5f1e9;
+      color: var(--text);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #ffffff 0%, #f2ece2 100%);
+    }
+
+    .page {
+      width: min(1280px, 100%);
+      margin: 0 auto;
+      padding: 32px 24px 54px;
+    }
+
+    .intro {
+      max-width: 900px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 4.6vw, 54px);
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    .intro p {
+      margin: 0;
+      color: var(--secondary);
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .preview-shell {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(300px, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+
+    .board {
+      padding: 16px;
+      border-radius: 30px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(87, 64, 37, 0.12);
+    }
+
+    .board h2 {
+      margin: 0 4px 12px;
+      font-size: 19px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .phone {
+      overflow: hidden;
+      min-height: 780px;
+      border-radius: 38px;
+      background: var(--page);
+      border: 1px solid rgba(0, 0, 0, 0.09);
+      box-shadow: 0 18px 48px rgba(87, 64, 37, 0.10);
+    }
+
+    .status {
+      height: 46px;
+      padding: 16px 24px 0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .screen {
+      min-height: 734px;
+      display: flex;
+      flex-direction: column;
+      background: var(--page);
+    }
+
+    .content {
+      flex: 1;
+      padding: 0 20px 14px;
+    }
+
+    .topbar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--primary);
+    }
+
+    .icon-button.neutral {
+      color: var(--text);
+    }
+
+    svg {
+      display: block;
+    }
+
+    .icon {
+      width: 25px;
+      height: 25px;
+      stroke: currentColor;
+      stroke-width: 2.35;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .title-row {
+      padding: 10px 0 14px;
+    }
+
+    .screen-title {
+      margin: 0;
+      font-size: 36px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .search {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 2px 0 10px;
+      padding: 0 15px;
+      border-radius: 14px;
+      color: var(--secondary);
+      background: var(--field);
+      border: 1px solid var(--hairline);
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .list {
+      margin: 0 -20px;
+    }
+
+    .recipe-row {
+      min-height: 92px;
+      display: grid;
+      grid-template-columns: 74px 1fr 68px;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 20px;
+      background: var(--page);
+    }
+
+    .recipe-row + .recipe-row {
+      border-top: 1px solid var(--hairline);
+    }
+
+    .recipe-row.featured {
+      background: var(--section);
+    }
+
+    .badge {
+      width: 54px;
+      height: 54px;
+      border-radius: 17px;
+      display: grid;
+      place-items: center;
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .badge svg {
+      width: 25px;
+      height: 25px;
+    }
+
+    .row-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 850;
+      line-height: 1.16;
+    }
+
+    .row-meta {
+      margin: 4px 0 0;
+      color: var(--secondary);
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .metric {
+      text-align: right;
+      color: var(--secondary);
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .metric b {
+      color: var(--water);
+      font-size: 27px;
+      line-height: 1;
+    }
+
+    .stage-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 6px 0 16px;
+    }
+
+    .stage {
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      color: var(--secondary);
+      background: var(--section);
+      border: 1px solid transparent;
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .stage.active {
+      color: var(--primary);
+      background: var(--primary-soft);
+      border-color: var(--hairline);
+    }
+
+    .recipe-header {
+      padding: 10px 0 18px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .recipe-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+
+    .recipe-heading h3 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .status-chip {
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 13px;
+      border-radius: 15px;
+      color: var(--primary);
+      background: var(--primary-soft);
+      border: 1px solid var(--hairline);
+      font-size: 15px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .summary-cell {
+      min-height: 72px;
+      padding: 11px;
+      border-radius: 15px;
+      color: var(--text);
+      background: var(--field);
+      border: 1px solid rgba(87, 64, 37, 0.08);
+    }
+
+    .summary-cell.water {
+      color: var(--water);
+      background: var(--water-soft);
+      border-color: rgba(51, 111, 122, 0.16);
+    }
+
+    .summary-label {
+      color: var(--secondary);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .summary-value {
+      margin-top: 3px;
+      font-size: 23px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .section-title {
+      margin: 22px 0 8px;
+      font-size: 23px;
+      line-height: 1.12;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .ingredient-list {
+      margin: 0 -20px;
+      border-top: 1px solid var(--hairline);
+      border-bottom: 1px solid var(--hairline);
+      background: var(--page);
+    }
+
+    .ingredient-row {
+      min-height: 68px;
+      display: grid;
+      grid-template-columns: 62px 1fr 58px 70px;
+      gap: 7px;
+      align-items: center;
+      padding: 0 20px;
+    }
+
+    .ingredient-row + .ingredient-row {
+      border-top: 1px solid var(--hairline);
+    }
+
+    .ingredient-row.soft {
+      background: var(--section);
+    }
+
+    .mini-badge {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      color: var(--primary);
+      background: var(--flour-soft);
+    }
+
+    .ingredient-row.water .mini-badge {
+      color: var(--water);
+      background: var(--water-soft);
+    }
+
+    .ingredient-name {
+      font-size: 19px;
+      font-weight: 880;
+    }
+
+    .percent,
+    .grams {
+      text-align: right;
+      font-size: 19px;
+      font-weight: 900;
+    }
+
+    .percent {
+      color: var(--primary);
+    }
+
+    .ingredient-row.water .percent {
+      color: var(--water);
+    }
+
+    .unit {
+      color: var(--secondary);
+      font-weight: 800;
+    }
+
+    .feed {
+      margin: 0 -20px;
+      border-top: 1px solid var(--hairline);
+    }
+
+    .feed-row {
+      padding: 16px 20px 18px;
+      border-bottom: 1px solid var(--hairline);
+      background: var(--page);
+    }
+
+    .feed-row.emphasis {
+      background: var(--section);
+    }
+
+    .feed-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .feed-title {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.13;
+      font-weight: 900;
+    }
+
+    .feed-meta {
+      margin: 4px 0 0;
+      color: var(--secondary);
+      font-size: 14px;
+      line-height: 1.34;
+      font-weight: 650;
+    }
+
+    .feed-band {
+      height: 118px;
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.62), transparent 26%),
+        linear-gradient(135deg, var(--flour-soft), var(--butter-soft));
+      border: 1px solid var(--hairline);
+    }
+
+    .bottom-nav {
+      height: 76px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-items: center;
+      border-top: 1px solid var(--hairline);
+      background: var(--page);
+    }
+
+    .bottom-nav .icon-button {
+      margin: 0 auto;
+      color: var(--text);
+    }
+
+    .bottom-nav .active {
+      color: var(--primary);
+    }
+
+    .dark-note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: var(--dark-page);
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .dark-note b {
+      color: #fff;
+    }
+
+    @media (max-width: 1080px) {
+      .preview-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .phone {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 22px 12px 34px;
+      }
+
+      .board {
+        padding: 10px;
+      }
+
+      .content {
+        padding-inline: 16px;
+      }
+
+      .list,
+      .ingredient-list,
+      .feed {
+        margin-inline: -16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="intro">
+      <h1>Milk Bread Theme, Card Background Removed</h1>
+      <p>C 方向保留：纯白 / 纯黑主底，淡暖 milk bread 组件色。UI layout 不改变，只移除外层 card 背景；selected/highlight area 改成整行 row treatment，用分隔线和轻色 row 建层级。</p>
+    </section>
+
+    <section class="preview-shell">
+      <article class="board">
+        <h2>Recipe List: same layout, row highlight</h2>
+        <div class="phone">
+          <div class="status"><span>9:39</span><span>41%</span></div>
+          <div class="screen">
+            <div class="content">
+              <div class="topbar">
+                <div class="toolbar-group">
+                  <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></span>
+                  <span class="icon-button neutral"><svg class="icon" viewBox="0 0 24 24"><path d="M8 3v18M5 6l3-3 3 3M16 21V3M13 18l3 3 3-3"/></svg></span>
+                </div>
+                <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+              </div>
+              <div class="search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>搜索配方名称</div>
+              <div class="list">
+                <div class="recipe-row featured">
+                  <span class="badge"><svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14v7H5z"/><path d="M7 12a5 5 0 0 1 10 0M9 12V9m3 3V8m3 4V9"/></svg></span>
+                  <div><p class="row-title">吐司配方</p><p class="row-meta">吐司 · 最近编辑</p></div>
+                  <div class="metric">含水<br><b>70</b>%</div>
+                </div>
+                <div class="recipe-row">
+                  <span class="badge"><svg class="icon" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M12 15v4M9 17h6"/></svg></span>
+                  <div><p class="row-title">新配方</p><p class="row-meta">配方 · Draft</p></div>
+                  <div class="metric">含水<br><b>0</b>%</div>
+                </div>
+                <div class="recipe-row">
+                  <span class="badge"><svg class="icon" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M12 15v4M9 17h6"/></svg></span>
+                  <div><p class="row-title">牛奶餐包</p><p class="row-meta">餐包 · Ready</p></div>
+                  <div class="metric">含水<br><b>62</b>%</div>
+                </div>
+                <div class="recipe-row">
+                  <span class="badge"><svg class="icon" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M12 15v4M9 17h6"/></svg></span>
+                  <div><p class="row-title">可颂面团</p><p class="row-meta">层压 · Draft</p></div>
+                  <div class="metric">含水<br><b>55</b>%</div>
+                </div>
+              </div>
+            </div>
+            <nav class="bottom-nav">
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H6v-7h12"/></svg></span>
+              <span class="icon-button active"><svg class="icon" viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 7h4M10 11h4M10 15h4"/></svg></span>
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 13V8m0 5 3 2M9 3h6"/></svg></span>
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M8 3h8v18l-4-3-4 3z"/></svg></span>
+            </nav>
+          </div>
+        </div>
+      </article>
+
+      <article class="board">
+        <h2>Recipe Detail: same layout, no outer card fill</h2>
+        <div class="phone">
+          <div class="status"><span>9:39</span><span>41%</span></div>
+          <div class="screen">
+            <div class="content">
+              <div class="topbar">
+                <span class="icon-button neutral"><svg class="icon" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></span>
+                <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+              </div>
+              <div class="stage-tabs">
+                <div class="stage active">概览</div>
+                <div class="stage">配方</div>
+                <div class="stage">步骤</div>
+              </div>
+              <section class="recipe-header">
+                <div class="recipe-heading">
+                  <h3>吐司配方</h3>
+                  <div class="status-chip"><svg class="icon" viewBox="0 0 24 24"><path d="M6 4h9l3 3v13H6z"/><path d="M9 12h6M9 16h4"/></svg>Draft</div>
+                </div>
+                <div class="summary-grid">
+                  <div class="summary-cell"><div class="summary-label">面团</div><div class="summary-value">940 g</div></div>
+                  <div class="summary-cell"><div class="summary-label">面粉</div><div class="summary-value">500 g</div></div>
+                  <div class="summary-cell water"><div class="summary-label">含水</div><div class="summary-value">70%</div></div>
+                </div>
+              </section>
+              <h3 class="section-title">材料</h3>
+              <div class="ingredient-list">
+                <div class="ingredient-row soft">
+                  <span class="mini-badge"><svg class="icon" viewBox="0 0 24 24"><path d="M12 4v16M8 7c4 0 4 4 4 4s0-4 4-4M8 12c4 0 4 4 4 4s0-4 4-4"/></svg></span>
+                  <div class="ingredient-name">面粉</div><div class="percent"></div><div class="grams">500 <span class="unit">g</span></div>
+                </div>
+                <div class="ingredient-row water">
+                  <span class="mini-badge"><svg class="icon" viewBox="0 0 24 24"><path d="M12 4s6 6 6 10a6 6 0 0 1-12 0c0-4 6-10 6-10z"/></svg></span>
+                  <div class="ingredient-name">水</div><div class="percent">70%</div><div class="grams">350 <span class="unit">g</span></div>
+                </div>
+                <div class="ingredient-row">
+                  <span class="mini-badge"><svg class="icon" viewBox="0 0 24 24"><path d="m12 5 7 7-7 7-7-7z"/><path d="M9 15 15 9"/></svg></span>
+                  <div class="ingredient-name">盐</div><div class="percent">2%</div><div class="grams">10 <span class="unit">g</span></div>
+                </div>
+                <div class="ingredient-row">
+                  <span class="mini-badge"><svg class="icon" viewBox="0 0 24 24"><path d="M5 10h14l-2 8H7z"/><path d="M8 10V7h8v3"/></svg></span>
+                  <div class="ingredient-name">黄油</div><div class="percent">8%</div><div class="grams">40 <span class="unit">g</span></div>
+                </div>
+              </div>
+            </div>
+            <nav class="bottom-nav">
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H6v-7h12"/></svg></span>
+              <span class="icon-button active"><svg class="icon" viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 7h4M10 11h4M10 15h4"/></svg></span>
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 13V8m0 5 3 2M9 3h6"/></svg></span>
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M8 3h8v18l-4-3-4 3z"/></svg></span>
+            </nav>
+          </div>
+        </div>
+      </article>
+
+      <article class="board">
+        <h2>Feed: same layout, lighter surfaces</h2>
+        <div class="phone">
+          <div class="status"><span>9:39</span><span>41%</span></div>
+          <div class="screen">
+            <div class="content">
+              <div class="title-row">
+                <h2 class="screen-title">首页</h2>
+              </div>
+              <div class="feed">
+                <article class="feed-row emphasis">
+                  <div class="feed-top">
+                    <div>
+                      <h3 class="feed-title">吐司正在发酵</h3>
+                      <p class="feed-meta">这之后会变成烘焙动态和灵感 feed。</p>
+                    </div>
+                    <span class="badge"><svg class="icon" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H6v-7h12"/></svg></span>
+                  </div>
+                  <div class="feed-band"></div>
+                </article>
+                <article class="feed-row">
+                  <div class="feed-top">
+                    <div>
+                      <h3 class="feed-title">牛奶餐包</h3>
+                      <p class="feed-meta">上次制作 · 62% 含水 · 8 个步骤</p>
+                    </div>
+                    <div class="metric"><b>62</b>%</div>
+                  </div>
+                  <div class="feed-band"></div>
+                </article>
+                <article class="feed-row">
+                  <div class="feed-top">
+                    <div>
+                      <h3 class="feed-title">可颂面团</h3>
+                      <p class="feed-meta">Draft · 需要补充折叠步骤</p>
+                    </div>
+                    <div class="metric"><b>55</b>%</div>
+                  </div>
+                </article>
+              </div>
+            </div>
+            <nav class="bottom-nav">
+              <span class="icon-button active"><svg class="icon" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H6v-7h12"/></svg></span>
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 7h4M10 11h4M10 15h4"/></svg></span>
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 13V8m0 5 3 2M9 3h6"/></svg></span>
+              <span class="icon-button"><svg class="icon" viewBox="0 0 24 24"><path d="M8 3h8v18l-4-3-4 3z"/></svg></span>
+            </nav>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <aside class="dark-note">
+      <b>Dark mode direction:</b> app page stays pure black. Rows stay full-width. Warm surfaces only appear as subtle near-black section bands, with milk-bread accent shifted lighter for readability.
+    </aside>
+  </main>
+</body>
+</html>
