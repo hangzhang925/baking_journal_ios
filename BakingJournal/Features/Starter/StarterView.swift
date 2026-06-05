@@ -2,28 +2,174 @@ import SwiftUI
 
 struct StarterView: View {
     @EnvironmentObject private var store: RecipeStore
-    @FocusState private var focusedField: StarterField?
+    @State private var starterStatusFilter: StarterLibraryStatusFilter = .all
+    @State private var starterFedSort: StarterFedSort = .newestFirst
+    @State private var starterSearchText = ""
+    @State private var selectedStarter: StarterProfile?
+    @State private var starterPendingDeletion: StarterProfile?
+    @State private var showingDeleteStarterConfirmation = false
+
+    var body: some View {
+        BakingLibraryListShell(
+            searchText: $starterSearchText,
+            searchPrompt: BakingTerms.starterSearchPrompt,
+            clearSearchAccessibilityLabel: BakingTerms.clearStarterSearch,
+            filters: { starterFilterControls },
+            action: { addStarterButton }
+        ) {
+            starterLibrary
+        }
+        .sheet(item: $selectedStarter) { starter in
+            StarterDetailView(starterID: starter.id)
+        }
+    }
+
+    private var starterFilterControls: some View {
+        HStack(spacing: BakingSpace.xs) {
+            Button {
+                starterStatusFilter = starterStatusFilter.next
+            } label: {
+                BakingIconButtonLabel(
+                    icon: starterStatusFilter.icon,
+                    role: .primary,
+                    size: .primary,
+                    isSelected: starterStatusFilter != .all
+                )
+            }
+            .buttonStyle(BakingPressFeedbackButtonStyle())
+            .accessibilityLabel(BakingTerms.starterStatusFilter)
+            .accessibilityValue(starterStatusFilter.accessibilityValue)
+
+            Button {
+                starterFedSort = starterFedSort.toggled
+            } label: {
+                BakingIconButtonLabel(
+                    icon: starterFedSort.icon,
+                    role: .secondary,
+                    size: .primary,
+                    isSelected: starterFedSort == .oldestFirst
+                )
+            }
+            .buttonStyle(BakingPressFeedbackButtonStyle())
+            .accessibilityLabel(BakingTerms.starterSortFed)
+            .accessibilityValue(starterFedSort.accessibilityValue)
+        }
+    }
+
+    private var addStarterButton: some View {
+        BakingIconButton(
+            icon: .add,
+            accessibilityLabel: BakingTerms.addStarter,
+            role: .primary
+        ) {
+            _ = store.createStarterProfile()
+        }
+    }
+
+    private var starterLibrary: some View {
+        BakingLibraryList {
+            Section {
+                if !store.hasLoadedPersistedState {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 220)
+                        .listRowBackground(Color.clear)
+                } else if store.starterProfiles.isEmpty {
+                    BakingEmptyState(title: BakingTerms.noStarters, systemImage: "cup.and.saucer")
+                        .listRowBackground(Color.clear)
+                } else if displayedStarters.isEmpty {
+                    BakingEmptyState(title: BakingTerms.noMatchingStarters, systemImage: "line.3.horizontal.decrease.circle")
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(displayedStarters) { starter in
+                        Button {
+                            selectedStarter = starter
+                        } label: {
+                            StarterLibraryRow(profile: starter)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                        .listRowBackground(BakingSurface.rowBackground)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                starterPendingDeletion = starter
+                                showingDeleteStarterConfirmation = true
+                            } label: {
+                                Label(BakingTerms.delete, systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            }
+            .listRowBackground(BakingSurface.rowBackground)
+        }
+        .confirmationDialog(
+            BakingTerms.starterDeleteConfirmationTitle,
+            isPresented: $showingDeleteStarterConfirmation,
+            titleVisibility: .visible,
+            presenting: starterPendingDeletion
+        ) { starter in
+            Button(BakingTerms.starterDeleteConfirmationButton, role: .destructive) {
+                store.deleteStarterProfile(starter)
+                starterPendingDeletion = nil
+            }
+            Button(BakingTerms.cancel, role: .cancel) {
+                starterPendingDeletion = nil
+            }
+        } message: { starter in
+            Text(BakingTerms.starterDeleteConfirmationMessage(store.starterDisplayName(for: starter)))
+        }
+        .onChange(of: showingDeleteStarterConfirmation) { _, isPresented in
+            if !isPresented {
+                starterPendingDeletion = nil
+            }
+        }
+    }
+
+    private var displayedStarters: [StarterProfile] {
+        let filteredByStatus = store.starterProfiles.filter { starter in
+            starterStatusFilter.includes(starter, store: store)
+        }
+        let trimmedSearch = starterSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filteredByName = trimmedSearch.isEmpty ? filteredByStatus : filteredByStatus.filter { starter in
+            store.starterDisplayName(for: starter).localizedStandardContains(trimmedSearch)
+        }
+        return filteredByName.sorted { lhs, rhs in
+            switch starterFedSort {
+            case .newestFirst:
+                return lhs.lastFedAt > rhs.lastFedAt
+            case .oldestFirst:
+                return lhs.lastFedAt < rhs.lastFedAt
+            }
+        }
+    }
+}
+
+private struct StarterDetailView: View {
+    @EnvironmentObject private var store: RecipeStore
+    let starterID: UUID
+    @State private var showingFeedSheet = false
     @State private var showingFedToast = false
     @State private var fedFeedbackTask: Task<Void, Never>?
-    @State private var starterWeightSliderMaximum: Double = 1
-    @State private var isAdjustingStarterWeight = false
 
     var body: some View {
         ScrollView {
-            VStack(spacing: BakingSpace.xl) {
+            VStack(spacing: BakingLayout.cardStackSpacing) {
                 starterHeader
                 weightSection
                 feedingSection
                 reminderSection
             }
-            .padding(.horizontal, BakingSpace.xl)
-            .padding(.top, BakingSpace.sm)
+            .padding(.horizontal, BakingLayout.screenHorizontalInset)
+            .padding(.top, BakingLayout.contentTopInset)
             .padding(.bottom, 94)
         }
         .scrollIndicators(.hidden)
         .background(Color.brandBackground)
         .safeAreaInset(edge: .bottom) {
             feedButton
+        }
+        .sheet(isPresented: $showingFeedSheet) {
+            feedSheet
         }
         .overlay(alignment: .bottom) {
             if showingFedToast {
@@ -37,124 +183,143 @@ struct StarterView: View {
                     )
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                Button(BakingTerms.done) {
-                    focusedField = nil
-                }
-            }
-        }
-        .onAppear {
-            syncStarterWeightSliderMaximum()
-        }
-        .onChange(of: store.starterFinalWeight) { _, _ in
-            guard !isAdjustingStarterWeight else { return }
-            syncStarterWeightSliderMaximum()
-        }
         .onDisappear {
             fedFeedbackTask?.cancel()
         }
     }
 
+    private var profile: StarterProfile {
+        store.starterProfiles.first(where: { $0.id == starterID }) ?? StarterProfile(id: starterID)
+    }
+
     private var starterHeader: some View {
-        VStack(alignment: .leading, spacing: BakingSpace.sm) {
-            sectionTitle(BakingTerms.starterSectionName)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(BakingTerms.starterSectionName)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.brandSecondaryText)
 
-            HStack(spacing: BakingSpace.md) {
-                BakingMaterialIconBadge(
-                    icon: .starter,
-                    size: BakingTouchTarget.materialBadge,
-                    iconSize: BakingTouchTarget.materialBadgeGlyph,
-                    color: .starterTint,
-                    background: .starterIconSurface
+            HStack(spacing: 8) {
+                BakingTopIconButtonLabel(
+                    icon: .edit,
+                    tint: .brandPrimary,
+                    glyphSize: BakingTouchTarget.secondaryActionGlyph
                 )
 
-                TextField(BakingTerms.starterProfileDefaultName, text: profileBinding(\.name))
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.brandText)
-                    .textFieldStyle(.plain)
-                    .focused($focusedField, equals: .name)
-                    .submitLabel(.done)
-
-                BakingSystemIconButtonLabel(
-                    systemImage: "pencil",
-                    tint: focusedField == .name ? .white : .brandPrimary,
-                    background: focusedField == .name ? .brandPrimary : Color.brandPrimary.opacity(0.10),
-                    visualSize: BakingTouchTarget.secondaryActionVisual,
-                    font: .subheadline.weight(.semibold)
+                BakingInlineTextField(
+                    text: profileBinding(\.name),
+                    placeholder: BakingTerms.starterProfileDefaultName,
+                    font: .systemFont(ofSize: 15, weight: .semibold)
                 )
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+
+                Spacer(minLength: BakingSpace.sm)
             }
-            .padding(BakingSpace.md)
-            .bakingCard()
-            .contentShape(RoundedRectangle(cornerRadius: BakingRadius.prominentCard, style: .continuous))
-            .onTapGesture {
-                focusedField = .name
-            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .bakingTitleInputSurface()
         }
+        .padding(10)
+        .bakingCard()
     }
 
     private var weightSection: some View {
         VStack(alignment: .leading, spacing: BakingSpace.sm) {
             sectionTitle(BakingTerms.starterSectionWeight)
 
-            VStack(spacing: BakingSpace.sm) {
-                HStack(spacing: BakingSpace.md) {
-                    BakingLabel(text: BakingTerms.starterContainerWeight, role: .inputLabel)
-
-                    Spacer(minLength: BakingSpace.md)
-
-                    Toggle(BakingTerms.starterContainerWeightToggle, isOn: profileBinding(\.isContainerWeightEnabled))
-                        .labelsHidden()
-                        .tint(.brandPrimary)
-
-                    weightField(
-                        value: numberBinding(\.containerWeight),
-                        field: .containerWeight,
-                        isEnabled: store.starterProfile.isContainerWeightEnabled
-                    )
+            VStack(spacing: 0) {
+                StarterInputRow(title: BakingTerms.starterFinalWeight) {
+                    weightField(value: starterFinalWeightBinding)
                 }
-                .padding(.horizontal, BakingSpace.md)
-                .padding(.vertical, BakingSpace.sm)
-                .bakingCard()
 
-                VStack(alignment: .leading, spacing: BakingSpace.md) {
-                    StarterMetricCell(
-                        title: BakingTerms.starterFinalWeight,
-                        value: BakingFormat.weight(store.starterFinalWeight),
-                        accent: .brandPrimary,
-                        background: .clear
-                    )
+                StarterDivider()
 
-                    HStack(spacing: BakingSpace.md) {
-                        Slider(
-                            value: starterWeightReductionBinding,
-                            in: 0...max(1, starterWeightSliderMaximum),
-                            step: 1,
-                            onEditingChanged: handleStarterWeightSliderEditingChanged
+                StarterToggleRow(
+                    title: BakingTerms.starterContainerWeightToggle,
+                    isOn: profileBinding(\.isContainerWeightEnabled)
+                )
+
+                if profile.isContainerWeightEnabled {
+                    StarterDivider()
+
+                    StarterInputRow(title: BakingTerms.starterContainerWeight) {
+                        weightField(
+                            value: numberBinding(\.containerWeight)
                         )
-                        .tint(.brandPrimary)
-                        .scaleEffect(x: -1, y: 1)
-
-                        weightField(value: starterFinalWeightBinding, field: .finalWeight)
                     }
-                    .padding(.horizontal, BakingSpace.sm)
-                    .padding(.vertical, BakingSpace.sm)
-                    .bakingFieldSurface(
-                        background: Color.brandBackground.opacity(0.56),
-                        stroke: Color.brandPrimary.opacity(0.10),
-                        radius: BakingRadius.compactCard
+                }
+            }
+            .padding(.horizontal, BakingSpace.md)
+            .padding(.vertical, BakingSpace.xs)
+            .bakingCard()
+        }
+    }
+
+    private var feedSheet: some View {
+        NavigationStack {
+            VStack(spacing: BakingSpace.xl) {
+                VStack(alignment: .leading, spacing: BakingSpace.sm) {
+                    StarterInfoRow(
+                        title: BakingTerms.starterSectionLastFed,
+                        value: BakingFormat.starterTimestamp(profile.lastFedAt)
                     )
 
-                    Text(BakingTerms.starterWeightAdjustHint)
-                        .bakingLabelStyle(.helperText)
+                    StarterInfoRow(
+                        title: BakingTerms.starterFinalWeight,
+                        value: BakingFormat.weight(store.starterFinalWeight(for: profile))
+                    )
+
+                    HStack(spacing: BakingSpace.sm) {
+                        StarterFeedInlineMetric(
+                            title: BakingTerms.starterFeedFlour,
+                            value: store.starterFeedFlourWeight(for: profile)
+                        )
+
+                        StarterFeedInlineMetric(
+                            title: BakingTerms.starterFeedWater,
+                            value: store.starterFeedWaterWeight(for: profile),
+                            isWater: true
+                        )
+                    }
                 }
                 .padding(BakingSpace.md)
-                .bakingCard(
-                    background: Color.brandPrimary.opacity(0.08),
-                    stroke: Color.brandPrimary.opacity(0.10)
-                )
+                .bakingCard()
+
+                VStack(alignment: .leading, spacing: BakingSpace.sm) {
+                    Text(BakingTerms.starterSlideToMarkFed)
+                        .bakingLabelStyle(.helperText)
+                        .padding(.horizontal, BakingSpace.sm)
+
+                    BakingSlideActionBar(
+                        icon: .complete,
+                        accessibilityLabel: BakingTerms.starterMarkFed,
+                        direction: .trailingToLeading,
+                        tint: .brandPrimary,
+                        trackBackground: .brandSurface,
+                        trackAccent: Color.brandSage.opacity(0.18)
+                    ) {
+                        store.markStarterFed(profile)
+                        showingFeedSheet = false
+                        showFedToast()
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, BakingLayout.screenHorizontalInset)
+            .padding(.top, BakingSpace.xl)
+            .background(Color.brandBackground)
+            .navigationTitle(BakingTerms.starterFeedTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(BakingTerms.done) {
+                        showingFeedSheet = false
+                    }
+                }
             }
         }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 
     private var feedingSection: some View {
@@ -174,7 +339,7 @@ struct StarterView: View {
                             }
                         }
                     } label: {
-                        RectangularDropdownTrigger(title: store.starterProfile.feedingRatio.label)
+                        RectangularDropdownTrigger(title: profile.feedingRatio.label)
                     }
                 }
                 .buttonStyle(.plain)
@@ -182,12 +347,12 @@ struct StarterView: View {
                 HStack(spacing: BakingSpace.sm) {
                     StarterFeedInlineMetric(
                         title: BakingTerms.starterFeedFlour,
-                        value: store.starterFeedFlourWeight
+                        value: store.starterFeedFlourWeight(for: profile)
                     )
 
                     StarterFeedInlineMetric(
                         title: BakingTerms.starterFeedWater,
-                        value: store.starterFeedWaterWeight,
+                        value: store.starterFeedWaterWeight(for: profile),
                         isWater: true
                     )
                 }
@@ -203,23 +368,12 @@ struct StarterView: View {
             sectionTitle(BakingTerms.starterSectionReminder)
 
             VStack(spacing: 0) {
-                DatePicker(
-                    BakingTerms.starterSectionLastFed,
-                    selection: profileBinding(\.lastFedAt),
-                    displayedComponents: [.date, .hourAndMinute]
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.brandText)
-                .padding(.vertical, BakingSpace.sm)
-
-                StarterDivider()
-
                 StarterToggleRow(
                     title: BakingTerms.starterReminderToggle,
                     isOn: profileBinding(\.isReminderEnabled)
                 )
 
-                if store.starterProfile.isReminderEnabled {
+                if profile.isReminderEnabled {
                     StarterDivider()
 
                     DatePicker(
@@ -227,7 +381,7 @@ struct StarterView: View {
                         selection: profileBinding(\.nextFeedingDate),
                         displayedComponents: .date
                     )
-                    .font(.subheadline.weight(.semibold))
+                    .font(BakingTypography.appPrimaryText)
                     .foregroundStyle(Color.brandText)
                     .padding(.vertical, BakingSpace.sm)
 
@@ -243,8 +397,7 @@ struct StarterView: View {
                                     .foregroundStyle(Color.brandPrimary)
                                     .padding(.horizontal, BakingSpace.md)
                                     .padding(.vertical, BakingSpace.xs)
-                                    .background(Color.brandPrimary.opacity(0.09))
-                                    .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
+                                    .bakingSurface(.inputSurface)
                             }
                         }
                     }
@@ -260,26 +413,25 @@ struct StarterView: View {
 
     private var feedButton: some View {
         VStack(alignment: .leading, spacing: BakingSpace.sm) {
-            Text(BakingTerms.starterSlideToMarkFed)
-                .bakingLabelStyle(.helperText)
-                .padding(.horizontal, BakingSpace.xxl)
-
-            BakingSlideActionBar(
-                icon: .complete,
-                accessibilityLabel: BakingTerms.starterMarkFed,
-                direction: .trailingToLeading,
-                tint: .brandPrimary,
-                trackBackground: .brandSurface,
-                trackAccent: Color.brandSage.opacity(0.18)
-            ) {
-                store.markStarterFed()
-                showFedToast()
+            VStack(alignment: .leading, spacing: BakingSpace.xs) {
+                BakingLabel(text: BakingTerms.starterSectionLastFed, role: .readOnlyLabel)
+                Text(BakingFormat.starterTimestamp(profile.lastFedAt))
+                    .font(BakingTypography.tableNumber)
+                    .foregroundStyle(Color.brandText)
             }
+            .padding(.horizontal, BakingLayout.screenHorizontalInset)
+
+            BakingActionButton(
+                title: BakingTerms.starterFeedTitle,
+                accessibilityLabel: BakingTerms.starterFeedTitle
+            ) {
+                showingFeedSheet = true
+            }
+            .padding(.horizontal, BakingLayout.screenHorizontalInset)
         }
-        .padding(.horizontal, BakingSpace.xl)
         .padding(.top, BakingSpace.sm)
         .padding(.bottom, BakingSpace.sm)
-        .background(.bar)
+        .background(BakingSurface.bottomBarBackground)
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -287,13 +439,13 @@ struct StarterView: View {
             .padding(.horizontal, BakingSpace.xxl)
     }
 
-    private func weightField(value: Binding<Double>, field: StarterField, isEnabled: Bool = true) -> some View {
+    private func weightField(value: Binding<Double>, isEnabled: Bool = true) -> some View {
         HStack(spacing: BakingSpace.xs) {
             BakingNumericTextField(
                 value: value,
                 fractionDigits: 0...1,
                 color: UIColor(isEnabled ? Color.brandText : Color.brandSecondaryText),
-                font: .monospacedDigitSystemFont(ofSize: 20, weight: .semibold),
+                font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold),
                 isEnabled: isEnabled
             )
             .frame(width: 84)
@@ -304,46 +456,36 @@ struct StarterView: View {
         }
         .padding(.horizontal, BakingSpace.sm)
         .padding(.vertical, BakingSpace.xs)
-        .bakingSurface(isEnabled ? .field : .readOnly)
+        .bakingSurface(isEnabled ? .inputSurface : .readOnly)
     }
 
     private func profileBinding<Value>(_ keyPath: WritableKeyPath<StarterProfile, Value>) -> Binding<Value> {
         Binding(
-            get: { store.starterProfile[keyPath: keyPath] },
+            get: { profile[keyPath: keyPath] },
             set: { value in
-                var next = store.starterProfile
+                var next = profile
                 next[keyPath: keyPath] = value
-                store.starterProfile = next
+                store.updateStarterProfile(next)
             }
         )
     }
 
     private func numberBinding(_ keyPath: WritableKeyPath<StarterProfile, Double>) -> Binding<Double> {
         Binding(
-            get: { store.starterProfile[keyPath: keyPath] },
+            get: { profile[keyPath: keyPath] },
             set: { value in
-                var next = store.starterProfile
+                var next = profile
                 next[keyPath: keyPath] = max(0, value)
-                store.starterProfile = next
+                store.updateStarterProfile(next)
             }
         )
     }
 
     private var starterFinalWeightBinding: Binding<Double> {
         Binding(
-            get: { store.starterFinalWeight },
+            get: { store.starterFinalWeight(for: profile) },
             set: { value in
-                store.updateStarterFinalWeight(max(0, value))
-            }
-        )
-    }
-
-    private var starterWeightReductionBinding: Binding<Double> {
-        Binding(
-            get: { max(0, starterWeightSliderMaximum - store.starterFinalWeight) },
-            set: { reduction in
-                let clampedReduction = min(max(0, reduction), starterWeightSliderMaximum)
-                store.updateStarterFinalWeight(starterWeightSliderMaximum - clampedReduction)
+                store.updateStarterFinalWeight(max(0, value), for: profile)
             }
         )
     }
@@ -363,19 +505,6 @@ struct StarterView: View {
             }
         }
     }
-
-    private func handleStarterWeightSliderEditingChanged(_ isEditing: Bool) {
-        isAdjustingStarterWeight = isEditing
-        if isEditing {
-            starterWeightSliderMaximum = max(1, store.starterFinalWeight)
-        } else {
-            syncStarterWeightSliderMaximum()
-        }
-    }
-
-    private func syncStarterWeightSliderMaximum() {
-        starterWeightSliderMaximum = max(1, store.starterFinalWeight)
-    }
 }
 
 private struct StarterFedToast: View {
@@ -384,17 +513,144 @@ private struct StarterFedToast: View {
             BakingIconView(icon: .complete, size: 16, color: .brandSage)
 
             Text(BakingTerms.starterFedDone)
-                .font(.subheadline.weight(.semibold))
+                .font(BakingTypography.appPrimaryText)
                 .foregroundStyle(Color.brandText)
         }
         .padding(.horizontal, BakingSpace.xl)
         .padding(.vertical, BakingSpace.md)
-        .bakingCard(
-            background: Color.brandSurface.opacity(0.98),
-            radius: BakingRadius.card,
-            stroke: Color.brandSage.opacity(0.14)
-        )
-        .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 6)
+        .bakingSurface(.success)
+        .bakingLiftedShadow()
+    }
+}
+
+private struct StarterLibraryRow: View {
+    @EnvironmentObject private var store: RecipeStore
+    let profile: StarterProfile
+
+    var body: some View {
+        HStack(spacing: BakingSpace.lg) {
+            BakingMaterialIconBadge(icon: .starter)
+
+            VStack(alignment: .leading, spacing: BakingSpace.xs) {
+                Text(store.starterDisplayName(for: profile))
+                    .font(BakingTypography.rowTitle)
+                    .foregroundStyle(Color.brandText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                HStack(spacing: BakingSpace.xs) {
+                    BakingIconView(icon: .water, size: BakingComponentMetrics.materialChipIcon, color: .waterText)
+
+                    Text(BakingFormat.weight(store.starterFinalWeight(for: profile)))
+                        .font(BakingTypography.rowMeta.monospacedDigit())
+                        .foregroundStyle(Color.waterText)
+                        .lineLimit(1)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(BakingTerms.starterFinalWeight)
+                .accessibilityValue(BakingFormat.weight(store.starterFinalWeight(for: profile)))
+            }
+
+            Spacer(minLength: BakingSpace.md)
+
+            VStack(alignment: .trailing, spacing: BakingSpace.xs) {
+                RecipeLibraryMetadataLine(
+                    title: BakingTerms.starterLastFed,
+                    value: profile.lastFedAt.formatted(date: .numeric, time: .omitted)
+                )
+                RecipeLibraryMetadataLine(
+                    title: BakingTerms.starterRatio,
+                    value: profile.feedingRatio.label
+                )
+            }
+        }
+        .frame(minHeight: 64)
+        .padding(.horizontal, BakingLayout.screenHorizontalInset)
+        .padding(.vertical, BakingSpace.sm)
+        .contentShape(Rectangle())
+    }
+}
+
+private enum StarterLibraryStatusFilter {
+    case all
+    case due
+    case fresh
+
+    var next: StarterLibraryStatusFilter {
+        switch self {
+        case .all:
+            return .due
+        case .due:
+            return .fresh
+        case .fresh:
+            return .all
+        }
+    }
+
+    var icon: BakingIcon {
+        switch self {
+        case .all:
+            return .filterAll
+        case .due:
+            return .starter
+        case .fresh:
+            return .complete
+        }
+    }
+
+    var accessibilityValue: String {
+        switch self {
+        case .all:
+            return BakingTerms.starterStatusFilterAll
+        case .due:
+            return BakingTerms.starterStatusFilterDue
+        case .fresh:
+            return BakingTerms.starterStatusFilterFresh
+        }
+    }
+
+    @MainActor
+    func includes(_ profile: StarterProfile, store: RecipeStore) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .due:
+            return store.isStarterReminderDue(for: profile)
+        case .fresh:
+            return !store.isStarterReminderDue(for: profile)
+        }
+    }
+}
+
+private enum StarterFedSort {
+    case newestFirst
+    case oldestFirst
+
+    var icon: BakingIcon {
+        switch self {
+        case .newestFirst:
+            return .sortNewest
+        case .oldestFirst:
+            return .sortOldest
+        }
+    }
+
+    var toggled: StarterFedSort {
+        switch self {
+        case .newestFirst:
+            return .oldestFirst
+        case .oldestFirst:
+            return .newestFirst
+        }
+    }
+
+    var accessibilityValue: String {
+        switch self {
+        case .newestFirst:
+            return BakingTerms.starterSortFedNewest
+        case .oldestFirst:
+            return BakingTerms.starterSortFedOldest
+        }
     }
 }
 
@@ -424,6 +680,28 @@ private struct StarterFeedInlineMetric: View {
         .padding(.vertical, BakingSpace.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .bakingSurface(isWater ? .selected : .readOnly)
+    }
+}
+
+private struct StarterInfoRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: BakingSpace.md) {
+            BakingLabel(text: title, role: .inputLabel)
+
+            Spacer(minLength: BakingSpace.md)
+
+            Text(value)
+                .font(BakingTypography.tableNumber)
+                .foregroundStyle(Color.brandText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .padding(.horizontal, BakingSpace.md)
+        .padding(.vertical, BakingSpace.sm)
+        .bakingSurface(.readOnly)
     }
 }
 
@@ -473,41 +751,10 @@ private struct StarterToggleRow: View {
     }
 }
 
-private struct StarterMetricCell: View {
-    let title: String
-    let value: String
-    var accent: Color = .brandPrimary
-    var background: Color = Color.brandBackground.opacity(0.75)
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: BakingSpace.xs) {
-            BakingLabel(text: title, role: .readOnlyLabel)
-
-            BakingNumericValue(
-                value: value,
-                kind: .metric,
-                role: .primary,
-                valueColor: accent
-            )
-        }
-        .padding(.horizontal, BakingSpace.md)
-        .padding(.vertical, BakingSpace.sm)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
-    }
-}
-
 private struct StarterDivider: View {
     var body: some View {
         Rectangle()
-            .fill(Color.brandPrimary.opacity(0.08))
+            .fill(BakingSurfaceTheme.separator)
             .frame(height: 0.6)
     }
-}
-
-private enum StarterField: Hashable {
-    case name
-    case containerWeight
-    case finalWeight
 }

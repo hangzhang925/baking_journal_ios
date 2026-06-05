@@ -3,7 +3,7 @@ import SwiftUI
 struct BakingDropdownTrigger: View {
     let title: String
     var tint: Color = .brandText
-    var background: Color = Color.brandBackground.opacity(0.9)
+    var background: Color = BakingSurfaceTheme.theme(for: .readOnly).background
 
     var body: some View {
         HStack(spacing: 5) {
@@ -12,7 +12,7 @@ struct BakingDropdownTrigger: View {
             Image(systemName: "chevron.down")
                 .font(.caption2.weight(.bold))
         }
-        .font(.subheadline.weight(.semibold))
+        .font(BakingTypography.appPrimaryText)
         .foregroundStyle(tint)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -32,21 +32,15 @@ struct BakingDropdownPopover<Content: View>: View {
         .padding(8)
         .frame(width: width)
         .presentationCompactAdaptation(.popover)
-        .background(
-            RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
-                .fill(Color.brandSurface.opacity(0.98))
-                .overlay {
-                    RoundedRectangle(cornerRadius: BakingRadius.popover, style: .continuous)
-                        .stroke(Color.brandPrimary.opacity(0.08), lineWidth: 0.6)
-                }
-                .shadow(color: Color.black.opacity(0.06), radius: 20, x: 0, y: 10)
-        )
+        .bakingPopoverSurface(width: width)
     }
 }
 
 struct BakingDropdownRow<Leading: View>: View {
     let title: String
     var isSelected: Bool = false
+    var foreground: Color = .brandText
+    var selectionTint: Color = .brandPrimary
     @ViewBuilder var leading: Leading
 
     var body: some View {
@@ -55,15 +49,15 @@ struct BakingDropdownRow<Leading: View>: View {
                 .frame(width: 20, height: 20)
 
             Text(title)
-                .font(.body.weight(.medium))
-                .foregroundStyle(Color.brandText)
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(foreground)
 
             Spacer(minLength: 0)
 
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.brandPrimary)
+                    .foregroundStyle(selectionTint)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -72,4 +66,3 @@ struct BakingDropdownRow<Leading: View>: View {
         .contentShape(Rectangle())
     }
 }
-

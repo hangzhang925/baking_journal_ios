@@ -2,27 +2,30 @@ import SwiftUI
 
 struct RectangularDropdownTrigger: View {
     let title: String
+    var isEnabled = true
+    var width: CGFloat = BakingComponentMetrics.dropdownTriggerWidth
+    var textAlignment: Alignment = .leading
+    var font: Font = BakingTypography.appSecondaryText.weight(.semibold)
 
     var body: some View {
         HStack(spacing: 6) {
             Text(title)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-            Image(systemName: "chevron.down")
-                .font(.caption2.weight(.bold))
+                .frame(maxWidth: .infinity, alignment: textAlignment)
+            if isEnabled {
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .frame(width: 14, alignment: .trailing)
+            }
         }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(Color.brandText)
+        .font(font)
+        .foregroundStyle(isEnabled ? Color.brandText : Color.brandSecondaryText)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .frame(width: 96, alignment: .leading)
+        .frame(width: width, alignment: .leading)
         .frame(minHeight: BakingTouchTarget.secondaryActionVisual)
-        .background(Color.brandBackground.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.brandPrimary.opacity(0.10), lineWidth: 0.5)
-        }
+        .bakingSurface(isEnabled ? .field : .readOnly)
     }
 }
 
@@ -37,7 +40,7 @@ struct CompactInfoBadge: View {
             Image(systemName: icon)
                 .font((compact ? Font.caption2 : Font.caption2).weight(.semibold))
             Text(text)
-                .font((compact ? Font.caption : Font.subheadline).monospacedDigit().weight(.semibold))
+                .font(compact ? BakingTypography.appSecondaryText.monospacedDigit().weight(.semibold) : BakingTypography.tableNumber)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
         }
@@ -45,8 +48,6 @@ struct CompactInfoBadge: View {
         .padding(.horizontal, compact ? 8 : 10)
         .padding(.vertical, compact ? 7 : 8)
         .frame(minWidth: compact ? 68 : 84, minHeight: compact ? BakingTouchTarget.dropdownIconSurface : BakingTouchTarget.secondaryActionVisual)
-        .background(isWater ? Color.waterSurfaceStrong.opacity(0.42) : Color.brandPrimary.opacity(0.075))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -73,6 +74,7 @@ struct ActiveDropdownMenu: Identifiable {
     let frame: CGRect
     let width: CGFloat
     let alignment: DropdownMenuAlignment
+    var reservesLeadingIconSlot = true
     let items: [DropdownMenuItem]
 }
 

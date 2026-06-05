@@ -153,7 +153,7 @@ struct FormulaItemDisplayRow: View {
                 if let detailText {
                     Text(detailText)
                         .bakingLabelStyle(.helperText)
-                        .foregroundStyle(isPureWaterItem ? Color.waterText.opacity(0.82) : Color.brandSecondaryText)
+                        .foregroundStyle(Color.brandSecondaryText)
                         .lineLimit(1)
                 }
             }
@@ -165,8 +165,8 @@ struct FormulaItemDisplayRow: View {
                     if currentItem.category != .flour {
                         BakingPercentColumn(
                             value: BakingFormat.number(percent, precision: 0),
-                            color: isPureWaterItem ? Color.waterText : Color.brandPrimary,
-                            unitColor: isPureWaterItem ? Color.waterText.opacity(0.68) : Color.brandPrimary.opacity(0.62),
+                            color: Color.brandText,
+                            unitColor: Color.brandSecondaryText,
                             width: Self.percentColumnWidth
                         )
                     } else {
@@ -178,14 +178,13 @@ struct FormulaItemDisplayRow: View {
                 BakingQuantityColumn(
                     value: weightParts.value,
                     unit: weightParts.unit,
-                    valueFont: BakingTypography.inputValue,
-                    unitFont: .caption.weight(.semibold),
-                    valueColor: isPureWaterItem ? Color.waterText : Color.brandText,
-                    unitColor: isPureWaterItem ? Color.waterText.opacity(0.68) : Color.brandSecondaryText,
+                    valueFont: BakingTypography.tableNumber,
+                    unitFont: BakingTypography.rowMeta,
+                    valueColor: Color.brandText,
+                    unitColor: Color.brandSecondaryText,
                     valueWidth: Self.weightValueWidth,
                     unitWidth: Self.weightUnitWidth
                 )
-
             }
             .frame(width: Self.numericColumnsWidth, alignment: .trailing)
             .layoutPriority(0)
@@ -203,7 +202,7 @@ struct FormulaItemDisplayRow: View {
         .overlay(alignment: .leading) {
             if isEditing {
                 Capsule()
-                    .fill(Color.brandPrimary.opacity(0.55))
+                    .fill(BakingSurfaceTheme.theme(for: .selected).stroke)
                     .frame(width: 3)
                     .padding(.vertical, BakingSpace.lg)
                     .transition(.opacity)
@@ -250,7 +249,7 @@ struct FormulaItemDisplayRow: View {
         BakingIconView(icon: BakingIcon.material(for: currentItem), size: BakingTouchTarget.inlineIconGlyph, color: itemTint)
             .frame(width: BakingTouchTarget.inlineIconSurface, height: BakingTouchTarget.inlineIconSurface)
             .background(iconBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
             .frame(width: Self.iconColumnWidth, alignment: .center)
     }
 
@@ -275,15 +274,11 @@ struct FormulaItemDisplayRow: View {
     }
 
     private var rowBackground: Color {
-        isEditing ? Color.brandPrimary.opacity(0.035) : Color.clear
+        isEditing ? Color.materialChipSurface.opacity(0.55) : Color.clear
     }
 
     private var percent: Double {
         store.summary.flourWeight > 0 ? currentItem.weight / store.summary.flourWeight * 100 : 0
-    }
-
-    private var isWholeEgg: Bool {
-        (currentItem.eggType ?? BakingTerms.wholeEgg) == BakingTerms.wholeEgg
     }
 
     private var weightParts: BakingFormattedUnitValue {
@@ -291,20 +286,8 @@ struct FormulaItemDisplayRow: View {
     }
 
     private var detailText: String? {
-        if currentItem.category == .starter {
-            return BakingTerms.formulaStarterDetail(
-                flour: BakingFormat.weight(store.flourContribution(currentItem)),
-                water: BakingFormat.weight(store.starterBaseWater(currentItem))
-            )
-        }
         if currentItem.tag == .egg {
-            guard isWholeEgg else {
-                return BakingTerms.formulaEggWaterDetail(BakingFormat.weight(store.waterContribution(currentItem)))
-            }
-            return BakingTerms.formulaEggDetail(
-                count: BakingFormat.number(currentItem.eggCount ?? 1, precision: 1),
-                water: BakingFormat.weight(store.waterContribution(currentItem))
-            )
+            return nil
         }
         return nil
     }
@@ -477,11 +460,17 @@ struct FormulaItemCard: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
-                        InlineNameField(
-                            text: itemTextBinding(\.name),
-                            placeholder: currentItem.category.label,
-                            font: .callout.weight(.semibold)
-                        )
+                        if currentItem.tag == .egg {
+                            BakingLabel(text: BakingTerms.egg, role: .inputLabel)
+                                .frame(width: 132, alignment: .leading)
+                                .frame(minHeight: 40)
+                        } else {
+                            InlineNameField(
+                                text: itemTextBinding(\.name),
+                                placeholder: currentItem.category.label,
+                                font: BakingTypography.appPrimaryText
+                            )
+                        }
                         if hasWaterContent {
                             Image(systemName: "drop.fill")
                                 .font(.caption2.weight(.semibold))
@@ -497,8 +486,8 @@ struct FormulaItemCard: View {
                     }
                     if let detailText {
                         Text(detailText)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(BakingTypography.appSecondaryText)
+                            .foregroundStyle(Color.brandSecondaryText)
                             .padding(.leading, 8)
                     }
                 }
@@ -511,7 +500,7 @@ struct FormulaItemCard: View {
                             value: BakingFormat.number(percent, precision: 0),
                             unit: "%",
                             font: .callout,
-                            color: .brandPrimary,
+                            color: .brandText,
                             totalWidth: 62,
                             isWaterStyle: isPureWaterItem
                         )
@@ -523,12 +512,12 @@ struct FormulaItemCard: View {
                             totalWidth: 76,
                             isWaterStyle: false
                         )
-                    } else if currentItem.tag == .egg && isWholeEgg {
+                    } else if currentItem.tag == .egg {
                         ReadOnlyInlineMetric(
                             value: BakingFormat.number(percent, precision: 0),
                             unit: "%",
                             font: .callout,
-                            color: .brandPrimary,
+                            color: .brandText,
                             totalWidth: 58,
                             isWaterStyle: false
                         )
@@ -545,7 +534,7 @@ struct FormulaItemCard: View {
                             BakingPercentageField(value: Binding(
                                 get: { percent },
                                 set: { store.updateItemPercent(currentItem, percent: $0) }
-                            ), precision: 0, font: .callout, color: .brandPrimary, fieldWidth: 34, totalWidth: 62, isWaterStyle: false)
+                            ), precision: 0, font: .callout, color: .brandText, fieldWidth: 34, totalWidth: 62, isWaterStyle: false)
                         } else {
                             Color.clear
                                 .frame(width: 58, height: 1)
@@ -564,7 +553,7 @@ struct FormulaItemCard: View {
             .padding(.vertical, 5)
 
             if isExpanded && currentItem.requiresAdvancedFormulaEditor {
-                Divider().padding(.horizontal, 12)
+                Divider().padding(.horizontal, 12).opacity(0)
 
                 if currentItem.category == .starter {
                     StarterMiniRecipeEditor(
@@ -609,8 +598,8 @@ struct FormulaItemCard: View {
                             } label: {
                                 BakingSystemIconButtonLabel(
                                     systemImage: "trash",
-                                    tint: .white,
-                                    background: .brandPrimary,
+                                    tint: .brandPrimary,
+                                    background: BakingSurfaceTheme.theme(for: .destructive).background,
                                     shape: .rounded(BakingRadius.card)
                                 )
                                 .frame(maxWidth: .infinity)
@@ -630,7 +619,7 @@ struct FormulaItemCard: View {
         }
         .animation(.easeInOut(duration: 0.22), value: isExpanded)
         .frame(maxWidth: .infinity)
-        .bakingCard(background: cardBackground, stroke: cardStroke)
+        .bakingMaterialCard(palette: currentItem.materialPalette)
     }
 
     @ViewBuilder private var iconControl: some View {
@@ -657,14 +646,14 @@ struct FormulaItemCard: View {
             BakingIconView(icon: BakingIcon.material(for: currentItem), size: BakingTouchTarget.inlineIconGlyph, color: itemTint)
                 .frame(width: BakingTouchTarget.inlineIconSurface, height: BakingTouchTarget.inlineIconSurface)
                 .background(iconBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
 
             if currentItem.requiresAdvancedFormulaEditor {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(Color.brandPrimary)
                     .frame(width: 14, height: 14)
-                    .background(Color.brandSurface)
+                    .background(Color.brandBackground)
                     .clipShape(Circle())
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
                     .offset(x: 3, y: 3)
@@ -727,11 +716,11 @@ struct FormulaItemCard: View {
     }
 
     private var cardBackground: Color {
-        currentItem.materialPalette.surface
+        currentItem.materialPalette.chipSurface
     }
 
     private var cardStroke: Color {
-        currentItem.materialPalette.stroke
+        currentItem.materialPalette.chipStroke
     }
 
     private var percent: Double {
@@ -739,20 +728,10 @@ struct FormulaItemCard: View {
     }
 
     private var detailText: String? {
-        if currentItem.category == .starter {
-            return BakingTerms.formulaStarterDetail(
-                flour: BakingFormat.weight(store.flourContribution(currentItem)),
-                water: BakingFormat.weight(store.starterBaseWater(currentItem))
-            )
-        }
         if currentItem.tag == .egg {
             return nil
         }
         return nil
-    }
-
-    private var isWholeEgg: Bool {
-        (currentItem.eggType ?? BakingTerms.wholeEgg) == BakingTerms.wholeEgg
     }
 
     private func itemTextBinding(_ keyPath: WritableKeyPath<RecipeItem, String>) -> Binding<String> {
@@ -766,24 +745,6 @@ struct FormulaItemCard: View {
         )
     }
 
-    private func itemNumberBinding(_ keyPath: WritableKeyPath<RecipeItem, Double?>, fallback: Double) -> Binding<Double> {
-        Binding(
-            get: { currentItem[keyPath: keyPath] ?? fallback },
-            set: {
-                var next = currentItem
-                next[keyPath: keyPath] = max(0, $0)
-                store.updateItem(next)
-            }
-        )
-    }
-
-    private func updateEgg(count: Double, unitWeight: Double) {
-        var next = currentItem
-        next.eggCount = max(0, count)
-        next.eggUnitWeight = max(0, unitWeight)
-        next.weight = (next.eggCount ?? 0) * (next.eggUnitWeight ?? 45)
-        store.updateItem(next)
-    }
 }
 
 extension RecipeItem {
@@ -829,8 +790,8 @@ private struct OtherMiniRecipeEditor: View {
                 } label: {
                     BakingSystemIconButtonLabel(
                         systemImage: "trash",
-                        tint: .white,
-                        background: .brandPrimary,
+                        tint: .brandPrimary,
+                        background: BakingSurfaceTheme.theme(for: .destructive).background,
                         shape: .rounded(BakingRadius.card)
                     )
                 }
@@ -840,8 +801,6 @@ private struct OtherMiniRecipeEditor: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.brandBackground.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var currentItem: RecipeItem {

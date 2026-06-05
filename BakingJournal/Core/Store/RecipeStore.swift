@@ -18,14 +18,37 @@ final class RecipeStore: ObservableObject {
         }
     }
 
-    @Published var recipeName: String = BakingTerms.toastRecipeName { didSet { persist() } }
-    @Published var items: [RecipeItem] = [] { didSet { persist() } }
+    @Published var recipeName: String = BakingTerms.toastRecipeName {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
+    @Published var recipeOverallNotes: String = "" {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
+    @Published var stepText: String = "" {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
+    @Published var items: [RecipeItem] = [] {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
     @Published var steps: [JournalStep] = [] {
         didSet {
             if steps.isEmpty {
                 currentWorkflowState = .draft
             }
             persist()
+            autosaveCurrentRecipeIfNeeded()
         }
     }
     @Published var cookState = CookState() { didSet { persist() } }
@@ -33,14 +56,31 @@ final class RecipeStore: ObservableObject {
     @Published var savedRecipes: [SavedRecipe] = [] { didSet { persist() } }
     @Published var bakeHistory: [BakeRecord] = [] { didSet { persist() } }
     @Published var activeBakeRecordID: UUID? { didSet { persist() } }
-    @Published var starterProfile = StarterProfile() { didSet { persist() } }
-    @Published var currentWorkflowState: RecipeWorkflowState = .draft { didSet { persist() } }
+    @Published var starterProfiles: [StarterProfile] = [StarterProfile()] { didSet { persist() } }
+    @Published var currentWorkflowState: RecipeWorkflowState = .draft {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
+    @Published var currentRecipeKind: RecipeKind = .toast {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
     @Published private(set) var hasLoadedPersistedState = false
 
     static let starterOptions = [BakingTerms.levainStarter, BakingTerms.liquidStarter, BakingTerms.tangzhongStarter, BakingTerms.scaldedStarter, BakingTerms.poolishStarter]
-    static let starterRatioOptions = ["1:1", "2:1", "5:1"]
+    static let starterRatioOptions = ["1:1", "1:2", "1:5"]
     static let yeastOptions = [BakingTerms.dryYeast, BakingTerms.freshYeast, BakingTerms.liquidYeast]
-    static let eggOptions = [BakingTerms.wholeEgg, BakingTerms.yolk, BakingTerms.white]
+    static let eggOptions = [BakingTerms.yolk, BakingTerms.white, BakingTerms.beatenEgg]
+    static let eggWaterContent = [
+        BakingTerms.wholeEgg: 75.0,
+        BakingTerms.beatenEgg: 75.0,
+        BakingTerms.yolk: 48.0,
+        BakingTerms.white: 88.0
+    ]
     // TODO: When starter notifications are added, schedule nextFeedingDate at these local reminder hours.
     static let starterReminderHours = [9, 12, 17]
 
@@ -67,6 +107,14 @@ final class RecipeStore: ObservableObject {
     }
 
     var summary: RecipeSummary {
+        summary(for: items)
+    }
+
+    func summary(for recipe: SavedRecipe) -> RecipeSummary {
+        summary(for: recipe.items)
+    }
+
+    func summary(for items: [RecipeItem]) -> RecipeSummary {
         let doughWeight = items.reduce(0) { $0 + $1.weight }
         let flourWeight = items.reduce(0) { $0 + flourContribution($1) }
         let waterWeight = items.reduce(0) { $0 + waterContribution($1) }
@@ -84,29 +132,40 @@ final class RecipeStore: ObservableObject {
     }
 
     var currentStarterDisplayName: String {
-        let trimmed = starterProfile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = starterProfiles.first?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? BakingTerms.starterProfileDefaultName : trimmed
     }
 
-    var starterFinalWeight: Double {
-        let containerWeight = starterProfile.isContainerWeightEnabled ? starterProfile.containerWeight : 0
-        return max(0, starterProfile.measuredWeight - containerWeight)
+    func starterDisplayName(for profile: StarterProfile) -> String {
+        let trimmed = profile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? BakingTerms.starterProfileDefaultName : trimmed
     }
 
-    var starterFeedFlourWeight: Double {
-        starterFinalWeight * starterProfile.feedingRatio.feedMultiplier
+    func starterFinalWeight(for profile: StarterProfile) -> Double {
+        let containerWeight = profile.isContainerWeightEnabled ? profile.containerWeight : 0
+        return max(0, profile.measuredWeight - containerWeight)
     }
 
-    var starterFeedWaterWeight: Double {
-        starterFinalWeight * starterProfile.feedingRatio.feedMultiplier
+    func starterFeedFlourWeight(for profile: StarterProfile) -> Double {
+        starterFinalWeight(for: profile) * profile.feedingRatio.feedMultiplier
+    }
+
+    func starterFeedWaterWeight(for profile: StarterProfile) -> Double {
+        starterFinalWeight(for: profile) * profile.feedingRatio.feedMultiplier
     }
 
     var isStarterReminderDue: Bool {
-        guard starterProfile.isReminderEnabled else { return false }
+        starterProfiles.contains { profile in
+            isStarterReminderDue(for: profile)
+        }
+    }
+
+    func isStarterReminderDue(for profile: StarterProfile) -> Bool {
+        guard profile.isReminderEnabled else { return false }
         let calendar = Calendar.current
         let todayStart = calendar.startOfDay(for: Date())
-        let nextFeedingStart = calendar.startOfDay(for: starterProfile.nextFeedingDate)
-        return todayStart >= nextFeedingStart && starterProfile.lastFedAt < nextFeedingStart
+        let nextFeedingStart = calendar.startOfDay(for: profile.nextFeedingDate)
+        return todayStart >= nextFeedingStart && profile.lastFedAt < nextFeedingStart
     }
 
     var bakesThisWeek: Int {
@@ -187,6 +246,9 @@ final class RecipeStore: ObservableObject {
         cancelCookTimerReminder()
         isLoading = true
         recipeName = BakingTerms.defaultRecipeName
+        currentRecipeKind = .custom
+        recipeOverallNotes = ""
+        stepText = ""
         items = []
         steps = []
         cookState = CookState()
@@ -210,6 +272,9 @@ final class RecipeStore: ObservableObject {
         cancelCookTimerReminder()
         isLoading = true
         recipeName = recipe.name.isEmpty ? BakingTerms.defaultRecipeName : BakingTerms.recipeCopyName(recipe.name)
+        currentRecipeKind = recipe.kind
+        recipeOverallNotes = recipe.overallNotes
+        stepText = recipe.stepText
         items = recipe.items
         steps = recipe.steps
         cookState = CookState()
@@ -220,20 +285,50 @@ final class RecipeStore: ObservableObject {
         persist()
     }
 
+    @discardableResult
+    func copyCurrentRecipe() -> SavedRecipe {
+        saveCurrentRecipe()
+        let now = Date()
+        let recipe = SavedRecipe(
+            id: UUID(),
+            name: BakingTerms.recipeCopyName(currentRecipeDisplayName),
+            kind: currentRecipeKind,
+            overallNotes: recipeOverallNotes,
+            stepText: stepText,
+            items: items,
+            steps: steps,
+            workflowState: recipeWorkflowState,
+            createdAt: now,
+            updatedAt: now
+        )
+        savedRecipes.insert(recipe, at: 0)
+        loadRecipe(recipe)
+        return recipe
+    }
+
     func applyTemplate(_ template: RecipeTemplate) {
         cancelCookTimerReminder()
         isLoading = true
         switch template {
         case .toast:
             recipeName = BakingTerms.toastRecipeName
+            currentRecipeKind = .toast
+            recipeOverallNotes = ""
+            stepText = ""
             items = Self.defaultItems
             steps = []
         case .chiffon:
             recipeName = BakingTerms.chiffonRecipeName
+            currentRecipeKind = .chiffon
+            recipeOverallNotes = ""
+            stepText = ""
             items = Self.chiffonItems
             steps = []
         case .countryBread:
             recipeName = BakingTerms.countryBreadRecipeName
+            currentRecipeKind = .countryBread
+            recipeOverallNotes = ""
+            stepText = ""
             items = Self.countryBreadItems
             steps = []
         }
@@ -249,6 +344,9 @@ final class RecipeStore: ObservableObject {
         let now = Date()
         if let currentRecipeID, let index = savedRecipes.firstIndex(where: { $0.id == currentRecipeID }) {
             savedRecipes[index].name = currentRecipeDisplayName
+            savedRecipes[index].kind = currentRecipeKind
+            savedRecipes[index].overallNotes = recipeOverallNotes
+            savedRecipes[index].stepText = stepText
             savedRecipes[index].items = items
             savedRecipes[index].steps = steps
             savedRecipes[index].workflowState = recipeWorkflowState
@@ -257,6 +355,9 @@ final class RecipeStore: ObservableObject {
             let recipe = SavedRecipe(
                 id: UUID(),
                 name: currentRecipeDisplayName,
+                kind: currentRecipeKind,
+                overallNotes: recipeOverallNotes,
+                stepText: stepText,
                 items: items,
                 steps: steps,
                 workflowState: recipeWorkflowState,
@@ -268,10 +369,44 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    private func autosaveCurrentRecipeIfNeeded() {
+        guard !isLoading,
+              let currentRecipeID,
+              let index = savedRecipes.firstIndex(where: { $0.id == currentRecipeID }) else {
+            return
+        }
+
+        let workflowState = recipeWorkflowState
+        let currentRecipe = savedRecipes[index]
+        guard currentRecipe.name != currentRecipeDisplayName
+            || currentRecipe.kind != currentRecipeKind
+            || currentRecipe.overallNotes != recipeOverallNotes
+            || currentRecipe.stepText != stepText
+            || currentRecipe.items != items
+            || currentRecipe.steps != steps
+            || currentRecipe.workflowState != workflowState else {
+            return
+        }
+
+        var recipes = savedRecipes
+        recipes[index].name = currentRecipeDisplayName
+        recipes[index].kind = currentRecipeKind
+        recipes[index].overallNotes = recipeOverallNotes
+        recipes[index].stepText = stepText
+        recipes[index].items = items
+        recipes[index].steps = steps
+        recipes[index].workflowState = workflowState
+        recipes[index].updatedAt = Date()
+        savedRecipes = recipes
+    }
+
     func loadRecipe(_ recipe: SavedRecipe) {
         cancelCookTimerReminder()
         isLoading = true
         recipeName = recipe.name
+        currentRecipeKind = recipe.kind
+        recipeOverallNotes = recipe.overallNotes
+        stepText = recipe.stepText
         items = recipe.items
         steps = recipe.steps
         cookState = CookState()
@@ -289,21 +424,40 @@ final class RecipeStore: ObservableObject {
         }
     }
 
-    func updateStarterFinalWeight(_ finalWeight: Double) {
-        var next = starterProfile
-        let containerWeight = next.isContainerWeightEnabled ? next.containerWeight : 0
-        next.measuredWeight = max(0, finalWeight) + containerWeight
-        starterProfile = next
+    @discardableResult
+    func createStarterProfile() -> StarterProfile {
+        let starter = StarterProfile()
+        starterProfiles.insert(starter, at: 0)
+        return starter
     }
 
-    func markStarterFed() {
-        var next = starterProfile
-        let currentWeight = starterFinalWeight
-        let addedWeight = starterFeedFlourWeight + starterFeedWaterWeight
+    func updateStarterProfile(_ profile: StarterProfile) {
+        guard let index = starterProfiles.firstIndex(where: { $0.id == profile.id }) else { return }
+        starterProfiles[index] = profile
+    }
+
+    func deleteStarterProfile(_ profile: StarterProfile) {
+        starterProfiles.removeAll { $0.id == profile.id }
+        if starterProfiles.isEmpty {
+            starterProfiles = [StarterProfile()]
+        }
+    }
+
+    func updateStarterFinalWeight(_ finalWeight: Double, for profile: StarterProfile) {
+        var next = profile
+        let containerWeight = next.isContainerWeightEnabled ? next.containerWeight : 0
+        next.measuredWeight = max(0, finalWeight) + containerWeight
+        updateStarterProfile(next)
+    }
+
+    func markStarterFed(_ profile: StarterProfile) {
+        var next = profile
+        let currentWeight = starterFinalWeight(for: profile)
+        let addedWeight = starterFeedFlourWeight(for: profile) + starterFeedWaterWeight(for: profile)
         let containerWeight = next.isContainerWeightEnabled ? next.containerWeight : 0
         next.lastFedAt = Date()
         next.measuredWeight = currentWeight + addedWeight + containerWeight
-        starterProfile = next
+        updateStarterProfile(next)
     }
 
     func updateBakeRecordNotes(_ notes: String, for record: BakeRecord) {
@@ -420,9 +574,27 @@ final class RecipeStore: ObservableObject {
             let nextBase = max(0, weight - optionalWeight)
             let scale = nextBase / currentBase
             setStarterParts(&next, flour: flourContribution(next) * scale, water: starterBaseWater(next) * scale)
+        } else if next.tag == .egg {
+            setEggWeight(&next, weight: weight)
         } else {
             next.weight = max(0, weight)
         }
+        updateItem(next)
+    }
+
+    func updateEggType(_ type: String, for item: RecipeItem) {
+        guard var next = items.first(where: { $0.id == item.id }) else { return }
+        let normalizedType = Self.eggOptions.contains(type) ? type : BakingTerms.beatenEgg
+
+        next.eggType = normalizedType
+        next.name = BakingTerms.egg
+        next.waterContentPct = Self.waterContent(forEggType: normalizedType)
+        updateItem(next)
+    }
+
+    func updateEggWeight(_ item: RecipeItem, weight: Double) {
+        guard var next = items.first(where: { $0.id == item.id }) else { return }
+        setEggWeight(&next, weight: weight)
         updateItem(next)
     }
 
@@ -437,24 +609,35 @@ final class RecipeStore: ObservableObject {
         next.starterType = type
         next.name = BakingTerms.starterDisplayName(type)
         next.starterRatio = Self.defaultStarterRatio[type] ?? "1:1"
-        applyStarterHydrationPreset(&next, hydrationPct: Self.starterRatioHydration[next.starterRatio ?? ""] ?? 100)
+        next.starterEditMode = .ratio
+        applyStarterHydrationPreset(&next, hydrationPct: Self.hydration(forStarterRatio: next.starterRatio ?? "1:1"))
         updateItem(next)
     }
 
     func applyStarterRatio(_ ratio: String, to item: RecipeItem) {
         guard var next = items.first(where: { $0.id == item.id }) else { return }
         next.starterRatio = ratio
-        applyStarterHydrationPreset(&next, hydrationPct: Self.starterRatioHydration[ratio] ?? 100)
+        next.starterEditMode = .ratio
+        applyStarterHydrationPreset(&next, hydrationPct: Self.hydration(forStarterRatio: ratio))
+        updateItem(next)
+    }
+
+    func updateStarterEditMode(_ mode: StarterEditMode, for item: RecipeItem) {
+        guard var next = items.first(where: { $0.id == item.id }) else { return }
+        next.starterEditMode = mode
+        next.starterRatio = starterRatioLabel(for: next)
         updateItem(next)
     }
 
     func updateStarterParts(_ item: RecipeItem, flour: Double? = nil, water: Double? = nil) {
         guard var next = items.first(where: { $0.id == item.id }) else { return }
+        next.starterEditMode = .weight
         setStarterParts(
             &next,
             flour: flour ?? flourContribution(next),
             water: water ?? starterBaseWater(next)
         )
+        next.starterRatio = starterRatioLabel(for: next)
         updateItem(next)
     }
 
@@ -475,6 +658,13 @@ final class RecipeStore: ObservableObject {
 
     func addStep(type: StepType) {
         steps.append(makeStep(type: type))
+    }
+
+    @discardableResult
+    func addTextStep() -> JournalStep {
+        let step = JournalStep(id: UUID(), type: .other, name: "", notes: "", materialAllocations: [])
+        steps.append(step)
+        return step
     }
 
     func removeStep(_ step: JournalStep) {
@@ -518,11 +708,11 @@ final class RecipeStore: ObservableObject {
     }
 
     func assign(itemId: UUID, to step: JournalStep) {
-        assign(itemId: itemId, percentage: remainingPercentage(for: itemId, excluding: step.id), to: step)
+        assign(itemId: itemId, percentage: 100, to: step)
     }
 
     func assign(itemId: UUID, percentage: Double, to step: JournalStep) {
-        let clamped = min(max(0, percentage), remainingPercentage(for: itemId, excluding: step.id))
+        let clamped = min(max(0, percentage), 100)
         guard clamped > 0 else { return }
         var nextSteps = steps
         guard let stepIndex = nextSteps.firstIndex(where: { $0.id == step.id }) else { return }
@@ -541,13 +731,11 @@ final class RecipeStore: ObservableObject {
         var nextSteps = steps
         guard let stepIndex = nextSteps.firstIndex(where: { $0.id == step.id }) else { return }
         for item in items {
-            let available = remainingPercentage(for: item.id, excluding: step.id)
-            guard available > 0 else { continue }
             if let allocationIndex = nextSteps[stepIndex].materialAllocations.firstIndex(where: { $0.itemId == item.id }) {
-                nextSteps[stepIndex].materialAllocations[allocationIndex].percentage = available
+                nextSteps[stepIndex].materialAllocations[allocationIndex].percentage = 100
             } else {
                 nextSteps[stepIndex].materialAllocations.append(
-                    StepMaterialAllocation(itemId: item.id, percentage: available)
+                    StepMaterialAllocation(itemId: item.id, percentage: 100)
                 )
             }
         }
@@ -576,31 +764,8 @@ final class RecipeStore: ObservableObject {
         }
     }
 
-    func unassignedItems() -> [RecipeItem] {
-        items.filter { remainingPercentage(for: $0.id) > 0 }
-    }
-
-    func stepContaining(itemId: UUID) -> JournalStep? {
-        steps.first { step in
-            step.materialAllocations.contains { $0.itemId == itemId }
-        }
-    }
-
     func allocationPercentage(for itemId: UUID, in step: JournalStep) -> Double {
         step.materialAllocations.first { $0.itemId == itemId }?.percentage ?? 0
-    }
-
-    func allocatedPercentage(for itemId: UUID, excluding stepId: UUID? = nil) -> Double {
-        steps.reduce(0) { total, step in
-            if step.id == stepId { return total }
-            return total + step.materialAllocations
-                .filter { $0.itemId == itemId }
-                .reduce(0) { $0 + $1.percentage }
-        }
-    }
-
-    func remainingPercentage(for itemId: UUID, excluding stepId: UUID? = nil) -> Double {
-        max(0, 100 - allocatedPercentage(for: itemId, excluding: stepId))
     }
 
     func allocatedWeight(for item: RecipeItem, percentage: Double) -> Double {
@@ -670,7 +835,13 @@ final class RecipeStore: ObservableObject {
     }
 
     func exportRecipeData() throws -> Data {
-        let state = LegacyPersistedRecipe(recipeName: recipeName, items: items, steps: steps)
+        let state = LegacyPersistedRecipe(
+            recipeName: recipeName,
+            overallNotes: recipeOverallNotes,
+            stepText: stepText,
+            items: items,
+            steps: steps
+        )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return try encoder.encode(state)
@@ -681,7 +852,10 @@ final class RecipeStore: ObservableObject {
         cancelCookTimerReminder()
         isLoading = true
         recipeName = decoded.recipeName.isEmpty ? BakingTerms.toastRecipeName : decoded.recipeName
+        recipeOverallNotes = decoded.overallNotes
+        stepText = decoded.stepText
         items = decoded.items.isEmpty ? Self.defaultItems : decoded.items
+        currentRecipeKind = RecipeKind.inferred(name: recipeName, items: items)
         steps = decoded.steps
         isLoading = false
         cookState = CookState()
@@ -694,7 +868,12 @@ final class RecipeStore: ObservableObject {
         if item.category == .flour { return item.weight }
         guard item.category == .starter else { return 0 }
         if let starterFlour = item.starterFlour { return starterFlour }
-        let hydration = (item.hydrationPct ?? Self.starterRatioHydration[item.starterRatio ?? ""] ?? Self.starterHydrationPresets[item.starterType ?? ""] ?? 100) / 100
+        let hydrationPct = item.hydrationPct
+            ?? Self.starterRatioHydration[item.starterRatio ?? ""]
+            ?? Self.parsedHydration(forStarterRatio: item.starterRatio ?? "")
+            ?? Self.starterHydrationPresets[item.starterType ?? ""]
+            ?? 100
+        let hydration = hydrationPct / 100
         let optionalWeight = (item.starterYeastWeight ?? 0) + starterEggWeight(item)
         return max(0, item.weight - optionalWeight) / (1 + hydration)
     }
@@ -702,7 +881,7 @@ final class RecipeStore: ObservableObject {
     func waterContribution(_ item: RecipeItem) -> Double {
         if item.tag == .water { return item.weight }
         if item.category == .starter { return starterBaseWater(item) + starterEggWater(item) }
-        if item.tag == .egg { return item.weight * ((item.waterContentPct ?? 75) / 100) }
+        if item.tag == .egg { return item.weight * (Self.waterContent(forEggType: item.eggType) / 100) }
         if item.category == .other { return item.weight * ((item.waterContentPct ?? 0) / 100) }
         if item.yeastType == BakingTerms.liquidYeast { return item.weight }
         return 0
@@ -712,10 +891,24 @@ final class RecipeStore: ObservableObject {
         waterContribution(item) > 0
     }
 
+    static func waterContent(forEggType type: String?) -> Double {
+        eggWaterContent[type ?? BakingTerms.beatenEgg] ?? eggWaterContent[BakingTerms.beatenEgg] ?? 75
+    }
+
     func starterBaseWater(_ item: RecipeItem) -> Double {
         if let starterWater = item.starterWater { return starterWater }
         let optionalWeight = (item.starterYeastWeight ?? 0) + starterEggWeight(item)
         return max(0, item.weight - optionalWeight) - flourContribution(item)
+    }
+
+    func starterEditMode(for item: RecipeItem) -> StarterEditMode {
+        item.starterEditMode ?? .ratio
+    }
+
+    func starterRatioLabel(for item: RecipeItem) -> String {
+        let flour = flourContribution(item)
+        let water = starterBaseWater(item)
+        return Self.starterRatioLabel(flour: flour, water: water, fallback: item.starterRatio ?? "1:1")
     }
 
     func starterEggWeight(_ item: RecipeItem) -> Double {
@@ -810,6 +1003,12 @@ final class RecipeStore: ObservableObject {
         syncStarterWeight(&item)
     }
 
+    private func setEggWeight(_ item: inout RecipeItem, weight: Double) {
+        let nextWeight = max(0, weight)
+        item.waterContentPct = Self.waterContent(forEggType: item.eggType)
+        item.weight = nextWeight
+    }
+
     private func displayGroup(for category: ItemCategory) -> ItemCategory {
         switch category {
         case .starter:
@@ -834,6 +1033,31 @@ final class RecipeStore: ObservableObject {
         let baseWeight = max(1, flourContribution(item) + starterBaseWater(item))
         let flour = baseWeight / (1 + hydrationPct / 100)
         setStarterParts(&item, flour: flour, water: baseWeight - flour)
+        item.starterRatio = Self.starterRatioLabel(flour: flour, water: baseWeight - flour, fallback: item.starterRatio ?? "1:1")
+    }
+
+    private static func hydration(forStarterRatio ratio: String) -> Double {
+        starterRatioHydration[ratio] ?? parsedHydration(forStarterRatio: ratio) ?? 100
+    }
+
+    private static func parsedHydration(forStarterRatio ratio: String) -> Double? {
+        let normalized = ratio.replacingOccurrences(of: "：", with: ":")
+        let parts = normalized.split(separator: ":")
+        guard parts.count == 2,
+              let flourPart = Double(parts[0]),
+              let waterPart = Double(parts[1]),
+              flourPart > 0 else { return nil }
+        return waterPart / flourPart * 100
+    }
+
+    private static func starterRatioLabel(flour: Double, water: Double, fallback: String) -> String {
+        guard flour > 0 else { return fallback }
+        let waterPart = max(0, water / flour)
+        let roundedWhole = waterPart.rounded()
+        if abs(waterPart - roundedWhole) < 0.05 {
+            return "1:\(Int(roundedWhole))"
+        }
+        return String(format: "1:%.1f", waterPart)
     }
 
     private func load() {
@@ -844,41 +1068,53 @@ final class RecipeStore: ObservableObject {
         }
         guard let data = UserDefaults.standard.data(forKey: storageKey) else {
             recipeName = BakingTerms.toastRecipeName
+            currentRecipeKind = .toast
+            recipeOverallNotes = ""
+            stepText = ""
             items = Self.defaultItems
             steps = []
-            starterProfile = StarterProfile()
+            starterProfiles = [StarterProfile()]
             return
         }
 
         if let decoded = try? JSONDecoder().decode(PersistedState.self, from: data) {
             recipeName = decoded.currentDraft.recipeName
+            recipeOverallNotes = decoded.currentDraft.overallNotes
+            stepText = decoded.currentDraft.stepText
             items = decoded.currentDraft.items.isEmpty ? Self.defaultItems : decoded.currentDraft.items
+            currentRecipeKind = decoded.currentRecipeKind
             steps = decoded.currentDraft.steps
             cookState = decoded.cookState
             currentRecipeID = decoded.currentRecipeID
             savedRecipes = decoded.savedRecipes
             bakeHistory = decoded.bakeHistory
             activeBakeRecordID = decoded.activeBakeRecordID
-            starterProfile = decoded.starterProfile
+            starterProfiles = decoded.starterProfiles.isEmpty ? [StarterProfile()] : decoded.starterProfiles
             currentWorkflowState = decoded.currentWorkflowState
             return
         }
 
         if let legacy = try? JSONDecoder().decode(LegacyPersistedRecipe.self, from: data) {
             recipeName = legacy.recipeName
+            recipeOverallNotes = legacy.overallNotes
+            stepText = legacy.stepText
             items = legacy.items.isEmpty ? Self.defaultItems : legacy.items
+            currentRecipeKind = RecipeKind.inferred(name: recipeName, items: items)
             steps = legacy.steps
             cookState = CookState()
             currentRecipeID = nil
             savedRecipes = []
             bakeHistory = []
             activeBakeRecordID = nil
-            starterProfile = StarterProfile()
+            starterProfiles = [StarterProfile()]
             currentWorkflowState = .draft
             return
         }
 
         recipeName = BakingTerms.toastRecipeName
+        currentRecipeKind = .toast
+        recipeOverallNotes = ""
+        stepText = ""
         items = Self.defaultItems
         steps = []
         cookState = CookState()
@@ -886,21 +1122,28 @@ final class RecipeStore: ObservableObject {
         savedRecipes = []
         bakeHistory = []
         activeBakeRecordID = nil
-        starterProfile = StarterProfile()
+        starterProfiles = [StarterProfile()]
         currentWorkflowState = .draft
     }
 
     private func persist() {
         guard !isLoading else { return }
         let state = PersistedState(
-            currentDraft: LegacyPersistedRecipe(recipeName: recipeName, items: items, steps: steps),
+            currentDraft: LegacyPersistedRecipe(
+                recipeName: recipeName,
+                overallNotes: recipeOverallNotes,
+                stepText: stepText,
+                items: items,
+                steps: steps
+            ),
             cookState: cookState,
             currentRecipeID: currentRecipeID,
             savedRecipes: savedRecipes,
             bakeHistory: bakeHistory,
             activeBakeRecordID: activeBakeRecordID,
-            starterProfile: starterProfile,
-            currentWorkflowState: currentWorkflowState
+            starterProfiles: starterProfiles,
+            currentWorkflowState: currentWorkflowState,
+            currentRecipeKind: currentRecipeKind
         )
         guard let data = try? JSONEncoder().encode(state) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
@@ -913,8 +1156,9 @@ final class RecipeStore: ObservableObject {
         var savedRecipes: [SavedRecipe]
         var bakeHistory: [BakeRecord]
         var activeBakeRecordID: UUID?
-        var starterProfile: StarterProfile
+        var starterProfiles: [StarterProfile]
         var currentWorkflowState: RecipeWorkflowState
+        var currentRecipeKind: RecipeKind
 
         init(
             currentDraft: LegacyPersistedRecipe,
@@ -923,8 +1167,9 @@ final class RecipeStore: ObservableObject {
             savedRecipes: [SavedRecipe],
             bakeHistory: [BakeRecord],
             activeBakeRecordID: UUID?,
-            starterProfile: StarterProfile,
-            currentWorkflowState: RecipeWorkflowState
+            starterProfiles: [StarterProfile],
+            currentWorkflowState: RecipeWorkflowState,
+            currentRecipeKind: RecipeKind
         ) {
             self.currentDraft = currentDraft
             self.cookState = cookState
@@ -932,8 +1177,9 @@ final class RecipeStore: ObservableObject {
             self.savedRecipes = savedRecipes
             self.bakeHistory = bakeHistory
             self.activeBakeRecordID = activeBakeRecordID
-            self.starterProfile = starterProfile
+            self.starterProfiles = starterProfiles
             self.currentWorkflowState = currentWorkflowState
+            self.currentRecipeKind = currentRecipeKind
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -944,7 +1190,9 @@ final class RecipeStore: ObservableObject {
             case bakeHistory
             case activeBakeRecordID
             case starterProfile
+            case starterProfiles
             case currentWorkflowState
+            case currentRecipeKind
         }
 
         init(from decoder: Decoder) throws {
@@ -955,15 +1203,69 @@ final class RecipeStore: ObservableObject {
             savedRecipes = try container.decode([SavedRecipe].self, forKey: .savedRecipes)
             bakeHistory = try container.decode([BakeRecord].self, forKey: .bakeHistory)
             activeBakeRecordID = try container.decodeIfPresent(UUID.self, forKey: .activeBakeRecordID)
-            starterProfile = try container.decodeIfPresent(StarterProfile.self, forKey: .starterProfile) ?? StarterProfile()
+            if let profiles = try container.decodeIfPresent([StarterProfile].self, forKey: .starterProfiles), !profiles.isEmpty {
+                starterProfiles = profiles
+            } else if let profile = try container.decodeIfPresent(StarterProfile.self, forKey: .starterProfile) {
+                starterProfiles = [profile]
+            } else {
+                starterProfiles = [StarterProfile()]
+            }
             currentWorkflowState = try container.decodeIfPresent(RecipeWorkflowState.self, forKey: .currentWorkflowState) ?? .draft
+            currentRecipeKind = try container.decodeIfPresent(RecipeKind.self, forKey: .currentRecipeKind)
+                ?? RecipeKind.inferred(name: currentDraft.recipeName, items: currentDraft.items)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(currentDraft, forKey: .currentDraft)
+            try container.encode(cookState, forKey: .cookState)
+            try container.encodeIfPresent(currentRecipeID, forKey: .currentRecipeID)
+            try container.encode(savedRecipes, forKey: .savedRecipes)
+            try container.encode(bakeHistory, forKey: .bakeHistory)
+            try container.encodeIfPresent(activeBakeRecordID, forKey: .activeBakeRecordID)
+            try container.encode(starterProfiles, forKey: .starterProfiles)
+            try container.encode(currentWorkflowState, forKey: .currentWorkflowState)
+            try container.encode(currentRecipeKind, forKey: .currentRecipeKind)
         }
     }
 
     private struct LegacyPersistedRecipe: Codable {
         var recipeName: String
+        var overallNotes: String
+        var stepText: String
         var items: [RecipeItem]
         var steps: [JournalStep]
+
+        init(
+            recipeName: String,
+            overallNotes: String = "",
+            stepText: String = "",
+            items: [RecipeItem],
+            steps: [JournalStep]
+        ) {
+            self.recipeName = recipeName
+            self.overallNotes = overallNotes
+            self.stepText = stepText
+            self.items = items
+            self.steps = steps
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case recipeName
+            case overallNotes
+            case stepText
+            case items
+            case steps
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            recipeName = try container.decode(String.self, forKey: .recipeName)
+            overallNotes = try container.decodeIfPresent(String.self, forKey: .overallNotes) ?? ""
+            stepText = try container.decodeIfPresent(String.self, forKey: .stepText) ?? ""
+            items = try container.decode([RecipeItem].self, forKey: .items)
+            steps = try container.decode([JournalStep].self, forKey: .steps)
+        }
     }
 
     private static let defaultItems: [RecipeItem] = [
@@ -977,7 +1279,7 @@ final class RecipeStore: ObservableObject {
 
     private static let chiffonItems: [RecipeItem] = [
         RecipeItem(id: UUID(), category: .flour, tag: .flour, name: BakingTerms.lowGlutenFlour, weight: 90),
-        RecipeItem(id: UUID(), category: .basic, tag: .egg, name: BakingTerms.egg, weight: 250, waterContentPct: 75, eggCount: 5, eggUnitWeight: 50, eggType: BakingTerms.wholeEgg),
+        RecipeItem(id: UUID(), category: .basic, tag: .egg, name: BakingTerms.egg, weight: 250, waterContentPct: 75, eggType: BakingTerms.beatenEgg),
         RecipeItem(id: UUID(), category: .basic, tag: .sugar, name: BakingTerms.granulatedSugar, weight: 80),
         RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.milk, weight: 60),
         RecipeItem(id: UUID(), category: .other, tag: .other, name: BakingTerms.cornOil, weight: 55)
@@ -994,14 +1296,16 @@ final class RecipeStore: ObservableObject {
 
     private static let defaultStarterRatio = [
         BakingTerms.levainStarter: "1:1",
-        BakingTerms.liquidStarter: "5:1",
-        BakingTerms.tangzhongStarter: "5:1",
+        BakingTerms.liquidStarter: "1:5",
+        BakingTerms.tangzhongStarter: "1:5",
         BakingTerms.scaldedStarter: "1:1",
         BakingTerms.poolishStarter: "1:1"
     ]
 
     private static let starterRatioHydration = [
         "1:1": 100.0,
+        "1:2": 200.0,
+        "1:5": 500.0,
         "2:1": 200.0,
         "5:1": 500.0
     ]
@@ -1025,7 +1329,7 @@ final class RecipeStore: ObservableObject {
         case .basic:
             switch tag ?? .water {
             case .egg:
-                return RecipeItem(id: UUID(), category: category, tag: .egg, name: BakingTerms.egg, weight: 50, waterContentPct: 75, eggCount: 1, eggUnitWeight: 50, eggType: BakingTerms.wholeEgg)
+                return RecipeItem(id: UUID(), category: category, tag: .egg, name: BakingTerms.egg, weight: 50, waterContentPct: 75, eggType: BakingTerms.beatenEgg)
             case .salt:
                 return RecipeItem(id: UUID(), category: category, tag: .salt, name: BakingTerms.salt, weight: 10)
             case .yeast:

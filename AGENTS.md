@@ -34,6 +34,7 @@
 - Keep model/store logic outside views. Views may bind to `RecipeStore`, but calculations that can be named as product behavior belong in the store or model helpers.
 - Avoid growing large feature files by adding unrelated helper components at the bottom. New reusable components go into the design system or a clearly named shared component file.
 - Keep `FormulaView.swift` as a screen-level orchestrator. Follow `FORMULA_REFACTOR_PLAN.md` for formula workflow file ownership.
+- For repo-level design component consistency work, use `docs/design-system/BAKING_DESIGN_COMPONENT_CONSISTENCY_INSTRUCTIONS.md` as the instruction and the local `$baking-journal-design-component-consistency` skill to generate diagnosis reports before fixing drift.
 
 ## Verification
 

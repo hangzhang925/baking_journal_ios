@@ -3,7 +3,7 @@ import SwiftUI
 @MainActor
 final class AppNavigationController: ObservableObject {
     @Published var resetToken = UUID()
-    @Published var selectedTab: HomeTab = .home
+    @Published var selectedTab: HomeTab = .formula
     @Published var path: [AppRoute] = []
     @Published private(set) var isHistorySwipeSuppressed = false
     @Published private(set) var historyDragTranslation: CGFloat = 0
@@ -20,7 +20,7 @@ final class AppNavigationController: ObservableObject {
     }
 
     func popToHome() {
-        selectTab(.home)
+        selectTab(.formula)
     }
 
     func selectTab(_ tab: HomeTab) {

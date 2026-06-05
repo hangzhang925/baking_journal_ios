@@ -78,11 +78,11 @@ private struct CookStepView: View {
 
                     if stepItems.isEmpty {
                         Text(BakingTerms.cookNoStepIngredients)
-                            .font(.callout)
+                            .font(BakingTypography.appPrimaryText)
                             .foregroundStyle(Color.brandSecondaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(10)
-                            .bakingCard(radius: BakingRadius.card, stroke: Color.brandPrimary.opacity(0.06))
+                            .bakingInsetSurface()
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 108), spacing: 7)], spacing: 7) {
                             ForEach(stepItems) { allocatedItem in
@@ -105,11 +105,11 @@ private struct CookStepView: View {
                     CookSectionHeader(title: BakingTerms.cookTips, detail: nil)
 
                     Text(step.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? BakingTerms.cookDefaultStepNote : step.notes)
-                        .font(.callout)
+                        .font(BakingTypography.appPrimaryText)
                         .foregroundStyle(Color.brandText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
-                        .bakingCard(radius: BakingRadius.card, stroke: Color.brandPrimary.opacity(0.06))
+                        .bakingInsetSurface()
                 }
             }
             .padding(.horizontal, BakingLayout.screenHorizontalInset)
@@ -186,7 +186,7 @@ private struct CookCurrentStageCard: View {
                     size: BakingTouchTarget.materialBadge,
                     iconSize: BakingTouchTarget.materialBadgeGlyph,
                     color: .brandPrimary,
-                    background: Color.brandPrimary.opacity(0.10)
+                    background: BakingSurfaceTheme.theme(for: .inputSurface).background
                 )
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -195,14 +195,14 @@ private struct CookCurrentStageCard: View {
                         Text(BakingTerms.cookCurrentStage)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(Color.brandPrimary.opacity(0.10))
+                            .background(BakingSurfaceTheme.theme(for: .selected).background)
                             .clipShape(Capsule())
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.brandPrimary)
 
                     Text(step.name)
-                        .font(.title2.weight(.bold))
+                        .font(BakingTypography.sectionTitle)
                         .foregroundStyle(Color.brandText)
                         .lineLimit(2)
 
@@ -226,8 +226,8 @@ private struct CookCurrentStageCard: View {
                             icon: "thermometer.medium",
                             text: temperatureText,
                             accent: .waterText,
-                            background: Color.waterSurfaceStrong.opacity(0.42),
-                            stroke: Color.brandSea.opacity(0.16),
+                            background: BakingSurfaceTheme.theme(for: .waterSurface).background,
+                            stroke: BakingSurfaceTheme.theme(for: .waterSurface).stroke,
                             width: 82
                         )
                     }
@@ -264,12 +264,7 @@ private struct CookCurrentStageCard: View {
             }
         }
         .padding(10)
-        .bakingCard(
-            background: Color.brandSurface,
-            radius: BakingRadius.prominentCard,
-            stroke: Color.brandPrimary.opacity(0.16),
-            lineWidth: 0.8
-        )
+        .bakingSectionCard()
     }
 
     private var isRunning: Bool {
@@ -331,11 +326,11 @@ private struct CookStepProgressStrip: View {
                     }
                     .frame(height: 26)
                     .padding(.horizontal, isCurrent ? 8 : 7)
-                    .background(isCurrent ? Color.brandPrimary.opacity(0.11) : Color.brandBackground.opacity(0.72))
+                    .background(isCurrent ? BakingSurfaceTheme.theme(for: .selected).background : BakingSurfaceTheme.theme(for: .readOnly).background)
                     .clipShape(Capsule())
                     .overlay {
                         Capsule()
-                            .stroke(isCurrent ? Color.brandPrimary.opacity(0.22) : Color.brandPrimary.opacity(0.06), lineWidth: 0.5)
+                            .stroke(isCurrent ? BakingSurfaceTheme.theme(for: .selected).stroke : BakingSurfaceTheme.theme(for: .readOnly).stroke, lineWidth: 0.5)
                     }
                     .accessibilityLabel(BakingTerms.cookStepProgress(stepIndex: index + 1, totalSteps: steps.count))
                     .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
@@ -357,7 +352,7 @@ private struct CookTimeMetric: View {
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(Color.brandSecondaryText)
             Text(value)
-                .font(.title3.monospacedDigit().weight(.bold))
+                .font(BakingTypography.tableNumber)
                 .foregroundStyle(accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.74)
@@ -365,8 +360,7 @@ private struct CookTimeMetric: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.brandBackground.opacity(0.76))
-        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
+        .bakingReadOnlySurface()
     }
 }
 
@@ -387,8 +381,8 @@ private struct CookMaterialMiniCard: View {
                     color: isChecked ? Color.brandSage : palette.tint
                 )
                 .frame(width: 24, height: 24)
-                .background(isChecked ? Color.brandSage.opacity(0.10) : palette.iconSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .background(isChecked ? BakingSurfaceTheme.theme(for: .success).background : palette.iconSurface)
+                .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
 
                 Spacer()
 
@@ -405,7 +399,7 @@ private struct CookMaterialMiniCard: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(BakingFormat.weight(allocatedItem.weight, gramPrecision: item.tag == .yeast ? 1 : 0))
-                    .font(.subheadline.monospacedDigit().weight(.bold))
+                    .font(BakingTypography.tableNumber)
                     .foregroundStyle(isChecked ? Color.brandSage : palette.text)
                     .lineLimit(1)
 
@@ -430,7 +424,7 @@ private struct CookMaterialMiniCard: View {
         .bakingCard(
             background: cardBackground(palette: palette),
             radius: BakingRadius.compactCard,
-            stroke: isChecked ? Color.brandSage.opacity(0.28) : palette.stroke,
+            stroke: isChecked ? BakingSurfaceTheme.theme(for: .success).stroke : palette.chipStroke,
             lineWidth: isChecked ? 0.9 : 0.5
         )
         .accessibilityElement(children: .combine)
@@ -450,7 +444,7 @@ private struct CookMaterialMiniCard: View {
         if isChecked {
             return Color.brandSage.opacity(0.095)
         }
-        return palette.surface.opacity(0.86)
+        return palette.chipSurface
     }
 }
 
@@ -461,7 +455,7 @@ private struct CookSectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(BakingTypography.appPrimaryText)
                 .foregroundStyle(Color.brandSecondaryText)
 
             Spacer()
@@ -494,10 +488,10 @@ private struct CookSummaryView: View {
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(BakingTerms.cookCompletedTitle)
-                                .font(.headline.weight(.semibold))
+                                .font(BakingTypography.sectionTitle)
                                 .foregroundStyle(Color.brandText)
                             Text(BakingTerms.cookCompletedBody)
-                                .font(.caption2)
+                                .font(BakingTypography.appSecondaryText)
                                 .foregroundStyle(Color.brandSecondaryText)
                         }
                     }
@@ -539,12 +533,12 @@ private struct CookSummaryView: View {
                             get: { activeBakeRecord.notes },
                             set: { store.updateBakeRecordNotes($0, for: activeBakeRecord) }
                         ))
-                        .font(.body)
+                        .font(BakingTypography.appPrimaryText)
                         .foregroundStyle(Color.brandText)
                         .frame(minHeight: 140)
                         .scrollContentBackground(.hidden)
                         .padding(8)
-                        .bakingCard(radius: BakingRadius.card, stroke: Color.brandPrimary.opacity(0.06))
+                        .bakingInsetSurface()
                     }
                 }
             }
@@ -567,10 +561,10 @@ private struct CookSummaryView: View {
             }
             .padding(.top, 10)
             .padding(.bottom, 8)
-            .background(Color.brandSurface.opacity(0.98))
+            .background(BakingSurface.bottomBarBackground)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(Color.brandPrimary.opacity(0.08))
+                    .fill(BakingSurfaceTheme.separator)
                     .frame(height: 0.6)
             }
         }

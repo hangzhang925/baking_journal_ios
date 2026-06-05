@@ -10,19 +10,18 @@ struct CompactSummaryPill: View {
     var body: some View {
         HStack(spacing: 6) {
             BakingLabel(text: title, role: .readOnlyLabel)
-                .foregroundStyle(isWater ? Color.waterText.opacity(0.82) : Color.brandSecondaryText)
+                .foregroundStyle(Color.brandSecondaryText)
             BakingNumericValue(
                 value: value,
                 unit: unit,
                 kind: .readOnly,
                 role: .secondary,
-                valueColor: isWater ? .waterText : .brandText
+                valueColor: .brandText
             )
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .bakingSurface(isWater ? .selected : .readOnly)
     }
 }
 
@@ -60,7 +59,7 @@ struct CompactNumberRow: View {
             )
             .frame(minWidth: 70)
             Text(unit)
-                .font(.caption.weight(.semibold))
+                .font(BakingTypography.rowMeta)
                 .foregroundStyle(Color.brandSecondaryText)
         }
         .padding(.vertical, 6)
@@ -70,7 +69,7 @@ struct CompactNumberRow: View {
 struct InlineNameField: View {
     @Binding var text: String
     let placeholder: String
-    var font: Font = .body.weight(.semibold)
+    var font: Font = BakingTypography.appPrimaryText
     var isWaterStyle = false
     var fieldWidth: CGFloat = 132
     var height: CGFloat = 40
@@ -90,7 +89,7 @@ struct InlineNameField: View {
     }
 
     private var editableFieldBackground: Color {
-        isWaterStyle ? Color.waterSurfaceStrong.opacity(0.25) : Color.brandPrimary.opacity(0.075)
+        isWaterStyle ? BakingSurfaceTheme.theme(for: .waterSurface).background : BakingSurfaceTheme.theme(for: .inputSurface).background
     }
 
     private var uiFont: UIFont {
@@ -100,7 +99,7 @@ struct InlineNameField: View {
         case .subheadline:
             return .systemFont(ofSize: 15, weight: .semibold)
         default:
-            return .systemFont(ofSize: 16, weight: .semibold)
+            return .systemFont(ofSize: 15, weight: .semibold)
         }
     }
 }
@@ -108,7 +107,7 @@ struct InlineNameField: View {
 struct InlineNumberField: View {
     @Binding var value: Double
     let unit: String
-    var font: Font = .subheadline
+    var font: Font = BakingTypography.appPrimaryText
     var color: Color = .primary
     var fieldWidth: CGFloat = 64
     var totalWidth: CGFloat? = nil
@@ -126,7 +125,7 @@ struct InlineNumberField: View {
             )
                 .frame(width: fieldWidth)
             Text(unit)
-                .font(.caption.weight(.semibold))
+                .font(BakingTypography.rowMeta)
                 .foregroundStyle(Color.brandSecondaryText)
         }
         .padding(.horizontal, 5)
@@ -139,11 +138,11 @@ struct InlineNumberField: View {
     private var uiFont: UIFont {
         switch font {
         case .subheadline:
-            return .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+            return .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
         case .callout:
-            return .monospacedDigitSystemFont(ofSize: 16, weight: .semibold)
+            return .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
         default:
-            return .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+            return .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
         }
     }
 }
@@ -151,7 +150,7 @@ struct InlineNumberField: View {
 struct ReadOnlyInlineMetric: View {
     let value: String
     let unit: String
-    var font: Font = .subheadline
+    var font: Font = BakingTypography.appPrimaryText
     var color: Color = .primary
     var totalWidth: CGFloat? = nil
     var isWaterStyle = false
@@ -165,7 +164,7 @@ struct ReadOnlyInlineMetric: View {
                 kind: .readOnly,
                 role: .secondary,
                 valueColor: color,
-                unitColor: Color.brandSecondaryText.opacity(0.82)
+                unitColor: color
             )
         }
         .padding(.horizontal, 5)
@@ -178,24 +177,24 @@ struct ReadOnlyInlineMetric: View {
     private var displayFont: Font {
         switch font {
         case .callout:
-            return .callout.monospacedDigit().weight(.semibold)
+            return BakingTypography.tableNumber
         default:
-            return .subheadline.monospacedDigit().weight(.semibold)
+            return BakingTypography.tableNumber
         }
     }
 
     private var editableFieldBackground: Color {
         if isWaterStyle {
-            return Color.waterSurfaceStrong.opacity(0.42)
+            return BakingSurfaceTheme.theme(for: .waterSurface).background
         }
-        return Color.brandPrimary.opacity(0.075)
+        return BakingSurfaceTheme.theme(for: .inputSurface).background
     }
 
     private var fieldStroke: Color {
         if isWaterStyle {
-            return Color.brandSea.opacity(0.16)
+            return BakingSurfaceTheme.theme(for: .waterSurface).stroke
         }
-        return Color.brandPrimary.opacity(0.10)
+        return BakingSurfaceTheme.theme(for: .inputSurface).stroke
     }
 }
 
@@ -233,7 +232,7 @@ struct CompactMenuRow: View {
                 BakingDropdownTrigger(
                     title: displayTitle(value),
                     tint: .brandPrimary,
-                    background: Color.brandPrimary.opacity(0.075)
+                    background: BakingSurfaceTheme.theme(for: .inputSurface).background
                 )
             }
             .buttonStyle(.plain)
@@ -259,31 +258,50 @@ struct CompactMenuRow: View {
 
 struct CompactRecipeMetrics: View {
     let summary: RecipeSummary
+    var items: [RecipeItem] = []
+    var flourContribution: ((RecipeItem) -> Double)?
+    var waterContribution: ((RecipeItem) -> Double)?
 
     var body: some View {
         HStack(spacing: 8) {
-            CompactMetricCell(title: "面团", value: BakingFormat.weight(summary.doughWeight))
-            CompactMetricCell(title: "面粉", value: BakingFormat.weight(summary.flourWeight))
+            CompactMetricCell(title: BakingTerms.formulaMetricDough, value: BakingFormat.weight(summary.doughWeight))
+            CompactMetricCell(title: BakingTerms.formulaMetricFlour, value: BakingFormat.weight(summary.flourWeight))
             CompactMetricCell(
-                title: "含水",
+                title: BakingTerms.formulaMetricHydration,
                 value: "\(BakingFormat.number(summary.hydration, precision: 1))%",
-                accent: .waterText,
-                background: .waterSurface
+                background: .waterSurface,
+                hydrationReceipt: hydrationReceipt
             )
         }
+    }
+
+    private var hydrationReceipt: HydrationReceipt? {
+        HydrationReceipt(
+            items: items,
+            summary: summary,
+            flourContribution: flourContribution,
+            waterContribution: waterContribution
+        )
     }
 }
 
 private struct CompactMetricCell: View {
     let title: String
     let value: String
-    var accent: Color = .brandPrimary
-    var background: Color = Color.brandBackground.opacity(0.75)
+    var accent: Color = .brandText
+    var background: Color = BakingSurfaceTheme.theme(for: .readOnly).background
+    var hydrationReceipt: HydrationReceipt?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .bakingLabelStyle(.readOnlyLabel)
+            HStack(spacing: 2) {
+                Text(title)
+                    .bakingLabelStyle(.readOnlyLabel)
+
+                if let hydrationReceipt {
+                    HydrationReceiptInfoButton(receipt: hydrationReceipt, iconSize: 15)
+                }
+            }
             Text(value)
                 .font(BakingTypography.readOnlyValue)
                 .foregroundStyle(accent)
