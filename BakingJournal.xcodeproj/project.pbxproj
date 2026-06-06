@@ -49,9 +49,9 @@
 		AA000001000000000000030D /* RecipeWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020D /* RecipeWorkspaceView.swift */; };
 		AA000001000000000000030E /* BakeRecordDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020E /* BakeRecordDetailView.swift */; };
 		AA000001000000000000030F /* KitchenTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020F /* KitchenTimerView.swift */; };
-		AA0000010000000000000312 /* BakingLibraryListShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000212 /* BakingLibraryListShell.swift */; };
 		AA0000010000000000000310 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000210 /* InfoPlist.strings */; };
 		AA0000010000000000000311 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000211 /* InfoPlist.strings */; };
+		AA0000010000000000000312 /* BakingLibraryListShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000212 /* BakingLibraryListShell.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,9 +83,9 @@
 		AA000001000000000000002A /* StarterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterView.swift; sourceTree = "<group>"; };
 		AA000001000000000000003A /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
 		AA000001000000000000003B /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		AA000001000000000000003C /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = zh-Hans.lproj/Localizable.strings; sourceTree = "<group>"; };
-			AA000001000000000000003D /* BakingNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingNotificationService.swift; sourceTree = "<group>"; };
-			AA000001000000000000003E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA000001000000000000003C /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		AA000001000000000000003D /* BakingNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingNotificationService.swift; sourceTree = "<group>"; };
+		AA000001000000000000003E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA0000010000000000000201 /* AppNavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationController.swift; sourceTree = "<group>"; };
 		AA0000010000000000000202 /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
 		AA0000010000000000000203 /* GlobalHistoryPanLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHistoryPanLayer.swift; sourceTree = "<group>"; };
@@ -101,9 +101,9 @@
 		AA000001000000000000020D /* RecipeWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeWorkspaceView.swift; sourceTree = "<group>"; };
 		AA000001000000000000020E /* BakeRecordDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakeRecordDetailView.swift; sourceTree = "<group>"; };
 		AA000001000000000000020F /* KitchenTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitchenTimerView.swift; sourceTree = "<group>"; };
-		AA0000010000000000000212 /* BakingLibraryListShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingLibraryListShell.swift; sourceTree = "<group>"; };
 		AA0000010000000000000210 /* InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = InfoPlist.strings; path = ../en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		AA0000010000000000000211 /* InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = InfoPlist.strings; path = "../zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		AA0000010000000000000212 /* BakingLibraryListShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingLibraryListShell.swift; sourceTree = "<group>"; };
 		AA0000010000000000000501 /* INGREDIENT_LIBRARY_AND_SYNC_PLAN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = INGREDIENT_LIBRARY_AND_SYNC_PLAN.md; sourceTree = "<group>"; };
 		AA0000010000000000000502 /* IOS_CRASH_TESTING_PLAN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IOS_CRASH_TESTING_PLAN.md; sourceTree = "<group>"; };
 		AA0000010000000000000503 /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
@@ -113,6 +113,10 @@
 		AA0000010000000000000507 /* BAKING_DESIGN_COMPONENT_CONSISTENCY_INSTRUCTIONS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BAKING_DESIGN_COMPONENT_CONSISTENCY_INSTRUCTIONS.md; sourceTree = "<group>"; };
 		AA0000010000000000000508 /* GESTURE_RULES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GESTURE_RULES.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		FF4268B72FD3E64C002F21C0 /* designs */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = designs; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		AA0000010000000000000020 /* Frameworks */ = {
@@ -137,6 +141,7 @@
 		AA0000010000000000000031 /* BakingJournal */ = {
 			isa = PBXGroup;
 			children = (
+				FF4268B72FD3E64C002F21C0 /* designs */,
 				AA0000010000000000000401 /* App */,
 				AA0000010000000000000402 /* Core */,
 				AA0000010000000000000403 /* Features */,
@@ -156,18 +161,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AA0000010000000000000036 /* Localization */ = {
-			isa = PBXGroup;
-			children = (
-				AA000001000000000000003A /* L10n.swift */,
-				AA000001000000000000003B /* Localizable.strings */,
-				AA000001000000000000003C /* Localizable.strings */,
-				AA0000010000000000000210 /* InfoPlist.strings */,
-				AA0000010000000000000211 /* InfoPlist.strings */,
-			);
-			path = Localization;
-			sourceTree = "<group>";
-		};
 		AA0000010000000000000033 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -184,20 +177,16 @@
 			path = Store;
 			sourceTree = "<group>";
 		};
-		AA000001000000000000040A /* Formatting */ = {
+		AA0000010000000000000036 /* Localization */ = {
 			isa = PBXGroup;
 			children = (
-				AA0000010000000000000014 /* Formatters.swift */,
+				AA000001000000000000003A /* L10n.swift */,
+				AA000001000000000000003B /* Localizable.strings */,
+				AA000001000000000000003C /* Localizable.strings */,
+				AA0000010000000000000210 /* InfoPlist.strings */,
+				AA0000010000000000000211 /* InfoPlist.strings */,
 			);
-			path = Formatting;
-			sourceTree = "<group>";
-		};
-		AA000001000000000000040B /* Notifications */ = {
-			isa = PBXGroup;
-			children = (
-				AA000001000000000000003D /* BakingNotificationService.swift */,
-			);
-			path = Notifications;
+			path = Localization;
 			sourceTree = "<group>";
 		};
 		AA0000010000000000000401 /* App */ = {
@@ -208,16 +197,6 @@
 				AA0000010000000000000405 /* Navigation */,
 			);
 			path = App;
-			sourceTree = "<group>";
-		};
-		AA0000010000000000000405 /* Navigation */ = {
-			isa = PBXGroup;
-			children = (
-				AA0000010000000000000201 /* AppNavigationController.swift */,
-				AA0000010000000000000202 /* AppRoute.swift */,
-				AA0000010000000000000203 /* GlobalHistoryPanLayer.swift */,
-			);
-			path = Navigation;
 			sourceTree = "<group>";
 		};
 		AA0000010000000000000402 /* Core */ = {
@@ -242,6 +221,49 @@
 				AA0000010000000000000411 /* Starter */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000404 /* SharedUI */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000001E /* BakingDesignSystem.swift */,
+				AA0000010000000000000212 /* BakingLibraryListShell.swift */,
+				AA000001000000000000001C /* IconSystem.swift */,
+				AA0000010000000000000205 /* BakingThemeColors.swift */,
+				AA0000010000000000000204 /* KeyboardUtilities.swift */,
+				AA000001000000000000020A /* MaterialPalette.swift */,
+				AA0000010000000000000209 /* RecipeWorkflowBadge.swift */,
+				AA0000010000000000000412 /* Dropdown */,
+				AA0000010000000000000413 /* Metrics */,
+				AA0000010000000000000414 /* EmptyState */,
+			);
+			path = SharedUI;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000405 /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000201 /* AppNavigationController.swift */,
+				AA0000010000000000000202 /* AppRoute.swift */,
+				AA0000010000000000000203 /* GlobalHistoryPanLayer.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040A /* Formatting */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000014 /* Formatters.swift */,
+			);
+			path = Formatting;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040B /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000003D /* BakingNotificationService.swift */,
+			);
+			path = Notifications;
 			sourceTree = "<group>";
 		};
 		AA000001000000000000040C /* Home */ = {
@@ -306,23 +328,6 @@
 				AA000001000000000000002A /* StarterView.swift */,
 			);
 			path = Starter;
-			sourceTree = "<group>";
-		};
-		AA0000010000000000000404 /* SharedUI */ = {
-			isa = PBXGroup;
-			children = (
-				AA000001000000000000001E /* BakingDesignSystem.swift */,
-				AA0000010000000000000212 /* BakingLibraryListShell.swift */,
-				AA000001000000000000001C /* IconSystem.swift */,
-				AA0000010000000000000205 /* BakingThemeColors.swift */,
-				AA0000010000000000000204 /* KeyboardUtilities.swift */,
-				AA000001000000000000020A /* MaterialPalette.swift */,
-				AA0000010000000000000209 /* RecipeWorkflowBadge.swift */,
-				AA0000010000000000000412 /* Dropdown */,
-				AA0000010000000000000413 /* Metrics */,
-				AA0000010000000000000414 /* EmptyState */,
-			);
-			path = SharedUI;
 			sourceTree = "<group>";
 		};
 		AA0000010000000000000412 /* Dropdown */ = {
@@ -395,6 +400,9 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				FF4268B72FD3E64C002F21C0 /* designs */,
+			);
 			name = BakingJournal;
 			productName = BakingJournal;
 			productReference = AA0000010000000000000010 /* BakingJournal.app */;
@@ -417,7 +425,7 @@
 			};
 			buildConfigurationList = AA0000010000000000000060 /* Build configuration list for PBXProject "BakingJournal" */;
 			compatibilityVersion = "Xcode 16.0";
-			developmentRegion = zh-Hans;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
@@ -624,8 +632,8 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = J37J65KDUY;
 				ENABLE_PREVIEWS = YES;
-					GENERATE_INFOPLIST_FILE = NO;
-					INFOPLIST_FILE = BakingJournal/Info.plist;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BakingJournal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hang.BakingJournal;
@@ -647,8 +655,8 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = J37J65KDUY;
 				ENABLE_PREVIEWS = YES;
-					GENERATE_INFOPLIST_FILE = NO;
-					INFOPLIST_FILE = BakingJournal/Info.plist;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BakingJournal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hang.BakingJournal;

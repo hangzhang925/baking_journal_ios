@@ -3,21 +3,21 @@ import SwiftUI
 struct BakingDropdownTrigger: View {
     let title: String
     var tint: Color = .brandText
-    var background: Color = BakingSurfaceTheme.theme(for: .readOnly).background
+    var chevronTint: Color = .brandTertiaryText
 
     var body: some View {
         HStack(spacing: 5) {
             Text(title)
                 .lineLimit(1)
+                .foregroundStyle(tint)
             Image(systemName: "chevron.down")
                 .font(.caption2.weight(.bold))
+                .foregroundStyle(chevronTint)
         }
         .font(BakingTypography.appPrimaryText)
-        .foregroundStyle(tint)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(background)
-        .clipShape(Capsule())
+        .bakingSurface(.dropdown)
     }
 }
 
@@ -40,7 +40,7 @@ struct BakingDropdownRow<Leading: View>: View {
     let title: String
     var isSelected: Bool = false
     var foreground: Color = .brandText
-    var selectionTint: Color = .brandPrimary
+    var selectionTint: Color = .brandPrimaryLight
     @ViewBuilder var leading: Leading
 
     var body: some View {
@@ -49,8 +49,8 @@ struct BakingDropdownRow<Leading: View>: View {
                 .frame(width: 20, height: 20)
 
             Text(title)
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(foreground)
+                .font(isSelected ? BakingTypography.appPrimaryText.weight(.bold) : BakingTypography.appPrimaryText)
+                .foregroundStyle(isSelected ? selectionTint : foreground)
 
             Spacer(minLength: 0)
 
@@ -63,6 +63,8 @@ struct BakingDropdownRow<Leading: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
+        .background(isSelected ? Color.selectedSurface : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous))
         .contentShape(Rectangle())
     }
 }

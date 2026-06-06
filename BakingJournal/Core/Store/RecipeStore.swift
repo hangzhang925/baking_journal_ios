@@ -142,8 +142,7 @@ final class RecipeStore: ObservableObject {
     }
 
     func starterFinalWeight(for profile: StarterProfile) -> Double {
-        let containerWeight = profile.isContainerWeightEnabled ? profile.containerWeight : 0
-        return max(0, profile.measuredWeight - containerWeight)
+        return max(0, profile.measuredWeight - profile.containerWeight)
     }
 
     func starterFeedFlourWeight(for profile: StarterProfile) -> Double {
@@ -445,8 +444,7 @@ final class RecipeStore: ObservableObject {
 
     func updateStarterFinalWeight(_ finalWeight: Double, for profile: StarterProfile) {
         var next = profile
-        let containerWeight = next.isContainerWeightEnabled ? next.containerWeight : 0
-        next.measuredWeight = max(0, finalWeight) + containerWeight
+        next.measuredWeight = max(0, finalWeight) + next.containerWeight
         updateStarterProfile(next)
     }
 
@@ -454,15 +452,23 @@ final class RecipeStore: ObservableObject {
         var next = profile
         let currentWeight = starterFinalWeight(for: profile)
         let addedWeight = starterFeedFlourWeight(for: profile) + starterFeedWaterWeight(for: profile)
-        let containerWeight = next.isContainerWeightEnabled ? next.containerWeight : 0
         next.lastFedAt = Date()
-        next.measuredWeight = currentWeight + addedWeight + containerWeight
+        next.measuredWeight = currentWeight + addedWeight + next.containerWeight
         updateStarterProfile(next)
     }
 
     func updateBakeRecordNotes(_ notes: String, for record: BakeRecord) {
         guard let index = bakeHistory.firstIndex(where: { $0.id == record.id }) else { return }
         bakeHistory[index].notes = notes
+    }
+
+    func deleteBakeRecord(_ record: BakeRecord) {
+        bakeHistory.removeAll { $0.id == record.id }
+        if activeBakeRecordID == record.id {
+            cookState = CookState()
+            activeBakeRecordID = nil
+            cancelCookTimerReminder()
+        }
     }
 
     func removeItem(_ item: RecipeItem) {
@@ -662,7 +668,7 @@ final class RecipeStore: ObservableObject {
 
     @discardableResult
     func addTextStep() -> JournalStep {
-        let step = JournalStep(id: UUID(), type: .other, name: "", notes: "", materialAllocations: [])
+        let step = JournalStep(id: UUID(), type: .other, name: BakingTerms.stepDefaultName(steps.count + 1), notes: "", materialAllocations: [])
         steps.append(step)
         return step
     }
@@ -812,15 +818,35 @@ final class RecipeStore: ObservableObject {
         let nextIndex = cookState.currentIndex + direction
         guard nextIndex >= 0 else { return }
         if nextIndex >= steps.count {
-            cookState.completedAt = Date()
+            let finishedAt = Date()
+            closeCurrentStepTiming(at: finishedAt)
+            cookState.completedAt = finishedAt
             finalizeBakeRecord()
             cancelCookTimerReminder()
             return
         }
+        let now = Date()
+        closeCurrentStepTiming(at: now)
         cookState.currentIndex = nextIndex
-        cookState.stepStartedAt = Date()
+        cookState.stepStartedAt = now
         cookState.timerEndsAt = nil
         cookState.timerStepId = nil
+        startTimingForCurrentStep(at: now)
+        cancelCookTimerReminder()
+    }
+
+    /// Jumps directly to a step (e.g. from the step carousel). Resets the per-step timer like `moveCookStep`.
+    func goToCookStep(_ index: Int) {
+        guard ensureCookStarted() else { return }
+        let clamped = min(max(0, index), max(steps.count - 1, 0))
+        guard clamped != cookState.currentIndex else { return }
+        let now = Date()
+        closeCurrentStepTiming(at: now)
+        cookState.currentIndex = clamped
+        cookState.stepStartedAt = now
+        cookState.timerEndsAt = nil
+        cookState.timerStepId = nil
+        startTimingForCurrentStep(at: now)
         cancelCookTimerReminder()
     }
 
@@ -828,6 +854,40 @@ final class RecipeStore: ObservableObject {
         cookState = CookState()
         activeBakeRecordID = nil
         cancelCookTimerReminder()
+    }
+
+    func completeBake() {
+        guard ensureCookStarted() else { return }
+        let finishedAt = Date()
+        closeCurrentStepTiming(at: finishedAt)
+        cookState.completedAt = finishedAt
+        finalizeBakeRecord()
+        cancelCookTimerReminder()
+    }
+
+    /// Whether an in-progress record can be opened in the cooking page.
+    /// The live bake is always resumable; an orphaned one is resumable as long as its source recipe still exists.
+    func canResumeBake(_ record: BakeRecord) -> Bool {
+        guard record.completedAt == nil else { return false }
+        if record.id == activeBakeRecordID { return true }
+        guard let recipeID = record.recipeID else { return false }
+        return savedRecipes.contains { $0.id == recipeID }
+    }
+
+    /// Re-activates an in-progress record so the cooking page reflects it.
+    /// If it is already the live bake, the existing progress (step index, checks, timer) is kept.
+    /// Otherwise the source recipe is reloaded and cooking restarts from the first step.
+    func resumeBake(_ record: BakeRecord) {
+        if record.id == activeBakeRecordID, cookState.totalStartedAt != nil, cookState.completedAt == nil {
+            return
+        }
+        guard let recipeID = record.recipeID,
+              let recipe = savedRecipes.first(where: { $0.id == recipeID }) else { return }
+        loadRecipe(recipe)
+        activeBakeRecordID = record.id
+        cookState.totalStartedAt = record.startedAt
+        cookState.stepStartedAt = Date()
+        startTimingForCurrentStep(at: cookState.stepStartedAt ?? Date())
     }
 
     func beginCookIfNeeded() {
@@ -926,8 +986,14 @@ final class RecipeStore: ObservableObject {
             let now = Date()
             cookState.totalStartedAt = now
             activeBakeRecordID = createBakeRecord(startedAt: now)
+            cookState.stepStartedAt = now
+            startTimingForCurrentStep(at: now)
         }
-        if cookState.stepStartedAt == nil { cookState.stepStartedAt = Date() }
+        if cookState.stepStartedAt == nil {
+            let now = Date()
+            cookState.stepStartedAt = now
+            startTimingForCurrentStep(at: now)
+        }
         return true
     }
 
@@ -974,6 +1040,53 @@ final class RecipeStore: ObservableObject {
         bakeHistory[index].recipeName = currentRecipeDisplayName
         bakeHistory[index].recipeSnapshotName = currentRecipeDisplayName
         bakeHistory[index].stepCount = steps.count
+    }
+
+    private func startTimingForCurrentStep(at startedAt: Date) {
+        guard let activeBakeRecordID,
+              steps.indices.contains(cookState.currentIndex),
+              let recordIndex = bakeHistory.firstIndex(where: { $0.id == activeBakeRecordID }) else { return }
+
+        let step = steps[cookState.currentIndex]
+        if bakeHistory[recordIndex].stepTimings.last?.stepID == step.id,
+           bakeHistory[recordIndex].stepTimings.last?.completedAt == nil {
+            return
+        }
+
+        bakeHistory[recordIndex].stepTimings.append(
+            BakeStepTiming(
+                id: UUID(),
+                stepID: step.id,
+                stepName: step.name,
+                startedAt: startedAt,
+                completedAt: nil
+            )
+        )
+    }
+
+    private func closeCurrentStepTiming(at completedAt: Date) {
+        guard let activeBakeRecordID,
+              let startedAt = cookState.stepStartedAt,
+              steps.indices.contains(cookState.currentIndex),
+              let recordIndex = bakeHistory.firstIndex(where: { $0.id == activeBakeRecordID }) else { return }
+
+        let step = steps[cookState.currentIndex]
+        if let timingIndex = bakeHistory[recordIndex].stepTimings.lastIndex(where: {
+            $0.stepID == step.id && $0.completedAt == nil
+        }) {
+            bakeHistory[recordIndex].stepTimings[timingIndex].stepName = step.name
+            bakeHistory[recordIndex].stepTimings[timingIndex].completedAt = completedAt
+        } else {
+            bakeHistory[recordIndex].stepTimings.append(
+                BakeStepTiming(
+                    id: UUID(),
+                    stepID: step.id,
+                    stepName: step.name,
+                    startedAt: startedAt,
+                    completedAt: completedAt
+                )
+            )
+        }
     }
 
     private func makeStep(type: StepType) -> JournalStep {

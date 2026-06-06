@@ -20,7 +20,7 @@ struct RecipeWorkflowBadge: View {
     private var foregroundColor: Color {
         switch state {
         case .draft:
-            return .brandPrimary
+            return .brandPrimaryLight   // accent-hover reads cleaner on the soft gold fill
         case .ready:
             return .brandSage
         }

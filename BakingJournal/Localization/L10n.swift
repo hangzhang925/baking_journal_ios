@@ -137,6 +137,19 @@ enum BakingTerms {
     static var exportLongImage: String { L10n.tr("home.action.export_long_image", default: "导出长图") }
     static var bakeAction: String { L10n.tr("home.action.bake", default: "烘焙") }
     static var activeBakeSection: String { L10n.tr("home.section.active_bake", default: "正在制作") }
+    static var bakeRecordOngoing: String { L10n.tr("bake_record.status.ongoing", default: "正在制作") }
+    static var bakeRecordStartedAt: String { L10n.tr("bake_record.started_at", default: "开始时间") }
+    static var bakeRecordCompletedAt: String { L10n.tr("bake_record.completed_at", default: "完成时间") }
+    static var bakeRecordStepTimingSection: String { L10n.tr("bake_record.section.step_timing", default: "步骤时间") }
+    static var bakeRecordStepColumn: String { L10n.tr("bake_record.column.step", default: "步骤") }
+    static var bakeRecordOpenRecipe: String { L10n.tr("bake_record.action.open_recipe", default: "打开配方") }
+    static var bakeRecordEditReviewNotes: String { L10n.tr("bake_record.action.edit_review_notes", default: "编辑复盘备注") }
+    static var bakeRecordNoReviewNotes: String { L10n.tr("bake_record.empty.review_notes", default: "还没有复盘备注") }
+    static var bakeRecordDeleteConfirmationTitle: String { L10n.tr("bake_record.confirm.delete.title", default: "删除这条记录？") }
+    static var bakeRecordDeleteConfirmationButton: String { L10n.tr("bake_record.confirm.delete.button", default: "删除记录") }
+    static func bakeRecordDeleteConfirmationMessage(_ name: String) -> String {
+        L10n.format("bake_record.confirm.delete.message", default: "“%@” 会从烘焙记录中移除。", name)
+    }
     static var noRecipes: String { L10n.tr("home.empty.no_recipes", default: "暂无配方") }
     static var noMatchingRecipes: String { L10n.tr("home.empty.no_matching_recipes", default: "没有匹配的配方") }
     static var recipeSearchPrompt: String { L10n.tr("home.search.recipes", default: "搜索配方名称") }
@@ -386,6 +399,10 @@ enum BakingTerms {
     static var productionStepName: String { L10n.tr("step.default.production_name", default: "制作") }
     static var customStepName: String { L10n.tr("step.default.custom_name", default: "其他") }
 
+    static func stepDefaultName(_ number: Int) -> String {
+        L10n.format("step.default.numbered_name", default: "步骤%d", number)
+    }
+
     static var starterProfileDefaultName: String { L10n.tr("starter_profile.default_name", default: "酵种") }
     static var starterTabTitle: String { L10n.tr("starter_profile.tab.title", default: "酵种") }
     static var starterSectionName: String { L10n.tr("starter_profile.section.name", default: "名称") }
@@ -398,6 +415,7 @@ enum BakingTerms {
     static var starterContainerWeight: String { L10n.tr("starter_profile.container_weight.label", default: "容器重量") }
     static var starterMeasuredWeight: String { L10n.tr("starter_profile.measured_weight", default: "称重") }
     static var starterFinalWeight: String { L10n.tr("starter_profile.final_weight", default: "酵种重量") }
+    static var starterTotalWeight: String { L10n.tr("starter_profile.total_weight", default: "总重量") }
     static var starterTime: String { L10n.tr("starter_profile.time", default: "时间") }
     static var starterRatio: String { L10n.tr("starter_profile.ratio", default: "比例") }
     static var starterFeedFlour: String { L10n.tr("starter_profile.feed_flour", default: "面粉") }
@@ -408,23 +426,23 @@ enum BakingTerms {
     static var starterFedDone: String { L10n.tr("starter_profile.action.done", default: "已完成喂养") }
     static var starterFeedTitle: String { L10n.tr("starter_profile.action.feed", default: "喂养") }
     static var starterMarkFed: String { L10n.tr("starter_profile.action.mark_fed", default: "完成喂养") }
-    static var starterSearchPrompt: String { L10n.tr("starter_library.search.prompt", default: "搜索种面名称") }
-    static var clearStarterSearch: String { L10n.tr("starter_library.search.clear", default: "清除种面搜索") }
-    static var starterStatusFilter: String { L10n.tr("starter_library.filter.status", default: "种面状态筛选") }
+    static var starterSearchPrompt: String { L10n.tr("starter_library.search.prompt", default: "搜索酵种名称") }
+    static var clearStarterSearch: String { L10n.tr("starter_library.search.clear", default: "清除酵种搜索") }
+    static var starterStatusFilter: String { L10n.tr("starter_library.filter.status", default: "酵种状态筛选") }
     static var starterStatusFilterAll: String { L10n.tr("starter_library.filter.status.all", default: "全部") }
     static var starterStatusFilterDue: String { L10n.tr("starter_library.filter.status.due", default: "需要喂养") }
     static var starterStatusFilterFresh: String { L10n.tr("starter_library.filter.status.fresh", default: "状态正常") }
     static var starterSortFed: String { L10n.tr("starter_library.filter.fed_sort", default: "喂养时间排序") }
     static var starterSortFedNewest: String { L10n.tr("starter_library.filter.fed_sort.newest", default: "最近喂养优先") }
     static var starterSortFedOldest: String { L10n.tr("starter_library.filter.fed_sort.oldest", default: "最早喂养优先") }
-    static var addStarter: String { L10n.tr("starter_library.action.add", default: "添加种面") }
-    static var noStarters: String { L10n.tr("starter_library.empty.no_starters", default: "暂无种面") }
-    static var noMatchingStarters: String { L10n.tr("starter_library.empty.no_matching_starters", default: "没有匹配的种面") }
+    static var addStarter: String { L10n.tr("starter_library.action.add", default: "添加酵种") }
+    static var noStarters: String { L10n.tr("starter_library.empty.no_starters", default: "暂无酵种") }
+    static var noMatchingStarters: String { L10n.tr("starter_library.empty.no_matching_starters", default: "没有匹配的酵种") }
     static var starterLastFed: String { L10n.tr("starter_library.row.last_fed", default: "喂养") }
-    static var starterDeleteConfirmationTitle: String { L10n.tr("starter_library.confirm.delete.title", default: "删除这个种面？") }
-    static var starterDeleteConfirmationButton: String { L10n.tr("starter_library.confirm.delete.button", default: "删除种面") }
+    static var starterDeleteConfirmationTitle: String { L10n.tr("starter_library.confirm.delete.title", default: "删除这个酵种？") }
+    static var starterDeleteConfirmationButton: String { L10n.tr("starter_library.confirm.delete.button", default: "删除酵种") }
     static func starterDeleteConfirmationMessage(_ name: String) -> String {
-        L10n.format("starter_library.confirm.delete.message", default: "“%@” 会从种面列表中移除。", name)
+        L10n.format("starter_library.confirm.delete.message", default: "“%@” 会从酵种列表中移除。", name)
     }
     static var starterSlideToMarkFed: String { L10n.tr("starter_profile.action.slide_to_mark_fed", default: "向左滑动完成喂养") }
     static var starterWeightAdjustHint: String { L10n.tr("starter_profile.weight.adjust_hint", default: "向左滑动减少克数，也可以直接输入") }

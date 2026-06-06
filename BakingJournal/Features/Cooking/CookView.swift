@@ -1,38 +1,31 @@
 import SwiftUI
 
 struct CookView: View {
+    @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
     @State private var now = Date()
+    @State private var showingActions = false
 
     var body: some View {
-        Group {
-            if store.steps.isEmpty {
-                EmptyStateView(title: BakingTerms.cookEmptyNeedsSteps, systemImage: "play.circle")
-                    .background(Color.brandBackground)
-            } else if !store.isReadyToBake {
-                EmptyStateView(title: BakingTerms.cookEmptyNotReady, systemImage: "exclamationmark.circle")
-                    .background(Color.brandBackground)
-            } else if store.cookState.completedAt != nil {
-                CookSummaryView()
-            } else {
-                CookStepView(now: now)
+        VStack(spacing: 0) {
+            header
+
+            Group {
+                if store.steps.isEmpty {
+                    EmptyStateView(title: BakingTerms.cookEmptyNeedsSteps, systemImage: "play.circle")
+                        .background(Color.brandBackground)
+                } else if !store.isReadyToBake {
+                    EmptyStateView(title: BakingTerms.cookEmptyNotReady, systemImage: "exclamationmark.circle")
+                        .background(Color.brandBackground)
+                } else if store.cookState.completedAt != nil {
+                    CookSummaryView()
+                } else {
+                    CookStepView(now: now)
+                }
             }
         }
         .navigationBarBackButtonHidden(true)
         .background(Color.brandBackground)
-        .toolbar {
-            if !store.steps.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        store.resetCook()
-                    } label: {
-                        BakingSystemIconButtonLabel(systemImage: "arrow.counterclockwise")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(BakingTerms.cookResetAccessibility)
-                }
-            }
-        }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { date in
             now = date
         }
@@ -40,202 +33,320 @@ struct CookView: View {
             store.beginCookIfNeeded()
         }
     }
+
+    private var header: some View {
+        BakingTopActionRow(
+            leading: {
+                if navigationController.canGoBack {
+                    BakingIconButton(
+                        icon: .back,
+                        accessibilityLabel: BakingTerms.back
+                    ) {
+                        navigationController.goBack()
+                    }
+                }
+            },
+            trailing: {
+                if !store.steps.isEmpty {
+                    Button {
+                        showingActions = true
+                    } label: {
+                        BakingTopSystemIconButtonLabel(systemImage: "ellipsis", tint: .brandText)
+                    }
+                    .buttonStyle(BakingPressFeedbackButtonStyle())
+                    .accessibilityLabel(BakingTerms.moreActions)
+                    .popover(isPresented: $showingActions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                        BakingDropdownPopover(width: 164) {
+                            if store.cookState.completedAt == nil {
+                                Button {
+                                    showingActions = false
+                                    store.completeBake()
+                                } label: {
+                                    BakingDropdownRow(title: BakingTerms.cookFinish, foreground: .brandText) {
+                                        BakingIconView(
+                                            icon: .complete,
+                                            size: BakingTouchTarget.dropdownIconGlyph,
+                                            color: .brandPrimary
+                                        )
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Button {
+                                showingActions = false
+                                store.resetCook()
+                            } label: {
+                                BakingDropdownRow(title: BakingTerms.reset, foreground: .brandText) {
+                                    BakingIconView(
+                                        icon: .delete,
+                                        size: BakingTouchTarget.dropdownIconGlyph,
+                                        color: .brandText
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        )
+    }
 }
 
 private struct CookStepView: View {
-    @Environment(\.historySwipeSuppressionHandler) private var setHistorySwipeSuppressed
     @EnvironmentObject private var store: RecipeStore
     let now: Date
-    @State private var isLocalStepSwipeActive = false
-    @State private var isVerticalScrollIntent = false
+    @State private var notesExpanded = false
+    @State private var stepSelection = 0
 
     var body: some View {
-        let step = currentStep
-        let stepItems = store.allocatedItems(for: step)
-        let checked = store.cookState.checked[step.id] ?? []
+        VStack(spacing: BakingSpace.sm) {
+            VStack(alignment: .leading, spacing: BakingSpace.sm) {
+                recipeHeader
 
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: BakingSpace.sm) {
-                CookCurrentStageCard(
-                    step: step,
+                if !trimmedOverallNotes.isEmpty {
+                    notesSection
+                }
+
+                CookStepCarousel(
                     steps: store.steps,
-                    stepIndex: store.cookState.currentIndex,
-                    totalSteps: store.steps.count,
-                    checkedCount: checked.count,
-                    totalItemCount: stepItems.count,
-                    now: now
+                    currentIndex: store.cookState.currentIndex,
+                    selectedIndex: carouselBinding
                 )
-                .id(step.id)
-                .transition(.opacity.combined(with: .scale(scale: 0.99, anchor: .top)))
-
-                VStack(alignment: .leading, spacing: 7) {
-                    CookSectionHeader(
-                        title: BakingTerms.cookIngredients,
-                        detail: stepItems.isEmpty
-                            ? BakingTerms.cookIngredientCount(0)
-                            : BakingTerms.cookIngredientProgress(checked: checked.count, total: stepItems.count)
-                    )
-
-                    if stepItems.isEmpty {
-                        Text(BakingTerms.cookNoStepIngredients)
-                            .font(BakingTypography.appPrimaryText)
-                            .foregroundStyle(Color.brandSecondaryText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(10)
-                            .bakingInsetSurface()
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 108), spacing: 7)], spacing: 7) {
-                            ForEach(stepItems) { allocatedItem in
-                                let item = allocatedItem.item
-                                Button {
-                                    store.toggleCookItem(stepId: step.id, itemId: item.id)
-                                } label: {
-                                    CookMaterialMiniCard(
-                                        allocatedItem: allocatedItem,
-                                        isChecked: checked.contains(item.id)
-                                    )
-                                }
-                                .buttonStyle(BakingPressFeedbackButtonStyle())
-                            }
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 7) {
-                    CookSectionHeader(title: BakingTerms.cookTips, detail: nil)
-
-                    Text(step.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? BakingTerms.cookDefaultStepNote : step.notes)
-                        .font(BakingTypography.appPrimaryText)
-                        .foregroundStyle(Color.brandText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .bakingInsetSurface()
-                }
             }
             .padding(.horizontal, BakingLayout.screenHorizontalInset)
             .padding(.top, BakingLayout.contentTopInset)
-            .padding(.bottom, 18)
+
+            TabView(selection: $stepSelection) {
+                ForEach(Array(store.steps.enumerated()), id: \.element.id) { index, step in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: BakingSpace.sm) {
+                            CookTimerCard(step: step, now: now)
+
+                            instructionSection(step: step)
+                        }
+                        .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                        .padding(.top, BakingSpace.xs)
+                        .padding(.bottom, 18)
+                    }
+                    .scrollIndicators(.hidden)
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .background(Color.brandBackground)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 36, coordinateSpace: .local)
-                .onChanged { value in
-                    guard !isVerticalScrollIntent else { return }
-                    if BakingGesturePolicy.isVerticalScrollIntent(value.translation) {
-                        isVerticalScrollIntent = true
-                        return
-                    }
-                    guard !isLocalStepSwipeActive else { return }
-                    guard BakingGesturePolicy.isHorizontalIntent(
-                        value.translation,
-                        minimumDistance: 68
-                    ) else { return }
-                    isLocalStepSwipeActive = true
-                    setHistorySwipeSuppressed(true)
+        .onAppear {
+            stepSelection = store.cookState.currentIndex
+        }
+        .onChange(of: stepSelection) { _, newValue in
+            if newValue != store.cookState.currentIndex {
+                store.goToCookStep(newValue)
+            }
+        }
+        .onChange(of: store.cookState.currentIndex) { _, newValue in
+            if stepSelection != newValue {
+                withAnimation(BakingMotion.standard) {
+                    stepSelection = newValue
                 }
-                .onEnded { value in
-                    let horizontalTravel = value.translation.width
-                    let shouldReleaseHistorySwipe = isLocalStepSwipeActive
-                    defer {
-                        isLocalStepSwipeActive = false
-                        isVerticalScrollIntent = false
-                        if shouldReleaseHistorySwipe {
-                            setHistorySwipeSuppressed(false)
-                        }
-                    }
-                    guard isLocalStepSwipeActive else { return }
-                    guard BakingGesturePolicy.isHorizontalIntent(
-                        value.translation,
-                        minimumDistance: 68
-                    ) else { return }
-                    withAnimation(BakingMotion.standard) {
-                        store.moveCookStep(horizontalTravel < 0 ? 1 : -1)
-                    }
-                }
-        )
+            }
+        }
         .accessibilityAction(named: BakingTerms.cookPreviousStep) {
             store.moveCookStep(-1)
         }
-        .accessibilityAction(named: store.cookState.currentIndex == store.steps.count - 1 ? BakingTerms.cookFinish : BakingTerms.cookNextStep) {
+        .accessibilityAction(named: BakingTerms.cookNextStep) {
             store.moveCookStep(1)
         }
+    }
+
+    private var carouselBinding: Binding<Int?> {
+        Binding(
+            get: { stepSelection },
+            set: { if let newValue = $0 { stepSelection = newValue } }
+        )
+    }
+
+    private var recipeHeader: some View {
+        HStack(spacing: BakingSpace.md) {
+            BakingMaterialIconBadge(
+                icon: BakingIcon.recipeKind(store.currentRecipeKind),
+                color: .brandPrimary,
+                background: BakingSurfaceTheme.theme(for: .inputSurface).background
+            )
+
+            Text(store.currentRecipeDisplayName)
+                .font(BakingTypography.screenTitle)
+                .foregroundStyle(Color.brandText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, BakingSpace.xs)
+    }
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            BakingDisclosureHeader(
+                title: BakingTerms.stepsPageNotes,
+                value: "",
+                showsValue: false,
+                systemImage: "note.text",
+                isExpanded: notesExpanded
+            ) {
+                withAnimation(BakingMotion.standard) {
+                    notesExpanded.toggle()
+                }
+            }
+
+            if notesExpanded {
+                Text(trimmedOverallNotes)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(10)
+                    .bakingInsetSurface()
+            }
+        }
+        .padding(10)
+        .bakingSectionCard()
+    }
+
+    private func instructionSection(step: JournalStep) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(BakingTerms.cookCurrentStage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.brandPrimary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(BakingSurfaceTheme.theme(for: .selected).background)
+                    .clipShape(Capsule())
+
+                Text(BakingTerms.cookTips)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
+
+                Spacer(minLength: 0)
+            }
+
+            Text(stepInstructionText(step))
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(Color.brandText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(10)
+                .bakingInsetSurface()
+        }
+        .padding(10)
+        .bakingSectionCard()
     }
 
     private var currentStep: JournalStep {
         store.steps[min(store.cookState.currentIndex, max(store.steps.count - 1, 0))]
     }
+
+    private var trimmedOverallNotes: String {
+        store.recipeOverallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func stepInstructionText(_ step: JournalStep) -> String {
+        let trimmed = step.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? BakingTerms.cookDefaultStepNote : step.notes
+    }
 }
 
-private struct CookCurrentStageCard: View {
-    @EnvironmentObject private var store: RecipeStore
-    let step: JournalStep
+private struct CookStepCarousel: View {
     let steps: [JournalStep]
+    let currentIndex: Int
+    @Binding var selectedIndex: Int?
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let cardWidth = max(0, width * 0.78)
+            let sideInset = max(0, (width - cardWidth) / 2)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: BakingSpace.sm) {
+                    ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                        CookStepCarouselCard(
+                            step: step,
+                            stepIndex: index,
+                            totalSteps: steps.count,
+                            isCurrent: index == currentIndex
+                        )
+                        .frame(width: cardWidth)
+                        .id(index)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(BakingMotion.standard) {
+                                selectedIndex = index
+                            }
+                        }
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .contentMargins(.horizontal, sideInset, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $selectedIndex)
+        }
+        .frame(height: 64)
+    }
+}
+
+private struct CookStepCarouselCard: View {
+    let step: JournalStep
     let stepIndex: Int
     let totalSteps: Int
-    let checkedCount: Int
-    let totalItemCount: Int
+    let isCurrent: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(BakingTerms.cookStepProgress(stepIndex: stepIndex + 1, totalSteps: totalSteps))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isCurrent ? Color.brandPrimary : Color.brandSecondaryText)
+
+            Text(step.name)
+                .font(BakingTypography.rowTitle)
+                .foregroundStyle(isCurrent ? Color.brandText : Color.brandSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .bakingCard(
+            background: isCurrent ? BakingSurface.selectedRowBackground : BakingSurfaceTheme.theme(for: .readOnly).background,
+            radius: BakingRadius.card,
+            stroke: isCurrent ? BakingSurface.selectedStroke : BakingSurfaceTheme.theme(for: .readOnly).stroke,
+            lineWidth: isCurrent ? 0.9 : 0.5
+        )
+        .opacity(isCurrent ? 1 : 0.7)
+        .animation(BakingMotion.standard, value: isCurrent)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(BakingTerms.cookStepProgress(stepIndex: stepIndex + 1, totalSteps: totalSteps))
+        .accessibilityValue(step.name)
+        .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
+    }
+}
+
+private struct CookTimerCard: View {
+    @EnvironmentObject private var store: RecipeStore
+    let step: JournalStep
     let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            CookStepProgressStrip(steps: steps, currentIndex: stepIndex)
-
-            HStack(alignment: .top, spacing: 9) {
-                BakingMaterialIconBadge(
-                    icon: BakingIcon.step(for: step.type),
-                    size: BakingTouchTarget.materialBadge,
-                    iconSize: BakingTouchTarget.materialBadgeGlyph,
-                    color: .brandPrimary,
-                    background: BakingSurfaceTheme.theme(for: .inputSurface).background
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(BakingTerms.cookStepProgress(stepIndex: stepIndex + 1, totalSteps: totalSteps))
-                        Text(BakingTerms.cookCurrentStage)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(BakingSurfaceTheme.theme(for: .selected).background)
-                            .clipShape(Capsule())
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.brandPrimary)
-
-                    Text(step.name)
-                        .font(BakingTypography.sectionTitle)
-                        .foregroundStyle(Color.brandText)
-                        .lineLimit(2)
-
-                    Text(step.type.label)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.brandSecondaryText)
-                }
-
-                Spacer(minLength: 6)
-
-                VStack(alignment: .trailing, spacing: 5) {
-                    StepValuePill(
-                        icon: "timer",
-                        text: remainingText,
-                        accent: .brandPrimary,
-                        width: 82
-                    )
-
-                    if let temperatureText {
-                        StepValuePill(
-                            icon: "thermometer.medium",
-                            text: temperatureText,
-                            accent: .waterText,
-                            background: BakingSurfaceTheme.theme(for: .waterSurface).background,
-                            stroke: BakingSurfaceTheme.theme(for: .waterSurface).stroke,
-                            width: 82
-                        )
-                    }
-                }
-            }
-
             HStack(spacing: 7) {
-                CookTimeMetric(title: BakingTerms.cookNow, value: BakingFormat.clockTime(now), accent: .brandText)
+                CookTimeMetric(
+                    title: BakingTerms.recipePreviewEstimatedDuration,
+                    value: durationText,
+                    accent: .brandPrimary
+                )
 
                 Button {
                     store.startTimer(for: step)
@@ -247,19 +358,21 @@ private struct CookCurrentStageCard: View {
                 }
                 .buttonStyle(.plain)
 
-                CookTimeMetric(title: BakingTerms.cookFinishAt, value: BakingFormat.clockTime(projectedEnd), accent: .brandPrimary)
-            }
-
-            HStack(spacing: 6) {
-                StepsMetricPill(
-                    title: BakingTerms.cookIngredients,
-                    value: "\(totalItemCount)",
+                CookTimeMetric(
+                    title: BakingTerms.cookFinishAt,
+                    value: BakingFormat.clockTime(projectedEnd),
                     accent: .brandText
                 )
-                StepsMetricPill(
-                    title: BakingTerms.cookChecked,
-                    value: "\(checkedCount)/\(totalItemCount)",
-                    accent: checkedCount == totalItemCount ? .brandSage : .brandPrimary
+            }
+
+            if let temperatureText {
+                StepValuePill(
+                    icon: "thermometer.medium",
+                    text: temperatureText,
+                    accent: .waterText,
+                    background: BakingSurfaceTheme.theme(for: .waterSurface).background,
+                    stroke: BakingSurfaceTheme.theme(for: .waterSurface).stroke,
+                    width: 92
                 )
             }
         }
@@ -278,17 +391,8 @@ private struct CookCurrentStageCard: View {
         return now.addingTimeInterval(store.stepMinutes(step) * 60)
     }
 
-    private var remainingText: String {
-        guard isRunning, let timerEndsAt = store.cookState.timerEndsAt else {
-            return compactDurationText
-        }
-        return BakingFormat.duration(minutes: max(0, timerEndsAt.timeIntervalSince(now) / 60))
-    }
-
-    private var compactDurationText: String {
+    private var durationText: String {
         BakingFormat.duration(minutes: store.stepMinutes(step))
-            .replacingOccurrences(of: " hr", with: "h")
-            .replacingOccurrences(of: " min", with: "m")
     }
 
     private var temperatureText: String? {
@@ -298,46 +402,6 @@ private struct CookCurrentStageCard: View {
             return "\(value)\(step.temperatureUnit?.rawValue ?? "F")"
         }
         return "\(value)°"
-    }
-}
-
-private struct CookStepProgressStrip: View {
-    let steps: [JournalStep]
-    let currentIndex: Int
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 5) {
-                ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
-                    let isCurrent = index == currentIndex
-
-                    HStack(spacing: 6) {
-                        BakingIconView(
-                            icon: BakingIcon.step(for: step.type),
-                            size: isCurrent ? 15 : 12,
-                            color: isCurrent ? .brandPrimary : .brandSecondaryText.opacity(0.78)
-                        )
-
-                        if isCurrent {
-                            Text(step.type.label)
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(Color.brandText)
-                        }
-                    }
-                    .frame(height: 26)
-                    .padding(.horizontal, isCurrent ? 8 : 7)
-                    .background(isCurrent ? BakingSurfaceTheme.theme(for: .selected).background : BakingSurfaceTheme.theme(for: .readOnly).background)
-                    .clipShape(Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(isCurrent ? BakingSurfaceTheme.theme(for: .selected).stroke : BakingSurfaceTheme.theme(for: .readOnly).stroke, lineWidth: 0.5)
-                    }
-                    .accessibilityLabel(BakingTerms.cookStepProgress(stepIndex: index + 1, totalSteps: steps.count))
-                    .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
-                }
-            }
-            .padding(.horizontal, 1)
-        }
     }
 }
 
@@ -364,222 +428,34 @@ private struct CookTimeMetric: View {
     }
 }
 
-private struct CookMaterialMiniCard: View {
-    @EnvironmentObject private var store: RecipeStore
-    let allocatedItem: AllocatedRecipeItem
-    let isChecked: Bool
-
-    var body: some View {
-        let item = allocatedItem.item
-        let palette = item.materialPalette
-
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 6) {
-                BakingIconView(
-                    icon: BakingIcon.material(for: item),
-                    size: 15,
-                    color: isChecked ? Color.brandSage : palette.tint
-                )
-                .frame(width: 24, height: 24)
-                .background(isChecked ? BakingSurfaceTheme.theme(for: .success).background : palette.iconSurface)
-                .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
-
-                Spacer()
-
-                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(isChecked ? Color.brandSage : Color.brandSecondaryText.opacity(0.62))
-            }
-
-            Text(item.name)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(BakingFormat.weight(allocatedItem.weight, gramPrecision: item.tag == .yeast ? 1 : 0))
-                    .font(BakingTypography.tableNumber)
-                    .foregroundStyle(isChecked ? Color.brandSage : palette.text)
-                    .lineLimit(1)
-
-                Spacer(minLength: 2)
-
-                if store.hasWaterContent(item) {
-                    Image(systemName: "drop.fill")
-                        .font(.caption2)
-                        .foregroundStyle(Color.waterText)
-                }
-            }
-
-            Text(detailText)
-                .font(.caption2)
-                .foregroundStyle(store.hasWaterContent(item) ? Color.waterText.opacity(0.82) : Color.brandSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: 98, alignment: .leading)
-        .bakingCard(
-            background: cardBackground(palette: palette),
-            radius: BakingRadius.compactCard,
-            stroke: isChecked ? BakingSurfaceTheme.theme(for: .success).stroke : palette.chipStroke,
-            lineWidth: isChecked ? 0.9 : 0.5
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isChecked ? [.isSelected] : [])
-    }
-
-    private var detailText: String {
-        let item = allocatedItem.item
-        if store.hasWaterContent(item) {
-            let waterWeight = BakingFormat.weight(store.waterContribution(item) * allocatedItem.percentage / 100)
-            return BakingTerms.cookWaterContribution(waterWeight)
-        }
-        return BakingTerms.cookAllocationPercent(BakingFormat.number(allocatedItem.percentage, precision: 0))
-    }
-
-    private func cardBackground(palette: MaterialPalette) -> Color {
-        if isChecked {
-            return Color.brandSage.opacity(0.095)
-        }
-        return palette.chipSurface
-    }
-}
-
-private struct CookSectionHeader: View {
-    let title: String
-    let detail: String?
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(Color.brandSecondaryText)
-
-            Spacer()
-
-            if let detail {
-                Text(detail)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Color.brandSecondaryText)
-            }
-        }
-        .padding(.horizontal, 2)
-    }
-}
-
 private struct CookSummaryView: View {
+    @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: BakingLayout.cardStackSpacing) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
-                        BakingMaterialIconBadge(
-                            icon: .complete,
-                            size: BakingTouchTarget.materialBadge,
-                            iconSize: BakingTouchTarget.materialBadgeGlyph,
-                            color: .brandSage,
-                            background: Color.brandSage.opacity(0.12)
-                        )
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(BakingTerms.cookCompletedTitle)
-                                .font(BakingTypography.sectionTitle)
-                                .foregroundStyle(Color.brandText)
-                            Text(BakingTerms.cookCompletedBody)
-                                .font(BakingTypography.appSecondaryText)
-                                .foregroundStyle(Color.brandSecondaryText)
-                        }
-                    }
-
-                    HStack(spacing: 6) {
-                        StepsMetricPill(
-                            title: BakingTerms.cookActualTime,
-                            value: BakingFormat.duration(minutes: actualMinutes),
-                            accent: .brandSage
-                        )
-                        StepsMetricPill(
-                            title: BakingTerms.cookEstimatedTime,
-                            value: BakingFormat.duration(minutes: store.totalStepMinutes()),
-                            accent: .brandPrimary
-                        )
-                    }
-
-                    HStack(spacing: 6) {
-                        StepsMetricPill(
-                            title: BakingTerms.cookCompletedSteps,
-                            value: "\(store.steps.count)/\(store.steps.count)",
-                            accent: .brandText
-                        )
-                        StepsMetricPill(
-                            title: BakingTerms.cookIngredientCheck,
-                            value: "\(checkedItemCount)/\(totalItemCount)",
-                            accent: .brandText
-                        )
-                    }
+        if let activeBakeRecord = store.activeBakeRecord {
+            BakeRecordReviewContent(
+                record: activeBakeRecord,
+                icon: BakingIcon.recipeKind(store.currentRecipeKind),
+                notes: notesBinding,
+                onOpenRecipe: {
+                    navigationController.push(.recipeWorkspace(.formula))
                 }
-                .padding(10)
-                .bakingCard()
+            )
+        } else {
+            EmptyStateView(title: BakingTerms.noRecords, systemImage: "clock.arrow.circlepath")
+                .background(Color.brandBackground)
+        }
+    }
 
+    private var notesBinding: Binding<String> {
+        Binding(
+            get: { store.activeBakeRecord?.notes ?? "" },
+            set: { notes in
                 if let activeBakeRecord = store.activeBakeRecord {
-                    VStack(alignment: .leading, spacing: 8) {
-                        CookSectionHeader(title: BakingTerms.reviewNotes, detail: nil)
-
-                        TextEditor(text: Binding(
-                            get: { activeBakeRecord.notes },
-                            set: { store.updateBakeRecordNotes($0, for: activeBakeRecord) }
-                        ))
-                        .font(BakingTypography.appPrimaryText)
-                        .foregroundStyle(Color.brandText)
-                        .frame(minHeight: 140)
-                        .scrollContentBackground(.hidden)
-                        .padding(8)
-                        .bakingInsetSurface()
-                    }
+                    store.updateBakeRecordNotes(notes, for: activeBakeRecord)
                 }
             }
-            .padding(.horizontal, BakingLayout.screenHorizontalInset)
-            .padding(.top, BakingLayout.contentTopInset)
-            .padding(.bottom, 96)
-        }
-        .background(Color.brandBackground)
-        .safeAreaInset(edge: .bottom) {
-            HStack {
-                Spacer()
-                Button {
-                    store.resetCook()
-                } label: {
-                    BakingSystemIconButtonLabel(systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(BakingTerms.cookBakeAgain)
-                Spacer()
-            }
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-            .background(BakingSurface.bottomBarBackground)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(BakingSurfaceTheme.separator)
-                    .frame(height: 0.6)
-            }
-        }
-    }
-
-    private var actualMinutes: Double {
-        guard let start = store.cookState.totalStartedAt, let end = store.cookState.completedAt else { return 0 }
-        return end.timeIntervalSince(start) / 60
-    }
-
-    private var totalItemCount: Int {
-        store.steps.reduce(0) { $0 + store.allocatedItems(for: $1).count }
-    }
-
-    private var checkedItemCount: Int {
-        store.cookState.checked.values.reduce(0) { $0 + $1.count }
+        )
     }
 }

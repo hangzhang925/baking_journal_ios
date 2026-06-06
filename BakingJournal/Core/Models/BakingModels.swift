@@ -303,6 +303,14 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
     }
 }
 
+struct BakeStepTiming: Identifiable, Codable, Equatable {
+    var id: UUID
+    var stepID: UUID?
+    var stepName: String
+    var startedAt: Date
+    var completedAt: Date?
+}
+
 struct BakeRecord: Identifiable, Codable, Equatable {
     var id: UUID
     var recipeID: UUID?
@@ -312,6 +320,54 @@ struct BakeRecord: Identifiable, Codable, Equatable {
     var completedAt: Date?
     var notes: String
     var stepCount: Int
+    var stepTimings: [BakeStepTiming]
+
+    init(
+        id: UUID,
+        recipeID: UUID?,
+        recipeName: String,
+        recipeSnapshotName: String,
+        startedAt: Date,
+        completedAt: Date?,
+        notes: String,
+        stepCount: Int,
+        stepTimings: [BakeStepTiming] = []
+    ) {
+        self.id = id
+        self.recipeID = recipeID
+        self.recipeName = recipeName
+        self.recipeSnapshotName = recipeSnapshotName
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.notes = notes
+        self.stepCount = stepCount
+        self.stepTimings = stepTimings
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case recipeID
+        case recipeName
+        case recipeSnapshotName
+        case startedAt
+        case completedAt
+        case notes
+        case stepCount
+        case stepTimings
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        recipeID = try container.decodeIfPresent(UUID.self, forKey: .recipeID)
+        recipeName = try container.decode(String.self, forKey: .recipeName)
+        recipeSnapshotName = try container.decodeIfPresent(String.self, forKey: .recipeSnapshotName) ?? recipeName
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        stepCount = try container.decodeIfPresent(Int.self, forKey: .stepCount) ?? 0
+        stepTimings = try container.decodeIfPresent([BakeStepTiming].self, forKey: .stepTimings) ?? []
+    }
 }
 
 struct CookState: Codable, Equatable {

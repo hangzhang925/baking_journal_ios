@@ -295,7 +295,8 @@ private struct RecipeBakeHistoryStageView: View {
                 } else {
                     ForEach(recipeHistory) { record in
                         Button {
-                            if record.id == store.activeBakeRecordID && record.completedAt == nil {
+                            if store.canResumeBake(record) {
+                                store.resumeBake(record)
                                 navigationController.push(.cook)
                             } else {
                                 navigationController.push(.bakeRecordDetail(record.id))
