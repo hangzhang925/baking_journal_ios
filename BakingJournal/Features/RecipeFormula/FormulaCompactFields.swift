@@ -35,8 +35,10 @@ struct CompactTextRow: View {
             Spacer()
             TextField(title, text: $text)
                 .font(BakingTypography.rowValue)
+                .foregroundStyle(Color.brandText)
                 .multilineTextAlignment(.trailing)
                 .textFieldStyle(.plain)
+                .bakingFittedInputField(.long, alignment: .trailing)
         }
         .padding(.vertical, 6)
     }
@@ -231,8 +233,7 @@ struct CompactMenuRow: View {
             } label: {
                 BakingDropdownTrigger(
                     title: displayTitle(value),
-                    tint: .brandPrimary,
-                    background: BakingSurfaceTheme.theme(for: .inputSurface).background
+                    tint: .brandPrimary
                 )
             }
             .buttonStyle(.plain)

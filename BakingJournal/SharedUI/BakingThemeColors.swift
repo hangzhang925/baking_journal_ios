@@ -1,105 +1,210 @@
 import SwiftUI
 import UIKit
 
+// MARK: - Baking Journal color foundation
+//
+// Source of truth: the "Baking Journal — Design System" produced in Claude Design
+// (direction "Honey Gold", warm light + warm-black dark themes).
+//
+// Direction A · Honey Gold (bright, sunny wheat) is the signature primary. It stays
+// vivid in both light and warm-black dark mode, like the saturated primaries in
+// WeChat / RedNote / Instagram. Secondary is a calm water blue tied to the legacy
+// `Color.water*` tokens. Surfaces follow a white-canvas → warm-cream-card model with
+// no cold grey. Filled primary controls take WHITE text.
+//
+// All app color routes through the semantic `Color.brand*`, `Color.water*`, semantic,
+// and material tokens below — recolor here and the change propagates app-wide.
+
 extension Color {
-    static let brandBackground = adaptiveColor(
-        light: RGB(1.0, 1.0, 1.0),
-        dark: RGB(0.0, 0.0, 0.0)
+
+    // MARK: Primary scale — Honey Gold (50 → 900)
+    static let goldenWheat50 = adaptiveColor(light: RGB(0.992, 0.965, 0.902), dark: RGB(0.992, 0.965, 0.902))
+    static let goldenWheat100 = adaptiveColor(light: RGB(0.984, 0.914, 0.761), dark: RGB(0.984, 0.914, 0.761))
+    static let goldenWheat200 = adaptiveColor(light: RGB(0.969, 0.843, 0.549), dark: RGB(0.969, 0.843, 0.549))
+    static let goldenWheat300 = adaptiveColor(light: RGB(0.953, 0.757, 0.314), dark: RGB(0.953, 0.757, 0.314))
+    static let goldenWheat400 = adaptiveColor(light: RGB(0.945, 0.682, 0.149), dark: RGB(0.945, 0.682, 0.149))
+    static let goldenWheat500 = adaptiveColor(light: RGB(0.949, 0.635, 0.047), dark: RGB(0.949, 0.635, 0.047))
+    static let goldenWheat600 = adaptiveColor(light: RGB(0.839, 0.522, 0.039), dark: RGB(0.839, 0.522, 0.039))
+    static let goldenWheat700 = adaptiveColor(light: RGB(0.682, 0.400, 0.039), dark: RGB(0.682, 0.400, 0.039))
+    static let goldenWheat800 = adaptiveColor(light: RGB(0.498, 0.294, 0.051), dark: RGB(0.498, 0.294, 0.051))
+    static let goldenWheat900 = adaptiveColor(light: RGB(0.325, 0.192, 0.043), dark: RGB(0.325, 0.192, 0.043))
+
+    // MARK: Secondary scale — Water Blue (50 → 900)
+    static let waterBlue50 = adaptiveColor(light: RGB(0.914, 0.965, 0.980), dark: RGB(0.914, 0.965, 0.980))
+    static let waterBlue100 = adaptiveColor(light: RGB(0.776, 0.914, 0.949), dark: RGB(0.776, 0.914, 0.949))
+    static let waterBlue200 = adaptiveColor(light: RGB(0.561, 0.827, 0.898), dark: RGB(0.561, 0.827, 0.898))
+    static let waterBlue300 = adaptiveColor(light: RGB(0.322, 0.725, 0.831), dark: RGB(0.322, 0.725, 0.831))
+    static let waterBlue400 = adaptiveColor(light: RGB(0.153, 0.627, 0.761), dark: RGB(0.153, 0.627, 0.761))
+    static let waterBlue500 = adaptiveColor(light: RGB(0.094, 0.533, 0.675), dark: RGB(0.094, 0.533, 0.675))
+    static let waterBlue600 = adaptiveColor(light: RGB(0.075, 0.439, 0.561), dark: RGB(0.075, 0.439, 0.561))
+    static let waterBlue700 = adaptiveColor(light: RGB(0.078, 0.357, 0.455), dark: RGB(0.078, 0.357, 0.455))
+    static let waterBlue800 = adaptiveColor(light: RGB(0.086, 0.286, 0.361), dark: RGB(0.086, 0.286, 0.361))
+    static let waterBlue900 = adaptiveColor(light: RGB(0.078, 0.227, 0.286), dark: RGB(0.078, 0.227, 0.286))
+
+    // MARK: Semantic — success / warning / error / info
+    static let semanticSuccessSoft = adaptiveColor(
+        light: RGB(0.886, 0.953, 0.910),
+        dark: RGB(0.114, 0.231, 0.165)
     )
-    static let brandSurface = adaptiveColor(
-        light: RGB(0.992, 0.976, 0.949),
-        dark: RGB(0.0, 0.0, 0.0)
+    static let semanticSuccess = adaptiveColor(
+        light: RGB(0.184, 0.620, 0.357),
+        dark: RGB(0.498, 0.851, 0.631)
     )
-    static let brandSurfaceStrong = adaptiveColor(
-        light: RGB(0.976, 0.953, 0.914),
-        dark: RGB(0.067, 0.067, 0.067)
+    static let semanticSuccessDeep = adaptiveColor(
+        light: RGB(0.118, 0.478, 0.263),
+        dark: RGB(0.498, 0.851, 0.631)
     )
-    static let brandFieldSurface = adaptiveColor(
-        light: RGB(0.996, 0.949, 0.878),
-        dark: RGB(0.165, 0.106, 0.047)
+    static let semanticWarningSoft = adaptiveColor(
+        light: RGB(0.988, 0.922, 0.831),
+        dark: RGB(0.243, 0.176, 0.090)
     )
-    static let brandFieldStroke = adaptiveColor(
-        light: RGB(0.875, 0.682, 0.424),
-        dark: RGB(0.545, 0.357, 0.157)
+    static let semanticWarning = adaptiveColor(
+        light: RGB(0.910, 0.510, 0.102),
+        dark: RGB(0.961, 0.745, 0.471)
     )
-    static let brandPrimary = adaptiveColor(
-        light: RGB(0.957, 0.643, 0.227),
-        dark: RGB(0.957, 0.643, 0.227)
+    static let semanticWarningDeep = adaptiveColor(
+        light: RGB(0.710, 0.380, 0.047),
+        dark: RGB(0.961, 0.745, 0.471)
     )
-    static let brandPrimaryLight = adaptiveColor(
-        light: RGB(0.910, 0.584, 0.141),
-        dark: RGB(0.941, 0.627, 0.184)
+    static let semanticErrorSoft = adaptiveColor(
+        light: RGB(0.984, 0.890, 0.878),
+        dark: RGB(0.243, 0.118, 0.106)
     )
-    static let brandPrimaryDark = adaptiveColor(
-        light: RGB(0.784, 0.459, 0.094),
-        dark: RGB(0.827, 0.518, 0.122)
+    static let semanticError = adaptiveColor(
+        light: RGB(0.859, 0.290, 0.239),
+        dark: RGB(0.949, 0.631, 0.600)
     )
-    static let brandOnPrimary = adaptiveColor(
-        light: RGB(1.0, 1.0, 1.0),
-        dark: RGB(1.0, 1.0, 1.0)
+    static let semanticErrorDeep = adaptiveColor(
+        light: RGB(0.682, 0.200, 0.153),
+        dark: RGB(0.949, 0.631, 0.600)
     )
-    static let brandSage = adaptiveColor(
-        light: RGB(0.373, 0.498, 0.322),
-        dark: RGB(0.60, 0.72, 0.50)
+    static let semanticInfoSoft = adaptiveColor(
+        light: RGB(0.882, 0.941, 0.965),
+        dark: RGB(0.106, 0.196, 0.231)
     )
-    static let brandSea = adaptiveColor(
-        light: RGB(0.247, 0.655, 0.710),
-        dark: RGB(0.333, 0.718, 0.761)
+    static let semanticInfo = adaptiveColor(
+        light: RGB(0.165, 0.525, 0.659),
+        dark: RGB(0.525, 0.773, 0.867)
     )
-    static let brandText = adaptiveColor(
-        light: RGB(0.067, 0.067, 0.067),
-        dark: RGB(1.0, 1.0, 1.0)
-    )
-    static let brandSecondaryText = adaptiveColor(
-        light: RGB(0.400, 0.400, 0.400),
-        dark: RGB(0.722, 0.722, 0.722)
-    )
-    static let brandTertiaryText = adaptiveColor(
-        light: RGB(0.600, 0.600, 0.600),
-        dark: RGB(0.467, 0.467, 0.467)
-    )
-    static let brandDivider = adaptiveColor(
-        light: RGB(0.886, 0.831, 0.745),
-        dark: RGB(0.141, 0.141, 0.141)
-    )
-    static let waterSurface = adaptiveColor(
-        light: RGB(0.918, 0.969, 0.976),
-        dark: RGB(0.063, 0.157, 0.169)
-    )
-    static let waterSurfaceStrong = adaptiveColor(
-        light: RGB(0.859, 0.945, 0.953),
-        dark: RGB(0.086, 0.220, 0.239)
-    )
-    static let waterText = adaptiveColor(
-        light: RGB(0.247, 0.655, 0.710),
-        dark: RGB(0.333, 0.718, 0.761)
+    static let semanticInfoDeep = adaptiveColor(
+        light: RGB(0.102, 0.408, 0.522),
+        dark: RGB(0.525, 0.773, 0.867)
     )
 
+    // MARK: Surfaces — white canvas → warm cream cards (no cold grey)
+    static let brandBackground = adaptiveColor(
+        light: RGB(1.0, 1.0, 1.0),                 // canvas · #FFFFFF
+        dark: RGB(0.082, 0.071, 0.051)             // warm near-black · #15120D
+    )
+    static let brandSurface = adaptiveColor(
+        light: RGB(0.984, 0.957, 0.910),           // card · #FBF4E8
+        dark: RGB(0.125, 0.106, 0.078)             // #201B14
+    )
+    static let brandSurfaceStrong = adaptiveColor(
+        light: RGB(0.965, 0.925, 0.855),           // nested cell · #F6ECDA
+        dark: RGB(0.165, 0.141, 0.106)             // #2A241B
+    )
+
+    // MARK: Editable field fills — "gold = you can edit this"
+    static let brandFieldSurface = adaptiveColor(
+        light: RGB(0.993, 0.953, 0.876),           // field-fill (gold wash on cream)
+        dark: RGB(0.216, 0.164, 0.075)
+    )
+    static let brandFieldStroke = adaptiveColor(
+        light: RGB(0.942, 0.788, 0.500),           // field-border (soft gold hairline)
+        dark: RGB(0.415, 0.310, 0.120)
+    )
+
+    // MARK: Primary accent
+    static let brandPrimary = adaptiveColor(
+        light: RGB(0.949, 0.635, 0.047),           // accent · p-500 · #F2A20C
+        dark: RGB(0.949, 0.635, 0.047)
+    )
+    static let brandPrimaryLight = adaptiveColor(
+        light: RGB(0.839, 0.522, 0.039),           // accent-hover (light → p-600)
+        dark: RGB(0.945, 0.682, 0.149)             // accent-hover (dark → p-400)
+    )
+    static let brandPrimaryDark = adaptiveColor(
+        light: RGB(0.682, 0.400, 0.039),           // accent-press (light → p-700)
+        dark: RGB(0.953, 0.757, 0.314)             // accent-press (dark → p-300)
+    )
+    static let brandOnPrimary = adaptiveColor(
+        light: RGB(1.0, 1.0, 1.0),                 // white text on the gold fill
+        dark: RGB(1.0, 1.0, 1.0)
+    )
+
+    // MARK: Secondary roles
+    static let brandSage = adaptiveColor(
+        light: RGB(0.184, 0.620, 0.357),           // success green · #2F9E5B
+        dark: RGB(0.498, 0.851, 0.631)
+    )
+    static let brandSea = adaptiveColor(
+        light: RGB(0.094, 0.533, 0.675),           // water blue · s-500
+        dark: RGB(0.322, 0.725, 0.831)             // water blue · s-300
+    )
+
+    // MARK: Text tiers (warm, no cold grey)
+    static let brandText = adaptiveColor(
+        light: RGB(0.165, 0.137, 0.110),           // text-1 · #2A231C
+        dark: RGB(0.957, 0.925, 0.867)             // #F4ECDD
+    )
+    static let brandSecondaryText = adaptiveColor(
+        light: RGB(0.416, 0.373, 0.314),           // text-2 · #6A5F50
+        dark: RGB(0.725, 0.678, 0.596)             // #B9AD98
+    )
+    static let brandTertiaryText = adaptiveColor(
+        light: RGB(0.612, 0.557, 0.482),           // text-3 · #9C8E7B
+        dark: RGB(0.518, 0.478, 0.408)             // #847A68
+    )
+    static let brandDivider = adaptiveColor(
+        light: RGB(0.937, 0.898, 0.827),           // border · #EFE5D3
+        dark: RGB(0.227, 0.196, 0.145)             // #3A3225
+    )
+    static let brandBorderStrong = adaptiveColor(
+        light: RGB(0.886, 0.827, 0.725),           // border-strong · #E2D3B9 (pickers, ghost buttons)
+        dark: RGB(0.290, 0.251, 0.192)             // #4A4031
+    )
+
+    // MARK: Water surfaces
+    static let waterSurface = adaptiveColor(
+        light: RGB(0.914, 0.965, 0.980),           // s-50
+        dark: RGB(0.071, 0.169, 0.184)
+    )
+    static let waterSurfaceStrong = adaptiveColor(
+        light: RGB(0.776, 0.914, 0.949),           // s-100
+        dark: RGB(0.094, 0.231, 0.267)
+    )
+    static let waterText = adaptiveColor(
+        light: RGB(0.094, 0.533, 0.675),           // s-500
+        dark: RGB(0.322, 0.725, 0.831)             // s-300
+    )
+
+    // MARK: Material chips & icon badges
     static let materialSurface = brandSurface
     static let materialChipSurface = adaptiveColor(
-        light: RGB(0.969, 0.969, 0.969),
-        dark: RGB(0.067, 0.067, 0.067)
+        light: RGB(0.965, 0.925, 0.855),           // warm cream cell · surface-2
+        dark: RGB(0.165, 0.141, 0.106)
     )
     static let materialChipSurfaceSelected = adaptiveColor(
-        light: RGB(0.996, 0.949, 0.878),
-        dark: RGB(0.165, 0.106, 0.047)
+        light: RGB(0.984, 0.914, 0.761),           // soft accent gold · p-100
+        dark: RGB(0.274, 0.201, 0.073)
     )
     static let selectedSurface = adaptiveColor(
-        light: RGB(0.996, 0.949, 0.878),
-        dark: RGB(0.165, 0.106, 0.047)
+        light: RGB(0.984, 0.914, 0.761),           // accent-soft fill
+        dark: RGB(0.274, 0.201, 0.073)
     )
     static let selectedSurfaceStroke = adaptiveColor(
-        light: RGB(0.957, 0.643, 0.227),
-        dark: RGB(0.957, 0.643, 0.227)
+        light: RGB(0.949, 0.635, 0.047),           // accent
+        dark: RGB(0.949, 0.635, 0.047)
     )
     static let materialIconSurface = adaptiveColor(
-        light: RGB(0.996, 0.929, 0.824),
-        dark: RGB(0.165, 0.106, 0.047)
+        light: RGB(0.984, 0.914, 0.761),           // accent-soft — stands apart from cream card
+        dark: RGB(0.274, 0.201, 0.073)
     )
 
     static let flourSurface = materialChipSurface
     static let flourIconSurface = materialIconSurface
-    static let starterTint = adaptiveColor(light: RGB(0.10, 0.42, 0.56), dark: RGB(0.42, 0.76, 0.86))
+    static let starterTint = adaptiveColor(light: RGB(0.094, 0.533, 0.675), dark: RGB(0.322, 0.725, 0.831))
     static let starterSurface = waterSurface
     static let starterIconSurface = waterSurfaceStrong
     static let saltTint = adaptiveColor(light: RGB(0.44, 0.47, 0.56), dark: RGB(0.77, 0.80, 0.90))

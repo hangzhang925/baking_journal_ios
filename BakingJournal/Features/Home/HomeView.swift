@@ -44,6 +44,8 @@ struct HomeView: View {
             RecipeWorkspaceView(initialStage: initialStage)
         case .recipeItemEditor(let itemID):
             RecipeItemEditorRouteView(itemID: itemID)
+        case .starterDetail(let starterID):
+            StarterDetailRouteView(starterID: starterID)
         case .cook:
             CookView()
         case .toolbox:
@@ -111,26 +113,6 @@ struct HomeView: View {
 
     private var recipeLibrary: some View {
         BakingLibraryList {
-            if store.hasActiveBakeInProgress, let activeRecipe {
-                Section {
-                    Button {
-                        navigationController.push(.cook)
-                    } label: {
-                        ActiveBakeResumeRow(
-                            recipeName: store.activeBakeRecord?.recipeSnapshotName ?? store.currentRecipeDisplayName,
-                            updatedAt: activeRecipe.updatedAt,
-                            stepName: store.currentCookStep?.name ?? BakingTerms.continueBake,
-                            stepIndex: store.cookState.currentIndex,
-                            totalSteps: store.steps.count
-                        )
-                    }
-                    .buttonStyle(.plain)
-                } header: {
-                    Text(BakingTerms.activeBakeSection)
-                }
-                .listRowBackground(BakingSurface.selectedRowBackground)
-            }
-
             Section {
                 if !store.hasLoadedPersistedState {
                     ProgressView()
@@ -211,20 +193,8 @@ struct HomeView: View {
         }
     }
 
-    private var activeRecipe: SavedRecipe? {
-        guard store.hasActiveBakeInProgress,
-              let currentRecipeID = store.currentRecipeID else {
-            return nil
-        }
-        return store.savedRecipes.first { $0.id == currentRecipeID }
-    }
-
     private var recipeLibraryCandidates: [SavedRecipe] {
-        guard store.hasActiveBakeInProgress,
-              let currentRecipeID = store.currentRecipeID else {
-            return store.savedRecipes
-        }
-        return store.savedRecipes.filter { $0.id != currentRecipeID }
+        store.savedRecipes
     }
 
     private func bakeCount(for recipe: SavedRecipe) -> Int {
@@ -496,52 +466,3 @@ private struct SettingsNavigationRow: View {
     }
 }
 
-private struct ActiveBakeResumeRow: View {
-    let recipeName: String
-    let updatedAt: Date
-    let stepName: String
-    let stepIndex: Int
-    let totalSteps: Int
-
-    var body: some View {
-        HStack(spacing: 14) {
-            BakingMaterialIconBadge(
-                icon: .start,
-                color: .brandPrimary,
-                background: BakingSurfaceTheme.theme(for: .inputSurface).background
-            )
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: BakingSpace.xs) {
-                    Text(BakingTerms.activeBakeSection)
-                        .font(BakingTypography.rowMeta)
-                        .foregroundStyle(Color.brandPrimary)
-                        .lineLimit(1)
-
-                    Text(BakingTerms.recipeMetadataLine(
-                        BakingTerms.recipeUpdatedAt,
-                        updatedAt.formatted(date: .numeric, time: .omitted)
-                    ))
-                    .font(BakingTypography.rowMeta)
-                    .foregroundStyle(Color.brandSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.86)
-                }
-
-                Text(recipeName)
-                    .font(BakingTypography.rowTitle)
-                    .foregroundStyle(Color.brandText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-
-                Text(BakingTerms.activeBakeProgress(stepIndex: stepIndex + 1, totalSteps: totalSteps, stepName: stepName))
-                    .font(BakingTypography.rowMeta)
-                    .foregroundStyle(Color.brandSecondaryText)
-                    .lineLimit(1)
-            }
-        }
-        .frame(minHeight: 64)
-        .padding(.vertical, BakingSpace.xs)
-        .contentShape(Rectangle())
-    }
-}

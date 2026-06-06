@@ -16,6 +16,7 @@ struct RectangularDropdownTrigger: View {
             if isEnabled {
                 Image(systemName: "chevron.down")
                     .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.brandTertiaryText)
                     .frame(width: 14, alignment: .trailing)
             }
         }
@@ -25,7 +26,7 @@ struct RectangularDropdownTrigger: View {
         .padding(.vertical, 7)
         .frame(width: width, alignment: .leading)
         .frame(minHeight: BakingTouchTarget.secondaryActionVisual)
-        .bakingSurface(isEnabled ? .field : .readOnly)
+        .bakingSurface(isEnabled ? .dropdown : .readOnly)
     }
 }
 

@@ -112,6 +112,17 @@
 "home.action.export_long_image" = "Export long image";
 "home.action.bake" = "Bake";
 "home.section.active_bake" = "In progress";
+"bake_record.status.ongoing" = "In progress";
+"bake_record.started_at" = "Started";
+"bake_record.completed_at" = "Finished";
+"bake_record.section.step_timing" = "Step timing";
+"bake_record.column.step" = "Step";
+"bake_record.action.open_recipe" = "Open recipe";
+"bake_record.action.edit_review_notes" = "Edit review notes";
+"bake_record.empty.review_notes" = "No review notes yet";
+"bake_record.confirm.delete.title" = "Delete this record?";
+"bake_record.confirm.delete.message" = "\"%@\" will be removed from bake history.";
+"bake_record.confirm.delete.button" = "Delete record";
 "home.empty.no_recipes" = "No recipes yet";
 "home.empty.no_matching_recipes" = "No matching recipes";
 "home.search.recipes" = "Search recipe names";

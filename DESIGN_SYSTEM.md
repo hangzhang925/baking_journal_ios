@@ -12,7 +12,8 @@ This app is an iOS-native baking tool. The visual language is warm, quiet, handm
 
 ## Tokens
 
-- Colors: use semantic `Color.brand*`, `Color.water*`, and material palettes only.
+- Colors: use semantic `Color.brand*`, `Color.water*`, semantic (`Color.semantic*`), and material palettes only. The foundation is the Claude Design **"Baking Journal — Design System"** (direction *Honey Gold*): a bright golden-wheat primary (`#F2A20C`) that stays vivid in light and warm-black dark mode, a water-blue secondary, and a white-canvas → warm-cream-card surface model with no cold grey. Full `goldenWheat*` / `waterBlue*` (50–900) scales and `semanticSuccess/Warning/Error/Info` tokens live in `BakingThemeColors.swift`.
+- On accent: filled primary controls take white text (`Color.brandOnPrimary`); gold field fills mean "editable".
 - Spacing: use `BakingSpace` values.
 - Radius: use `BakingRadius` values.
 - Motion: use `BakingMotion.quick` or `BakingMotion.standard`.

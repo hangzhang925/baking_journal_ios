@@ -202,32 +202,22 @@ struct RecipePreviewView: View {
     }
 
     private var ingredientsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(BakingTerms.recipePreviewIngredients)
-                .font(RecipePreviewTypography.sectionHeading)
-                .foregroundStyle(Color.brandText)
-
+        BakingSectionCard(title: BakingTerms.recipePreviewIngredients) {
             PreviewIngredientList(ingredients: previewIngredientSnapshots)
+                .padding(.horizontal, BakingSpace.md)
+                .padding(.bottom, BakingSpace.sm)
         }
-        .padding(.horizontal, BakingSpace.md)
-        .padding(.vertical, BakingSpace.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .bakingCard()
         .previewDismissesKeyboardOnTap()
     }
 
     private var stepsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(BakingTerms.recipePreviewSteps)
-                .font(RecipePreviewTypography.sectionHeading)
-                .foregroundStyle(Color.brandText)
-
+        BakingSectionCard(title: BakingTerms.recipePreviewSteps) {
             PreviewStepList(steps: previewStepSnapshots)
+                .padding(.horizontal, BakingSpace.md)
+                .padding(.bottom, BakingSpace.sm)
         }
-        .padding(.horizontal, BakingSpace.md)
-        .padding(.vertical, BakingSpace.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .bakingCard()
         .previewDismissesKeyboardOnTap()
     }
 
@@ -659,9 +649,7 @@ private struct PreviewIngredientList: View {
                     )
 
                     if index < ingredients.count - 1 {
-                        Divider()
-                            .overlay(BakingSurfaceTheme.separator)
-                            .padding(.leading, 42)
+                        BakingTableDivider(leadingInset: 42)
                     }
                 }
             }
@@ -746,9 +734,7 @@ private struct PreviewStepList: View {
                     )
 
                     if index < steps.count - 1 {
-                        Divider()
-                            .overlay(BakingSurfaceTheme.separator)
-                            .padding(.leading, 42)
+                        BakingTableDivider(leadingInset: 42)
                     }
                 }
             }
@@ -778,21 +764,15 @@ private struct PreviewOverallNotesDisplay: View {
     let notesText: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(BakingTerms.recipePreviewOverallNotes)
-                .font(RecipePreviewTypography.sectionHeading)
-                .foregroundStyle(Color.brandText)
-
+        BakingSectionCard(title: BakingTerms.recipePreviewOverallNotes) {
             Text(notesText)
                 .font(RecipePreviewTypography.tablePrimary)
                 .foregroundStyle(Color.brandText)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 2)
+                .padding(.horizontal, BakingSpace.md)
+                .padding(.bottom, BakingSpace.md)
         }
-        .padding(.horizontal, BakingSpace.md)
-        .padding(.vertical, BakingSpace.sm)
-        .bakingCard()
     }
 }
 
@@ -857,28 +837,18 @@ private struct RecipePreviewExportContent: View {
                     PreviewOverallNotesDisplay(notesText: trimmedOverallNotes)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(BakingTerms.recipePreviewIngredients)
-                        .font(RecipePreviewTypography.sectionHeading)
-                        .foregroundStyle(Color.brandText)
-
+                BakingSectionCard(title: BakingTerms.recipePreviewIngredients) {
                     PreviewIngredientList(ingredients: ingredients)
+                        .padding(.horizontal, BakingSpace.md)
+                        .padding(.bottom, BakingSpace.sm)
                 }
-                .padding(.horizontal, BakingSpace.md)
-                .padding(.vertical, BakingSpace.sm)
-                .bakingCard()
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(BakingTerms.recipePreviewSteps)
-                        .font(RecipePreviewTypography.sectionHeading)
-                        .foregroundStyle(Color.brandText)
-
+                BakingSectionCard(title: BakingTerms.recipePreviewSteps) {
                     PreviewStepList(steps: steps)
+                        .padding(.horizontal, BakingSpace.md)
+                        .padding(.bottom, BakingSpace.sm)
                 }
-                .padding(.horizontal, BakingSpace.md)
-                .padding(.vertical, BakingSpace.sm)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .bakingCard()
             }
             .padding(.horizontal, BakingLayout.screenHorizontalInset)
             .padding(.vertical, BakingLayout.screenHorizontalInset)

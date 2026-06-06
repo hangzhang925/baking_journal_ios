@@ -137,8 +137,8 @@ struct BakingDropdownTextRow: View {
     var body: some View {
         HStack(spacing: BakingSpace.sm) {
             Text(title)
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(Color.brandText)
+                .font(isSelected ? BakingTypography.appPrimaryText.weight(.bold) : BakingTypography.appPrimaryText)
+                .foregroundStyle(isSelected ? Color.brandPrimaryLight : Color.brandText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
 
@@ -147,12 +147,14 @@ struct BakingDropdownTextRow: View {
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.brandPrimary)
+                    .foregroundStyle(Color.brandPrimaryLight)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
         .padding(.horizontal, BakingSpace.sm)
         .padding(.vertical, BakingSpace.sm)
+        .background(isSelected ? Color.selectedSurface : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous))
         .contentShape(Rectangle())
     }
 }
@@ -696,9 +698,7 @@ private struct PopupMainIcon: View {
 
 struct PopupTableDivider: View {
     var body: some View {
-        Divider()
-            .overlay(BakingSurfaceTheme.separator)
-            .padding(.leading, BakingSpace.md)
+        BakingTableDivider()
     }
 }
 

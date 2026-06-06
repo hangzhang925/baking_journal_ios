@@ -147,50 +147,43 @@ struct StepsView: View {
     }
 
     private var stepTableSection: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Text(BakingTerms.stepsSectionTitle)
-                    .bakingLabelStyle(.sectionHeader)
-
-                Text(BakingTerms.stepsCount(store.steps.count))
-                    .bakingLabelStyle(.helperText)
-                    .foregroundStyle(Color.brandSecondaryText)
-
-                Spacer()
-
-                Button {
-                    withAnimation(ReorderMotion.animation) {
-                        isStepListEditing.toggle()
+        BakingSectionCard(
+            title: BakingTerms.stepsSectionTitle,
+            detail: BakingTerms.stepsCount(store.steps.count),
+            headerBottomPadding: displayedSteps.isEmpty ? 0 : BakingSpace.xs,
+            accessory: {
+                HStack(spacing: BakingSpace.xs) {
+                    Button {
+                        withAnimation(ReorderMotion.animation) {
+                            isStepListEditing.toggle()
+                        }
+                    } label: {
+                        BakingSystemIconButtonLabel(
+                            systemImage: "minus",
+                            visualSize: BakingTouchTarget.secondaryActionVisual,
+                            font: .caption.weight(.bold)
+                        )
                     }
-                } label: {
-                    BakingSystemIconButtonLabel(
-                        systemImage: "minus",
-                        visualSize: BakingTouchTarget.secondaryActionVisual,
-                        font: .caption.weight(.bold)
-                    )
-                }
-                .buttonStyle(.borderless)
-                .disabled(store.steps.isEmpty)
-                .opacity(store.steps.isEmpty ? 0.45 : 1)
-                .accessibilityLabel(BakingTerms.stepsEditSteps)
+                    .buttonStyle(.borderless)
+                    .disabled(store.steps.isEmpty)
+                    .opacity(store.steps.isEmpty ? 0.45 : 1)
+                    .accessibilityLabel(BakingTerms.stepsEditSteps)
 
-                Button {
-                    let step = store.addTextStep()
-                    presentStepEditor(step)
-                } label: {
-                    BakingSystemIconButtonLabel(
-                        systemImage: "plus",
-                        visualSize: BakingTouchTarget.secondaryActionVisual,
-                        font: .caption.weight(.bold)
-                    )
+                    Button {
+                        let step = store.addTextStep()
+                        presentStepEditor(step)
+                    } label: {
+                        BakingSystemIconButtonLabel(
+                            systemImage: "plus",
+                            visualSize: BakingTouchTarget.secondaryActionVisual,
+                            font: .caption.weight(.bold)
+                        )
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(BakingTerms.stepsAddStep)
                 }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(BakingTerms.stepsAddStep)
             }
-            .padding(.horizontal, BakingSpace.md)
-            .padding(.top, BakingSpace.md)
-            .padding(.bottom, displayedSteps.isEmpty ? 0 : BakingSpace.xs)
-
+        ) {
             if displayedSteps.isEmpty {
                 Text(BakingTerms.stepsEmptyMessage)
                     .font(BakingTypography.appPrimaryText)
@@ -207,14 +200,12 @@ struct StepsView: View {
                             .animation(ReorderMotion.animation, value: displayedSteps.map(\.id))
 
                         if index < displayedSteps.count - 1 {
-                            Divider()
-                                .overlay(BakingSurfaceTheme.separator)
+                            BakingTableDivider()
                         }
                     }
                 }
             }
         }
-        .bakingCard()
     }
 
     private var displayedSteps: [JournalStep] {
@@ -515,22 +506,17 @@ private struct RecipeStepNotesDisplayCard: View {
 
     var body: some View {
         Button(action: onEdit) {
-            VStack(alignment: .leading, spacing: BakingSpace.sm) {
-                HStack(spacing: BakingSpace.sm) {
-                    Text(BakingTerms.stepsPageNotes)
-                        .font(BakingTypography.sectionTitle)
-                        .foregroundStyle(Color.brandText)
-
-                    Spacer(minLength: BakingSpace.sm)
-
+            BakingSectionCard(
+                title: BakingTerms.stepsPageNotes,
+                headerBottomPadding: noteText.isEmpty ? 0 : BakingSpace.xs,
+                accessory: {
                     BakingSystemIconButtonLabel(
                         systemImage: noteText.isEmpty ? "plus" : "pencil",
                         visualSize: BakingTouchTarget.secondaryActionVisual,
                         font: .caption.weight(.semibold)
                     )
                 }
-                .frame(minHeight: BakingTouchTarget.secondaryAction)
-
+            ) {
                 if !noteText.isEmpty {
                     Text(noteText)
                         .font(BakingTypography.appPrimaryText)
@@ -538,16 +524,14 @@ private struct RecipeStepNotesDisplayCard: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, BakingSpace.xs)
+                        .padding(.horizontal, BakingSpace.md)
+                        .padding(.bottom, BakingSpace.md)
                 }
             }
-            .padding(.horizontal, BakingSpace.md)
-            .padding(.vertical, BakingSpace.xs)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous))
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
-        .bakingCard()
         .accessibilityElement(children: .combine)
         .accessibilityLabel(BakingTerms.stepsPageNotes)
         .accessibilityValue(noteText)
@@ -577,18 +561,22 @@ private struct RecipeStepNotesEditorSheet: View {
                     }
                 })
 
-                TextEditor(text: Binding(
-                    get: { store.recipeOverallNotes },
-                    set: { store.recipeOverallNotes = $0 }
-                ))
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(Color.brandText)
-                .frame(minHeight: BakingComponentMetrics.notesEditorMinHeight)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .padding(10)
-                .bakingInsetSurface()
-                .accessibilityLabel(BakingTerms.stepsPageNotes)
+                BakingSectionCard(title: BakingTerms.stepsPageNotes) {
+                    TextEditor(text: Binding(
+                        get: { store.recipeOverallNotes },
+                        set: { store.recipeOverallNotes = $0 }
+                    ))
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandText)
+                    .frame(minHeight: BakingComponentMetrics.notesEditorMinHeight)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    .padding(10)
+                    .bakingInsetSurface()
+                    .accessibilityLabel(BakingTerms.stepsPageNotes)
+                    .padding(.horizontal, BakingSpace.md)
+                    .padding(.bottom, BakingSpace.md)
+                }
                 .padding(.horizontal, BakingLayout.screenHorizontalInset)
                 .padding(.top, BakingSpace.sm)
 
@@ -715,9 +703,9 @@ private struct StepTableHeader: View {
 private struct StepDisplayRow: View {
     static let iconColumnWidth: CGFloat = 40
     static let separatorLeadingInset: CGFloat = BakingSpace.sm + iconColumnWidth + BakingSpace.lg
-    static let durationColumnWidth: CGFloat = 64
-    static let temperatureColumnWidth: CGFloat = 60
-    static let numericColumnSpacing: CGFloat = 10
+    static let durationColumnWidth: CGFloat = 70
+    static let temperatureColumnWidth: CGFloat = 72
+    static let numericColumnSpacing: CGFloat = 8
     static let numericColumnsWidth: CGFloat = durationColumnWidth + numericColumnSpacing + temperatureColumnWidth
     private static let trailingDeleteHitWidth = BakingTouchTarget.primaryAction
 
@@ -751,19 +739,23 @@ private struct StepDisplayRow: View {
             .layoutPriority(1)
 
             HStack(alignment: .firstTextBaseline, spacing: Self.numericColumnSpacing) {
-                Text(durationText)
-                    .font(BakingTypography.tableNumber)
-                    .foregroundStyle(Color.brandText)
-                    .frame(width: Self.durationColumnWidth, alignment: .trailing)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
+                BakingTableMetricValue(
+                    symbol: .bakingIcon(.timer, .brandPrimary),
+                    value: durationValue.value,
+                    unit: durationValue.unit,
+                    numericKind: .duration,
+                    width: Self.durationColumnWidth,
+                    isActive: showsDurationField
+                )
 
-                Text(temperatureText)
-                    .font(BakingTypography.tableNumber)
-                    .foregroundStyle(showsTemperatureField ? Color.brandText : Color.brandSecondaryText)
-                    .frame(width: Self.temperatureColumnWidth, alignment: .trailing)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
+                BakingTableMetricValue(
+                    symbol: .systemImage("thermometer.medium", .waterText),
+                    value: temperatureValue.value,
+                    unit: temperatureValue.unit,
+                    numericKind: .temperature,
+                    width: Self.temperatureColumnWidth,
+                    isActive: showsTemperatureField
+                )
             }
             .frame(width: Self.numericColumnsWidth, alignment: .trailing)
 
@@ -851,15 +843,19 @@ private struct StepDisplayRow: View {
         currentStep.temperature != nil
     }
 
-    private var durationText: String {
-        guard currentStep.timeValue != nil else { return BakingTerms.stepsNoValue }
-        return StepFormatting.compactDuration(minutes: store.stepMinutes(currentStep))
+    private var showsDurationField: Bool {
+        currentStep.timeValue != nil
     }
 
-    private var temperatureText: String {
-        guard let temperature = currentStep.temperature else { return BakingTerms.stepsNoValue }
+    private var durationValue: (value: String, unit: String?) {
+        guard showsDurationField else { return (BakingTerms.stepsNoValue, nil) }
+        return StepFormatting.compactDurationParts(minutes: store.stepMinutes(currentStep))
+    }
+
+    private var temperatureValue: (value: String, unit: String?) {
+        guard let temperature = currentStep.temperature else { return (BakingTerms.stepsNoValue, nil) }
         let value = BakingFormat.number(temperature, precision: 0)
-        return "\(value)\(currentStep.temperatureUnit?.rawValue ?? TemperatureUnit.fahrenheit.rawValue)"
+        return (value, currentStep.temperatureUnit?.rawValue ?? TemperatureUnit.fahrenheit.rawValue)
     }
 }
 
@@ -1022,15 +1018,19 @@ private struct StepTextEditorSheetView: View {
     }
 
     private var notesEditorCard: some View {
-        TextEditor(text: stepNotesBinding)
-            .font(BakingTypography.appPrimaryText)
-            .foregroundStyle(Color.brandText)
-            .frame(minHeight: 260)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .padding(10)
-            .bakingInsetSurface()
-            .accessibilityLabel(BakingTerms.stepsTextBlockAccessibility)
+        BakingSectionCard(title: BakingTerms.stepsFieldNotes) {
+            TextEditor(text: stepNotesBinding)
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(Color.brandText)
+                .frame(minHeight: 236)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .padding(10)
+                .bakingInsetSurface()
+                .accessibilityLabel(BakingTerms.stepsTextBlockAccessibility)
+                .padding(.horizontal, BakingSpace.md)
+                .padding(.bottom, BakingSpace.md)
+        }
     }
 
     private func toggleMaterials() {
@@ -1524,7 +1524,12 @@ private struct TemperaturePopoverView: View {
 
     var body: some View {
         VStack(spacing: BakingSpace.sm) {
+            temperatureScroller
+
             if let unit {
+                Divider()
+                    .overlay(BakingSurfaceTheme.separator)
+
                 Picker(BakingTerms.stepsTemperatureUnit, selection: convertedUnitBinding(unit)) {
                     ForEach(TemperatureUnit.allCases) { unit in
                         Text(unit.rawValue).tag(unit)
@@ -1535,8 +1540,6 @@ private struct TemperaturePopoverView: View {
                 .tint(.brandPrimary)
                 .accessibilityLabel(BakingTerms.stepsFieldTemperature)
             }
-
-            temperatureScroller
         }
         .padding(.horizontal, BakingSpace.sm)
         .padding(.vertical, BakingSpace.sm)
@@ -1546,7 +1549,7 @@ private struct TemperaturePopoverView: View {
     private var temperatureScroller: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: BakingSpace.sm) {
+                LazyVStack(spacing: BakingSpace.xs) {
                     ForEach(temperatureValues, id: \.self) { option in
                         Button {
                             withAnimation(BakingMotion.quick) {
@@ -1558,7 +1561,16 @@ private struct TemperaturePopoverView: View {
                                 .foregroundStyle(isSelected(option) ? Color.brandPrimary : Color.brandText)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: BakingComponentMetrics.temperatureOptionHeight)
-                                .bakingSurface(isSelected(option) ? .selected : .readOnly)
+                                .background {
+                                    if isSelected(option) {
+                                        RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous)
+                                            .fill(BakingSurfaceTheme.theme(for: .selected).background)
+                                            .overlay {
+                                                RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous)
+                                                    .stroke(BakingSurfaceTheme.theme(for: .selected).stroke, lineWidth: 0.6)
+                                            }
+                                    }
+                                }
                         }
                         .buttonStyle(BakingPressFeedbackButtonStyle())
                         .id(option)
@@ -1712,14 +1724,20 @@ private struct CountdownDurationPicker: UIViewRepresentable {
 
 private enum StepFormatting {
     static func compactDuration(minutes: Double) -> String {
+        let parts = compactDurationParts(minutes: minutes)
+        guard let unit = parts.unit else { return parts.value }
+        return "\(parts.value)\(unit)"
+    }
+
+    static func compactDurationParts(minutes: Double) -> (value: String, unit: String?) {
         let total = Int(minutes.rounded())
         let hours = total / 60
         let minutes = total % 60
         if hours > 0, minutes > 0 {
-            return "\(hours)\(BakingTerms.stepsHourShort) \(minutes)\(BakingTerms.stepsMinuteShort)"
+            return ("\(hours):\(String(format: "%02d", minutes))", BakingTerms.stepsHourShort)
         }
-        if hours > 0 { return "\(hours)\(BakingTerms.stepsHourShort)" }
-        return "\(minutes)\(BakingTerms.stepsMinuteShort)"
+        if hours > 0 { return ("\(hours)", BakingTerms.stepsHourShort) }
+        return ("\(minutes)", BakingTerms.stepsMinuteShort)
     }
 }
 

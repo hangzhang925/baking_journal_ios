@@ -10,6 +10,7 @@ enum AppRoute: Hashable {
     case bakeRecipePicker
     case recipeWorkspace(RecipeWorkspaceStage)
     case recipeItemEditor(UUID)
+    case starterDetail(UUID)
     case cook
     case toolbox
     case kitchenTimer

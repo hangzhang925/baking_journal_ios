@@ -17,19 +17,21 @@ struct RecipeLibraryRow: View {
                     .minimumScaleFactor(0.82)
 
                 HStack(spacing: BakingSpace.xs) {
-                    BakingIconView(icon: .water, size: BakingComponentMetrics.materialChipIcon, color: .waterText)
+                    BakingIconView(icon: .water, size: BakingComponentMetrics.materialChipIcon, color: .brandSecondaryText)
 
                     Text(hydrationLabel)
                         .font(BakingTypography.rowMeta.monospacedDigit())
-                        .foregroundStyle(Color.waterText)
+                        .foregroundStyle(Color.brandSecondaryText)
                         .lineLimit(1)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(BakingTerms.formulaMetricHydration)
                 .accessibilityValue(hydrationLabel)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: BakingSpace.md)
+            RecipeWorkflowBadge(state: recipe.workflowState)
+                .frame(width: BakingComponentMetrics.libraryRowStatusColumnWidth, alignment: .center)
 
             VStack(alignment: .trailing, spacing: BakingSpace.xs) {
                 RecipeLibraryMetadataLine(
@@ -41,8 +43,9 @@ struct RecipeLibraryRow: View {
                     value: recipe.updatedAt.formatted(date: .numeric, time: .omitted)
                 )
             }
+            .frame(width: BakingComponentMetrics.libraryRowMetadataColumnWidth, alignment: .trailing)
         }
-        .frame(minHeight: 64)
+        .frame(minHeight: BakingComponentMetrics.listRowMinHeight)
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.vertical, BakingSpace.sm)
         .contentShape(Rectangle())
@@ -58,13 +61,17 @@ struct RecipeLibraryMetadataLine: View {
     let value: String
 
     var body: some View {
-        Text(BakingTerms.recipeMetadataLine(title, value))
+        ViewThatFits(in: .horizontal) {
+            Text(BakingTerms.recipeMetadataLine(title, value))
+            Text(value)
+        }
             .font(.caption.weight(.semibold))
             .foregroundStyle(Color.brandSecondaryText)
             .lineLimit(1)
-            .minimumScaleFactor(0.86)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(value)
+            .minimumScaleFactor(0.78)
+            .multilineTextAlignment(.trailing)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue(value)
     }
 }

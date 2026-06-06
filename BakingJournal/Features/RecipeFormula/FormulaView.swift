@@ -252,9 +252,7 @@ struct FormulaView: View {
                             .animation(ReorderMotion.animation, value: categoryItems.map(\.id))
 
                         if index < categoryItems.count - 1 {
-                            Divider()
-                                .overlay(BakingSurfaceTheme.separator)
-                                .padding(.leading, FormulaItemDisplayRow.separatorLeadingInset)
+                            BakingTableDivider(leadingInset: FormulaItemDisplayRow.separatorLeadingInset)
                         }
                     }
                 }
