@@ -67,7 +67,10 @@ private struct RecipeMetricsOverview: View {
     private var metricDivider: some View {
         Rectangle()
             .fill(BakingSurfaceTheme.separator)
-            .frame(width: 0.6, height: 38)
+            .frame(
+                width: BakingComponentMetrics.metricStripDividerWidth,
+                height: BakingComponentMetrics.metricStripDividerHeight
+            )
             .padding(.horizontal, 6)
     }
 }
@@ -99,7 +102,7 @@ private struct MetricCell: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.metricStripCellMinHeight, alignment: .leading)
     }
 }
 
@@ -123,12 +126,15 @@ struct HydrationReceipt: Equatable {
         waterContribution: ((RecipeItem) -> Double)?
     ) {
         guard let flourContribution, let waterContribution, !items.isEmpty else { return nil }
-        lines = items.map { item in
-            Line(
+        lines = items.compactMap { item in
+            let waterWeight = waterContribution(item)
+            let flourWeight = flourContribution(item)
+            guard waterWeight > 0 || flourWeight > 0 else { return nil }
+            return Line(
                 id: item.id,
                 name: item.name,
-                waterWeight: waterContribution(item),
-                flourWeight: flourContribution(item)
+                waterWeight: waterWeight,
+                flourWeight: flourWeight
             )
         }
         waterTotal = summary.waterWeight

@@ -28,6 +28,7 @@ struct CompactSummaryPill: View {
 struct CompactTextRow: View {
     let title: String
     @Binding var text: String
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -38,7 +39,8 @@ struct CompactTextRow: View {
                 .foregroundStyle(Color.brandText)
                 .multilineTextAlignment(.trailing)
                 .textFieldStyle(.plain)
-                .bakingFittedInputField(.long, alignment: .trailing)
+                .focused($isFocused)
+                .bakingFittedInputField(.long, alignment: .trailing, kind: isFocused ? .focused : .field)
         }
         .padding(.vertical, 6)
     }
@@ -75,11 +77,13 @@ struct InlineNameField: View {
     var isWaterStyle = false
     var fieldWidth: CGFloat = 132
     var height: CGFloat = 40
+    @State private var isFocused = false
 
     var body: some View {
         BakingInlineTextField(
             text: $text,
             placeholder: placeholder,
+            isFocused: $isFocused,
             color: UIColor(Color.brandText),
             font: uiFont
         )
@@ -87,7 +91,7 @@ struct InlineNameField: View {
             .padding(.vertical, 4)
             .frame(width: fieldWidth, alignment: .leading)
             .frame(height: height)
-            .bakingSurface(.field)
+            .bakingSurface(isFocused ? .focused : .field)
     }
 
     private var editableFieldBackground: Color {
@@ -116,12 +120,14 @@ struct InlineNumberField: View {
     var isWaterStyle = false
     var fractionDigits: ClosedRange<Int> = 0...0
     var height: CGFloat = 40
+    @State private var isFocused = false
 
     var body: some View {
         HStack(spacing: 4) {
             BakingNumericTextField(
                 value: $value,
                 fractionDigits: fractionDigits,
+                isFocused: $isFocused,
                 color: UIColor(color),
                 font: uiFont
             )
@@ -134,7 +140,7 @@ struct InlineNumberField: View {
         .padding(.vertical, 2)
         .frame(width: totalWidth, alignment: .trailing)
         .frame(height: height)
-        .bakingSurface(.field)
+        .bakingSurface(isFocused ? .focused : .field)
     }
 
     private var uiFont: UIFont {

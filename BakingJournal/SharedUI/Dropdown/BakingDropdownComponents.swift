@@ -41,16 +41,22 @@ struct BakingDropdownRow<Leading: View>: View {
     var isSelected: Bool = false
     var foreground: Color = .brandText
     var selectionTint: Color = .brandPrimaryLight
+    var showsLeadingSlot = true
     @ViewBuilder var leading: Leading
 
     var body: some View {
         HStack(spacing: 10) {
-            leading
-                .frame(width: 20, height: 20)
+            if showsLeadingSlot {
+                leading
+                    .frame(width: 20, height: 20)
+            }
 
             Text(title)
                 .font(isSelected ? BakingTypography.appPrimaryText.weight(.bold) : BakingTypography.appPrimaryText)
                 .foregroundStyle(isSelected ? selectionTint : foreground)
+                .lineLimit(1)
+                .minimumScaleFactor(0.86)
+                .frame(minHeight: BakingTouchTarget.dropdownIconSurface, alignment: .center)
 
             Spacer(minLength: 0)
 
@@ -60,9 +66,8 @@ struct BakingDropdownRow<Leading: View>: View {
                     .foregroundStyle(selectionTint)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
         .padding(.horizontal, 8)
-        .padding(.vertical, 8)
         .background(isSelected ? Color.selectedSurface : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous))
         .contentShape(Rectangle())

@@ -151,6 +151,7 @@ struct BakingTemperatureEditorRow: View {
     let title: String
     @Binding var value: Double
     @Binding var unit: TemperatureUnit
+    @State private var isFocused = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -162,6 +163,7 @@ struct BakingTemperatureEditorRow: View {
             BakingNumericTextField(
                 value: $value,
                 fractionDigits: 0...0,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
             )
@@ -169,7 +171,7 @@ struct BakingTemperatureEditorRow: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .frame(height: 36)
-            .bakingFieldSurface()
+            .bakingSurface(isFocused ? .focused : .field)
 
             TemperatureUnitFlipButton(unit: unit) {
                 flipUnit()

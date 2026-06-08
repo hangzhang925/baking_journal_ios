@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import UniformTypeIdentifiers
 import OSLog
 
@@ -27,7 +26,6 @@ struct FormulaView: View {
     @State private var pendingDeleteItem: RecipeItem?
     @State private var showingDeleteConfirmation = false
     @State private var editingItemID: UUID?
-    @State private var itemEditorMeasuredContentHeight: CGFloat = 0
     @StateObject private var dropdownPresenter = DropdownPresenter()
 
     private let reorderCoordinateSpace = "formulaReorderSpace"
@@ -493,23 +491,15 @@ struct FormulaView: View {
         if let editingItem {
             ItemEditorSheetView(item: editingItem) {
                 editingItemID = nil
-            } onContentHeightChange: { height in
-                itemEditorMeasuredContentHeight = height
             }
             .id(editingItem.id)
             .environmentObject(store)
-            .presentationDetents([.height(itemEditorSheetHeight(for: editingItem))])
+            .presentationDetents([BakingPopupSheetMetrics.editSheetTallDetent])
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.brandBackground)
-            .onAppear {
-                itemEditorMeasuredContentHeight = 0
-            }
-            .onChange(of: editingItem.id) { _, _ in
-                itemEditorMeasuredContentHeight = 0
-            }
         } else {
             BakingEmptyState(title: BakingTerms.formulaItemMissing, systemImage: "exclamationmark.triangle")
-                .presentationDetents([.medium])
+                .presentationDetents([BakingPopupSheetMetrics.editSheetTallDetent])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.brandBackground)
         }
@@ -518,24 +508,6 @@ struct FormulaView: View {
     private var editingItem: RecipeItem? {
         guard let editingItemID else { return nil }
         return store.items.first { $0.id == editingItemID }
-    }
-
-    private func itemEditorSheetHeight(for item: RecipeItem) -> CGFloat {
-        BakingPopupSheetMetrics.detentHeight(
-            for: itemEditorSheetSize(for: item),
-            measuredContentHeight: itemEditorMeasuredContentHeight,
-            screenHeight: itemEditorScreenHeight
-        )
-    }
-
-    private func itemEditorSheetSize(for item: RecipeItem) -> BakingPopupSheetSize {
-        item.category == .starter || item.tag == .egg ? .expanded : .compact
-    }
-
-    private var itemEditorScreenHeight: CGFloat? {
-        UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.screen.bounds.height }
-            .first
     }
 
     private func requestDeleteItem(_ item: RecipeItem) {
@@ -604,7 +576,8 @@ struct FormulaView: View {
     @ViewBuilder
     private func dropdownOverlay(_ menu: ActiveDropdownMenu) -> some View {
         GeometryReader { proxy in
-            let layout = dropdownLayout(for: menu, in: proxy.size)
+            let width = dropdownWidth(for: menu, in: proxy.size)
+            let layout = dropdownLayout(for: menu, width: width, in: proxy.size)
 
             Color.clear
                 .contentShape(Rectangle())
@@ -612,7 +585,7 @@ struct FormulaView: View {
                     dropdownPresenter.dismiss()
                 }
 
-            BakingDropdownPopover(width: menu.width) {
+            BakingDropdownPopover(width: width) {
                 ForEach(menu.items) { item in
                     Button {
                         dropdownPresenter.dismiss()
@@ -627,28 +600,39 @@ struct FormulaView: View {
                                 }
                             }
                         } else {
-                            BakingDropdownTextRow(title: item.title, isSelected: item.isSelected)
+                            BakingDropdownRow(
+                                title: item.title,
+                                isSelected: item.isSelected,
+                                showsLeadingSlot: false
+                            ) {
+                                EmptyView()
+                            }
                         }
                     }
                     .buttonStyle(.plain)
                 }
             }
             .position(
-                x: layout.origin.x + menu.width / 2,
+                x: layout.origin.x + width / 2,
                 y: layout.origin.y + layout.height / 2
             )
             .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .topLeading)))
         }
     }
 
-    private func dropdownLayout(for menu: ActiveDropdownMenu, in containerSize: CGSize) -> (origin: CGPoint, height: CGFloat) {
+    private func dropdownWidth(for menu: ActiveDropdownMenu, in containerSize: CGSize) -> CGFloat {
+        min(menu.width, max(0, containerSize.width - 16))
+    }
+
+    private func dropdownLayout(for menu: ActiveDropdownMenu, width: CGFloat, in containerSize: CGSize) -> (origin: CGPoint, height: CGFloat) {
         let rowHeight: CGFloat = 44
         let verticalPadding: CGFloat = 16
         let menuHeight = CGFloat(menu.items.count) * rowHeight + verticalPadding
         let horizontalInset: CGFloat = 8
         let verticalGap: CGFloat = 2
-        let rawX = menu.alignment == .trailing ? (menu.frame.maxX - menu.width) : menu.frame.minX
-        let x = min(max(horizontalInset, rawX), containerSize.width - menu.width - horizontalInset)
+        let rawX = menu.alignment == .trailing ? (menu.frame.maxX - width) : menu.frame.minX
+        let maxX = max(horizontalInset, containerSize.width - width - horizontalInset)
+        let x = min(max(horizontalInset, rawX), maxX)
 
         let availableBelow = containerSize.height - menu.frame.maxY
         let showAbove = availableBelow < menuHeight + 20 && menu.frame.minY > menuHeight + 20

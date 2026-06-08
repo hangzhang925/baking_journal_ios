@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Photos
 
 private enum RecipePreviewTypography {
     static let title: Font = BakingTypography.appPrimaryText
@@ -23,9 +24,9 @@ struct RecipePreviewView: View {
 
     var showsDoneButton: Bool = false
     var showsToolbar: Bool = true
-    @State private var shareImage: UIImage?
-    @State private var showingShareSheet = false
     @State private var exportError: String?
+    @State private var exportSuccessMessage: String?
+    @State private var showingTextTutorial = false
     @State private var showingCookView = false
     @State private var showingWorkspace = false
     @State private var localWorkspaceStage: RecipeWorkspaceStage = .formula
@@ -47,16 +48,14 @@ struct RecipePreviewView: View {
         }
         .background(Color.brandBackground)
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingShareSheet) {
-            if let shareImage {
-                ActivityViewController(activityItems: [shareImage])
-            }
-        }
         .navigationDestination(isPresented: $showingCookView) {
             CookView()
         }
         .navigationDestination(isPresented: $showingWorkspace) {
             RecipeWorkspaceView(initialStage: localWorkspaceStage)
+        }
+        .sheet(isPresented: $showingTextTutorial) {
+            RecipePreviewTextTutorialSheet(text: textTutorial)
         }
         .alert(BakingTerms.recipePreviewExportFailed, isPresented: Binding(
             get: { exportError != nil },
@@ -67,6 +66,16 @@ struct RecipePreviewView: View {
             }
         } message: {
             Text(exportError ?? "")
+        }
+        .alert(BakingTerms.recipePreviewSaveImageSucceeded, isPresented: Binding(
+            get: { exportSuccessMessage != nil },
+            set: { if !$0 { exportSuccessMessage = nil } }
+        )) {
+            Button(BakingTerms.ok, role: .cancel) {
+                exportSuccessMessage = nil
+            }
+        } message: {
+            Text(exportSuccessMessage ?? "")
         }
     }
 
@@ -88,12 +97,26 @@ struct RecipePreviewView: View {
             },
             trailing: {
                 HStack(spacing: BakingSpace.xs) {
-                    BakingIconButton(
-                        icon: .share,
-                        accessibilityLabel: BakingTerms.exportLongImage
-                    ) {
-                        exportLongImage()
+                    Menu {
+                        Button {
+                            saveLongImage()
+                        } label: {
+                            Label(BakingTerms.saveAsImage, systemImage: "photo")
+                        }
+
+                        Button {
+                            showingTextTutorial = true
+                        } label: {
+                            Label(BakingTerms.generateTextTutorial, systemImage: "doc.text")
+                        }
+                    } label: {
+                        BakingIconButtonLabel(
+                            icon: .share,
+                            role: .secondary
+                        )
                     }
+                    .buttonStyle(BakingPressFeedbackButtonStyle())
+                    .accessibilityLabel(BakingTerms.share)
 
                     BakingIconButton(
                         icon: .start,
@@ -201,6 +224,10 @@ struct RecipePreviewView: View {
         store.recipeOverallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var previewShareContent: RecipePreviewShareContent {
+        RecipePreviewShareContent(store: store)
+    }
+
     private var ingredientsCard: some View {
         BakingSectionCard(title: BakingTerms.recipePreviewIngredients) {
             PreviewIngredientList(ingredients: previewIngredientSnapshots)
@@ -222,28 +249,11 @@ struct RecipePreviewView: View {
     }
 
     private var previewIngredientSnapshots: [PreviewIngredientSnapshot] {
-        previewItems.map {
-            PreviewIngredientSnapshot(
-                item: $0,
-                weightParts: BakingFormat.weightParts($0.weight, gramPrecision: $0.tag == .yeast ? 1 : 0),
-                percentValue: $0.category == .flour ? nil : BakingFormat.number(percentForPreview($0), precision: 1),
-                detailText: secondaryDetail(for: $0),
-                hasWater: store.hasWaterContent($0)
-            )
-        }
+        previewShareContent.ingredients
     }
 
     private var previewStepSnapshots: [PreviewStepSnapshot] {
-        store.steps.enumerated().map { index, step in
-            PreviewStepSnapshot(
-                index: index + 1,
-                name: step.name,
-                durationText: BakingFormat.duration(minutes: store.stepMinutes(step)),
-                temperatureText: temperatureText(for: step),
-                itemsText: stepItemsText(for: step),
-                notesText: previewNotes(for: step)
-            )
-        }
+        previewShareContent.steps
     }
 
     private var previewItems: [RecipeItem] {
@@ -317,44 +327,77 @@ struct RecipePreviewView: View {
         return item.weight / flourWeight * 100
     }
 
-    private func exportLongImage() {
-        let exportView = RecipePreviewExportContent(
-            currentRecipeDisplayName: store.currentRecipeDisplayName,
-            summary: store.summary,
-            totalDuration: store.totalStepMinutes(),
-            overallNotes: store.recipeOverallNotes,
-            ingredients: previewIngredientSnapshots,
-            steps: previewStepSnapshots
-        )
+    private var textTutorial: String {
+        previewShareContent.textTutorial
+    }
 
-        let renderer = ImageRenderer(content: exportView)
-        renderer.proposedSize = ProposedViewSize(width: UIScreen.main.bounds.width, height: nil)
-        renderer.scale = UIScreen.main.scale
+    private func saveLongImage() {
+        guard let image = renderLongImage() else { return }
+        saveImageToPhotoLibrary(image)
+    }
 
-        guard let image = renderer.uiImage else {
+    private func renderLongImage() -> UIImage? {
+        guard let image = previewShareContent.renderLongImage() else {
             exportError = BakingTerms.recipePreviewExportRenderFailed
-            return
+            return nil
         }
 
-        shareImage = image
-        showingShareSheet = true
+        return image
+    }
+
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
+        switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
+        case .authorized, .limited:
+            performPhotoLibrarySave(image)
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                Task { @MainActor in
+                    if status == .authorized || status == .limited {
+                        performPhotoLibrarySave(image)
+                    } else {
+                        exportError = BakingTerms.recipePreviewPhotoAccessDenied
+                    }
+                }
+            }
+        case .denied, .restricted:
+            exportError = BakingTerms.recipePreviewPhotoAccessDenied
+        @unknown default:
+            exportError = BakingTerms.recipePreviewPhotoAccessDenied
+        }
+    }
+
+    private func performPhotoLibrarySave(_ image: UIImage) {
+        PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.creationRequestForAsset(from: image)
+        } completionHandler: { success, error in
+            Task { @MainActor in
+                if success {
+                    exportSuccessMessage = BakingTerms.recipePreviewSaveImageSucceededMessage
+                } else {
+                    exportError = error?.localizedDescription ?? BakingTerms.recipePreviewSaveImageFailed
+                }
+            }
+        }
     }
 }
 
 private struct RecipePreviewTitleBlock: View {
     @Binding var recipeName: String
+    @State private var isFocused = false
 
     var body: some View {
         BakingInlineTextField(
             text: $recipeName,
             placeholder: BakingTerms.recipeNamePromptLabel,
+            isFocused: $isFocused,
             font: RecipePreviewTypography.titleUIFont,
             maxLength: 24
         )
         .bakingFittedInputField(
             width: BakingComponentMetrics.compactRecipeTitleInputFieldWidth,
             height: BakingComponentMetrics.compactInputFieldHeight,
-            alignment: .leading
+            alignment: .leading,
+            kind: isFocused ? .focused : .field
         )
         .frame(minHeight: BakingTouchTarget.primaryAction, alignment: .leading)
     }
@@ -559,37 +602,20 @@ private struct CompactIngredientRow: View {
     let item: RecipeItem
     let weightParts: BakingFormattedUnitValue
     let percentValue: String?
-    let detailText: String?
     let hasWater: Bool
 
     var body: some View {
-        let rowMinHeight: CGFloat = detailText == nil ? 40 : 46
-
         HStack(alignment: .center, spacing: 8) {
-            BakingIconView(icon: BakingIcon.material(for: item), size: BakingComponentMetrics.materialChipIcon, color: item.materialPalette.tint)
-                .frame(width: BakingTouchTarget.dropdownIconSurface, height: BakingTouchTarget.dropdownIconSurface)
-                .background(item.materialPalette.iconSurface)
-                .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
+            HStack(spacing: 5) {
+                Text(item.name)
+                    .font(RecipePreviewTypography.tablePrimary)
+                    .foregroundStyle(Color.brandText)
+                    .lineLimit(1)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text(item.name)
-                        .font(RecipePreviewTypography.tablePrimary)
-                        .foregroundStyle(Color.brandText)
-                        .lineLimit(1)
-
-                    if hasWater {
-                        Image(systemName: "drop.fill")
-                            .font(.caption2)
-                            .foregroundStyle(Color.waterText)
-                    }
-                }
-
-                if let detailText, !detailText.isEmpty {
-                    Text(detailText)
-                        .font(RecipePreviewTypography.tableSecondary)
-                        .foregroundStyle(Color.brandSecondaryText)
-                        .lineLimit(1)
+                if hasWater {
+                    Image(systemName: "drop.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.waterText)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -624,7 +650,7 @@ private struct CompactIngredientRow: View {
             .frame(width: 124, alignment: .trailing)
             .layoutPriority(0)
         }
-        .frame(minHeight: rowMinHeight)
+        .frame(minHeight: 58)
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .contentShape(Rectangle())
@@ -644,12 +670,11 @@ private struct PreviewIngredientList: View {
                         item: snapshot.item,
                         weightParts: snapshot.weightParts,
                         percentValue: snapshot.percentValue,
-                        detailText: snapshot.detailText,
                         hasWater: snapshot.hasWater
                     )
 
                     if index < ingredients.count - 1 {
-                        BakingTableDivider(leadingInset: 42)
+                        BakingTableDivider(leadingInset: 6)
                     }
                 }
             }
@@ -667,47 +692,38 @@ private struct CompactStepRow: View {
     let notesText: String?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("\(index)")
-                .font(RecipePreviewTypography.tableUnit.monospacedDigit())
-                .foregroundStyle(Color.brandText)
-                .frame(width: 20, height: 20)
-                .background(BakingSurface.selectedRowBackground)
-                .clipShape(Circle())
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text("\(index). \(name)")
+                    .font(RecipePreviewTypography.tablePrimary)
+                    .foregroundStyle(Color.brandText)
+                    .lineLimit(1)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(name)
-                        .font(RecipePreviewTypography.tablePrimary)
-                        .foregroundStyle(Color.brandText)
-                        .lineLimit(1)
+                Spacer(minLength: 4)
 
-                    Spacer(minLength: 4)
+                Text(durationText)
+                    .font(RecipePreviewTypography.tableSecondary.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(Color.brandSecondaryText)
 
-                    Text(durationText)
+                if let temperatureText {
+                    Text(temperatureText)
                         .font(RecipePreviewTypography.tableSecondary.monospacedDigit().weight(.semibold))
                         .foregroundStyle(Color.brandSecondaryText)
-
-                    if let temperatureText {
-                        Text(temperatureText)
-                            .font(RecipePreviewTypography.tableSecondary.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(Color.brandSecondaryText)
-                    }
                 }
+            }
 
-                if let itemsText {
-                    Text(itemsText)
-                        .font(RecipePreviewTypography.tableSecondary)
-                        .foregroundStyle(Color.brandSecondaryText)
-                        .lineLimit(1)
-                }
+            if let itemsText {
+                Text(itemsText)
+                    .font(RecipePreviewTypography.tableSecondary)
+                    .foregroundStyle(Color.brandSecondaryText)
+                    .lineLimit(1)
+            }
 
-                if let notesText {
-                    Text(notesText)
-                        .font(RecipePreviewTypography.tableSecondary)
-                        .foregroundStyle(Color.brandText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            if let notesText {
+                Text(notesText)
+                    .font(RecipePreviewTypography.tableSecondary)
+                    .foregroundStyle(Color.brandText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, 6)
@@ -734,7 +750,7 @@ private struct PreviewStepList: View {
                     )
 
                     if index < steps.count - 1 {
-                        BakingTableDivider(leadingInset: 42)
+                        BakingTableDivider(leadingInset: 6)
                     }
                 }
             }
@@ -776,7 +792,7 @@ private struct PreviewOverallNotesDisplay: View {
     }
 }
 
-private struct PreviewIngredientSnapshot: Identifiable {
+struct PreviewIngredientSnapshot: Identifiable {
     let item: RecipeItem
     let weightParts: BakingFormattedUnitValue
     let percentValue: String?
@@ -786,7 +802,7 @@ private struct PreviewIngredientSnapshot: Identifiable {
     var id: UUID { item.id }
 }
 
-private struct PreviewStepSnapshot: Identifiable {
+struct PreviewStepSnapshot: Identifiable {
     let index: Int
     let name: String
     let durationText: String
@@ -795,6 +811,176 @@ private struct PreviewStepSnapshot: Identifiable {
     let notesText: String?
 
     var id: Int { index }
+}
+
+@MainActor
+struct RecipePreviewShareContent {
+    let currentRecipeDisplayName: String
+    let summary: RecipeSummary
+    let totalDuration: Double
+    let overallNotes: String
+    let ingredients: [PreviewIngredientSnapshot]
+    let steps: [PreviewStepSnapshot]
+
+    init(store: RecipeStore) {
+        currentRecipeDisplayName = store.currentRecipeDisplayName
+        summary = store.summary
+        totalDuration = store.totalStepMinutes()
+        overallNotes = store.recipeOverallNotes
+
+        let sortedItems = store.items.sorted { lhs, rhs in
+            Self.previewSortRank(for: lhs) < Self.previewSortRank(for: rhs)
+        }
+        ingredients = sortedItems.map { item in
+            PreviewIngredientSnapshot(
+                item: item,
+                weightParts: BakingFormat.weightParts(item.weight, gramPrecision: item.tag == .yeast ? 1 : 0),
+                percentValue: item.category == .flour ? nil : BakingFormat.number(Self.percentForPreview(item, summary: store.summary), precision: 1),
+                detailText: Self.secondaryDetail(for: item, store: store),
+                hasWater: store.hasWaterContent(item)
+            )
+        }
+
+        steps = store.steps.enumerated().map { index, step in
+            PreviewStepSnapshot(
+                index: index + 1,
+                name: step.name,
+                durationText: BakingFormat.duration(minutes: store.stepMinutes(step)),
+                temperatureText: Self.temperatureText(for: step),
+                itemsText: Self.stepItemsText(for: step, store: store),
+                notesText: Self.previewNotes(for: step)
+            )
+        }
+    }
+
+    var textTutorial: String {
+        var sections: [String] = []
+
+        sections.append(currentRecipeDisplayName)
+        sections.append([
+            "\(BakingTerms.recipePreviewEstimatedDuration): \(BakingFormat.duration(minutes: totalDuration))",
+            "\(BakingTerms.formulaMetricDough): \(BakingFormat.weight(summary.doughWeight))",
+            "\(BakingTerms.formulaMetricFlour): \(BakingFormat.weight(summary.flourWeight))",
+            "\(BakingTerms.formulaMetricHydration): \(BakingFormat.number(summary.hydration, precision: 1))%"
+        ].joined(separator: "\n"))
+
+        let trimmedOverallNotes = overallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedOverallNotes.isEmpty {
+            sections.append("\(BakingTerms.recipePreviewOverallNotes)\n\(trimmedOverallNotes)")
+        }
+
+        let ingredientLines = ingredients.map { snapshot in
+            var line = "- \(snapshot.item.name): \(snapshot.weightParts.value) \(snapshot.weightParts.unit)"
+            if let percentValue = snapshot.percentValue {
+                line += " (\(percentValue)%)"
+            }
+            if let detailText = snapshot.detailText {
+                line += " - \(detailText)"
+            }
+            return line
+        }
+        sections.append("\(BakingTerms.recipePreviewIngredients)\n\(ingredientLines.isEmpty ? BakingTerms.formulaEmptyMaterials : ingredientLines.joined(separator: "\n"))")
+
+        let stepLines = steps.map { step in
+            var parts = ["\(step.index). \(step.name)", step.durationText]
+            if let temperatureText = step.temperatureText {
+                parts.append(temperatureText)
+            }
+            var line = parts.joined(separator: " - ")
+            if let itemsText = step.itemsText {
+                line += "\n   \(itemsText)"
+            }
+            if let notesText = step.notesText {
+                line += "\n   \(notesText)"
+            }
+            return line
+        }
+        sections.append("\(BakingTerms.recipePreviewSteps)\n\(stepLines.isEmpty ? BakingTerms.stepsEmptyMessage : stepLines.joined(separator: "\n"))")
+
+        return sections.joined(separator: "\n\n")
+    }
+
+    @MainActor
+    func renderLongImage() -> UIImage? {
+        let exportView = RecipePreviewExportContent(
+            currentRecipeDisplayName: currentRecipeDisplayName,
+            summary: summary,
+            totalDuration: totalDuration,
+            overallNotes: overallNotes,
+            ingredients: ingredients,
+            steps: steps
+        )
+
+        let renderer = ImageRenderer(content: exportView)
+        renderer.proposedSize = ProposedViewSize(width: UIScreen.main.bounds.width, height: nil)
+        renderer.scale = UIScreen.main.scale
+
+        return renderer.uiImage
+    }
+
+    private static func previewSortRank(for item: RecipeItem) -> Int {
+        switch item.category {
+        case .flour:
+            return 0
+        case .starter:
+            return 1
+        case .basic:
+            switch item.tag {
+            case .water: return 2
+            case .salt: return 3
+            case .egg: return 4
+            case .butter: return 5
+            case .yeast: return 6
+            case .sugar: return 7
+            default: return 8
+            }
+        case .other:
+            return 9
+        }
+    }
+
+    private static func stepItemsText(for step: JournalStep, store: RecipeStore) -> String? {
+        let names = store.allocatedItems(for: step).map { allocatedItem in
+            let item = allocatedItem.item
+            return "\(item.name) \(BakingFormat.weight(allocatedItem.weight, gramPrecision: item.tag == .yeast ? 1 : 0))"
+        }
+        guard !names.isEmpty else { return nil }
+        return names.joined(separator: " · ")
+    }
+
+    private static func temperatureText(for step: JournalStep) -> String? {
+        guard let temperature = step.temperature else { return nil }
+        return "\(BakingFormat.number(temperature, precision: 0))\(step.temperatureUnit?.rawValue ?? "C")"
+    }
+
+    private static func previewNotes(for step: JournalStep) -> String? {
+        let trimmed = step.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func secondaryDetail(for item: RecipeItem, store: RecipeStore) -> String? {
+        if item.category == .starter {
+            return BakingTerms.recipePreviewStarterDetail(
+                flour: BakingFormat.weight(store.flourContribution(item)),
+                water: BakingFormat.weight(store.waterContribution(item))
+            )
+        }
+        if item.tag == .egg {
+            return BakingTerms.recipePreviewEggDetail(
+                count: BakingFormat.number(1, precision: 0),
+                water: BakingFormat.weight(store.waterContribution(item))
+            )
+        }
+        if item.tag == .water {
+            return nil
+        }
+        return nil
+    }
+
+    private static func percentForPreview(_ item: RecipeItem, summary: RecipeSummary) -> Double {
+        guard summary.flourWeight > 0 else { return 0 }
+        return item.weight / summary.flourWeight * 100
+    }
 }
 
 private struct RecipePreviewExportContent: View {
@@ -857,14 +1043,55 @@ private struct RecipePreviewExportContent: View {
     }
 }
 
-private struct ActivityViewController: UIViewControllerRepresentable {
-    let activityItems: [Any]
+struct RecipePreviewTextTutorialSheet: View {
+    let text: String
+    @State private var hasCopied = false
 
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(text)
+                    .font(BakingTypography.appSecondaryText)
+                    .foregroundStyle(Color.brandText)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(BakingSpace.md)
+                    .bakingCard()
+                    .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                    .padding(.top, BakingLayout.contentTopInset)
+                    .padding(.bottom, BakingTouchTarget.primaryAction + BakingSpace.xxl * 2)
+            }
+            .background(Color.brandBackground)
+            .navigationTitle(BakingTerms.textTutorialTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: BakingSpace.sm) {
+                    if hasCopied {
+                        Text(BakingTerms.copiedToClipboard)
+                            .font(BakingTypography.appSecondaryText)
+                            .foregroundStyle(Color.brandSage)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
+                    BakingActionButton(
+                        title: BakingTerms.copyTextTutorial,
+                        accessibilityLabel: BakingTerms.copyTextTutorial,
+                        icon: .copy
+                    ) {
+                        UIPasteboard.general.string = text
+                        withAnimation(BakingMotion.quick) {
+                            hasCopied = true
+                        }
+                    }
+                }
+                .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                .padding(.top, BakingSpace.sm)
+                .padding(.bottom, BakingSpace.md)
+                .background(Color.brandBackground)
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 private extension View {

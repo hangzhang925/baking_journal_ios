@@ -132,7 +132,6 @@ struct HomeView: View {
                         } label: {
                             RecipeLibraryRow(
                                 recipe: recipe,
-                                summary: store.summary(for: recipe),
                                 bakeCount: bakeCount(for: recipe)
                             )
                         }
@@ -465,4 +464,3 @@ private struct SettingsNavigationRow: View {
         .contentShape(Rectangle())
     }
 }
-

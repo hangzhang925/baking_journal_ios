@@ -19,7 +19,6 @@ struct StepsView: View {
     @State private var pendingDeleteStep: JournalStep?
     @State private var showingDeleteConfirmation = false
     @State private var editingStepID: UUID?
-    @State private var stepEditorDetent = PresentationDetent.height(560)
     @State private var showingNotesEditor = false
 
     private let reorderCoordinateSpace = "stepsReorderSpace"
@@ -333,7 +332,6 @@ struct StepsView: View {
     }
 
     private func presentStepEditor(_ step: JournalStep) {
-        stepEditorDetent = .height(560)
         editingStepID = step.id
     }
 
@@ -346,15 +344,21 @@ struct StepsView: View {
     @ViewBuilder
     private var stepEditorSheet: some View {
         if let editingStep {
-            StepTextEditorSheetView(step: editingStep, presentationDetent: $stepEditorDetent)
+            StepTextEditorSheetView(
+                step: editingStep,
+                isScrollEnabled: true,
+                onDismiss: {
+                    editingStepID = nil
+                }
+            )
             .id(editingStep.id)
             .environmentObject(store)
-            .presentationDetents([.height(560), .large], selection: $stepEditorDetent)
+            .presentationDetents([BakingPopupSheetMetrics.editSheetTallDetent])
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.brandBackground)
         } else {
             BakingEmptyState(title: BakingTerms.stepsMissingStep, systemImage: "exclamationmark.triangle")
-                .presentationDetents([.medium])
+                .presentationDetents([BakingPopupSheetMetrics.editSheetTallDetent])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.brandBackground)
         }
@@ -674,9 +678,6 @@ private struct AddStepControl: View {
 private struct StepTableHeader: View {
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.lg) {
-            Color.clear
-                .frame(width: StepDisplayRow.iconColumnWidth, height: 1)
-
             Text(BakingTerms.stepsTableStep)
                 .bakingLabelStyle(.tableHeader)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -701,8 +702,7 @@ private struct StepTableHeader: View {
 }
 
 private struct StepDisplayRow: View {
-    static let iconColumnWidth: CGFloat = 40
-    static let separatorLeadingInset: CGFloat = BakingSpace.sm + iconColumnWidth + BakingSpace.lg
+    static let separatorLeadingInset: CGFloat = BakingSpace.sm
     static let durationColumnWidth: CGFloat = 70
     static let temperatureColumnWidth: CGFloat = 72
     static let numericColumnSpacing: CGFloat = 8
@@ -720,8 +720,6 @@ private struct StepDisplayRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.lg) {
-            iconBlock
-
             VStack(alignment: .leading, spacing: 3) {
                 Text(titleText)
                     .bakingLabelStyle(.inputLabel)
@@ -804,19 +802,13 @@ private struct StepDisplayRow: View {
         } label: {
             BakingSystemIconButtonLabel(
                 systemImage: "trash",
+                tint: BakingComponentTheme.action(role: .destructive).foreground,
                 visualSize: BakingTouchTarget.secondaryActionVisual,
                 font: .caption.weight(.semibold)
             )
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
         .accessibilityLabel(BakingTerms.stepsDeleteStep)
-    }
-
-    private var iconBlock: some View {
-        BakingIconView(icon: BakingIcon.step(for: currentStep.type), size: BakingTouchTarget.inlineIconGlyph, color: .brandPrimary)
-            .frame(width: BakingTouchTarget.inlineIconSurface, height: BakingTouchTarget.inlineIconSurface)
-            .bakingReadOnlySurface()
-            .frame(width: Self.iconColumnWidth, alignment: .center)
     }
 
     private var currentStep: JournalStep {
@@ -861,34 +853,63 @@ private struct StepDisplayRow: View {
 
 private struct StepTextEditorSheetView: View {
     @EnvironmentObject private var store: RecipeStore
-    @Environment(\.dismiss) private var dismiss
     let step: JournalStep
-    @Binding var presentationDetent: PresentationDetent
+    var isScrollEnabled = true
+    var onDismiss: () -> Void
+    var onContentHeightChange: (CGFloat) -> Void = { _ in }
+    @State private var selectedCategory: StepCategory
+    @State private var showingCategoryPicker = false
+    @State private var showingStarterPicker = false
+    @State private var selectedStarterID: UUID?
     @State private var showingMaterials = false
     @State private var showingDurationPicker = false
     @State private var showingTemperaturePicker = false
 
+    init(
+        step: JournalStep,
+        isScrollEnabled: Bool = true,
+        onDismiss: @escaping () -> Void,
+        onContentHeightChange: @escaping (CGFloat) -> Void = { _ in }
+    ) {
+        self.step = step
+        self.isScrollEnabled = isScrollEnabled
+        self.onDismiss = onDismiss
+        self.onContentHeightChange = onContentHeightChange
+        _selectedCategory = State(initialValue: StepCategory.defaultCategory(for: step))
+    }
+
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                editorToolbar
+        VStack(spacing: 0) {
+            editorToolbar
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: BakingLayout.cardStackSpacing) {
-                        primaryControlsCard
-                        materialControlsCard
+            ScrollView {
+                VStack(alignment: .leading, spacing: BakingLayout.cardStackSpacing) {
+                    primaryControlsCard
+                    stepContentCard
 
-                        notesEditorCard
-                    }
-                    .padding(.horizontal, BakingLayout.screenHorizontalInset)
-                    .padding(.top, BakingSpace.sm)
-                    .padding(.bottom, 34)
+                    notesEditorCard
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                .padding(.top, BakingSpace.sm)
+                .padding(.bottom, 34)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(key: StepEditorContentHeightPreferenceKey.self, value: proxy.size.height)
+                    }
+                )
             }
-            .background(Color.brandBackground)
+            .onPreferenceChange(StepEditorContentHeightPreferenceKey.self) { height in
+                onContentHeightChange(height)
+            }
+            .scrollDisabled(!isScrollEnabled)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
         }
+        .background(Color.brandBackground)
         .animation(BakingMotion.standard, value: showingMaterials)
+        .animation(BakingMotion.standard, value: showingStarterPicker)
+        .animation(BakingMotion.standard, value: selectedCategory)
     }
 
     private var editorToolbar: some View {
@@ -900,55 +921,93 @@ private struct StepTextEditorSheetView: View {
                 size: .secondary,
                 font: .caption.weight(.bold)
             ) {
-                dismiss()
+                onDismiss()
             }
         })
     }
 
     private var primaryControlsCard: some View {
         VStack(spacing: 0) {
+            StepPopupActionTableRow(title: BakingTerms.stepsFieldCategory) {
+                Button {
+                    showingCategoryPicker = true
+                } label: {
+                    BakingDropdownTrigger(title: selectedCategory.label)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.stepsFieldCategory)
+                .popover(isPresented: $showingCategoryPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                    BakingDropdownPopover(width: 176) {
+                        ForEach(StepCategory.allCases) { category in
+                            Button {
+                                selectCategory(category)
+                                showingCategoryPicker = false
+                            } label: {
+                                BakingDropdownRow(title: category.label, isSelected: selectedCategory == category) {
+                                    BakingIconView(icon: category.icon, size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            PopupTableDivider()
+
             StepPopupNameTableRow(
                 title: BakingTerms.stepsFieldName,
                 text: stepTextBinding(\.name),
                 placeholder: BakingTerms.stepsFieldName
             )
 
-            PopupTableDivider()
+            if !isStarterCategory {
+                PopupTableDivider()
 
-            StepPopupActionTableRow(title: BakingTerms.stepsFieldTemperature) {
-                Button {
-                    showingTemperaturePicker = true
-                } label: {
-                    StepCompactValueButton(systemImage: "thermometer.medium", text: temperatureText, tint: .waterText)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(BakingTerms.stepsFieldTemperature)
-                .popover(isPresented: $showingTemperaturePicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-                    TemperaturePopoverView(
-                        value: stepNumberBinding(\.temperature, fallback: defaultTemperatureValue),
-                        unit: stepTemperatureUnitBinding
-                    )
-                    .presentationCompactAdaptation(.popover)
-                }
-            }
-
-            PopupTableDivider()
-
-            StepPopupActionTableRow(title: BakingTerms.stepsFieldDuration) {
-                Button {
-                    showingDurationPicker = true
-                } label: {
-                    StepCompactValueButton(systemImage: "timer", text: durationText, tint: .brandPrimary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(BakingTerms.stepsFieldDuration)
-                .popover(isPresented: $showingDurationPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-                    DurationPopoverView(totalMinutes: durationMinutesBinding)
+                StepPopupActionTableRow(title: BakingTerms.stepsFieldTemperature) {
+                    Button {
+                        showingTemperaturePicker = true
+                    } label: {
+                        StepCompactValueButton(systemImage: "thermometer.medium", text: temperatureText, tint: .waterText)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(BakingTerms.stepsFieldTemperature)
+                    .popover(isPresented: $showingTemperaturePicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                        TemperaturePopoverView(
+                            value: stepNumberBinding(\.temperature, fallback: defaultTemperatureValue),
+                            unit: stepTemperatureUnitBinding
+                        )
                         .presentationCompactAdaptation(.popover)
+                    }
+                }
+
+                PopupTableDivider()
+
+                StepPopupActionTableRow(title: BakingTerms.stepsFieldDuration) {
+                    Button {
+                        showingDurationPicker = true
+                    } label: {
+                        StepCompactValueButton(systemImage: "timer", text: durationText, tint: .brandPrimary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(BakingTerms.stepsFieldDuration)
+                    .popover(isPresented: $showingDurationPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                        DurationPopoverView(totalMinutes: durationMinutesBinding)
+                            .presentationCompactAdaptation(.popover)
+                    }
                 }
             }
         }
         .bakingCard()
+    }
+
+    @ViewBuilder
+    private var stepContentCard: some View {
+        if isStarterCategory {
+            starterPickerCard
+        } else {
+            materialControlsCard
+        }
     }
 
     private var materialControlsCard: some View {
@@ -975,6 +1034,73 @@ private struct StepTextEditorSheetView: View {
             }
         }
         .bakingCard()
+    }
+
+    private var starterPickerCard: some View {
+        VStack(spacing: 0) {
+            StepPopupActionTableRow(title: BakingTerms.stepsStarterPickerSection) {
+                Button {
+                    toggleStarterPicker()
+                } label: {
+                    BakingSystemIconButtonLabel(
+                        systemImage: "checklist",
+                        visualSize: BakingTouchTarget.secondaryActionVisual,
+                        font: .caption.weight(.semibold)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.stepsStarterPickerAccessibility)
+            }
+
+            if showingStarterPicker {
+                PopupTableDivider()
+
+                starterPickerContent
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .bakingCard()
+    }
+
+    private var starterPickerContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if starterItems.isEmpty {
+                Text(BakingTerms.stepsStarterPickerEmpty)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, BakingSpace.sm)
+            } else {
+                VStack(spacing: BakingSpace.sm) {
+                    ForEach(starterItems) { item in
+                        StepStarterSelectionCard(
+                            item: item,
+                            componentLines: starterComponentLines(for: item),
+                            isSelected: selectedStarterID == item.id
+                        ) {
+                            selectedStarterID = item.id
+                        }
+                    }
+                }
+
+                HStack {
+                    Spacer()
+
+                    BakingActionButton(
+                        title: BakingTerms.stepsInsertSelectedMaterials,
+                        accessibilityLabel: BakingTerms.stepsInsertSelectedMaterials,
+                        role: .primary,
+                        state: selectedStarter == nil ? .disabled : .normal
+                    ) {
+                        appendSelectedStarterComponents()
+                    }
+                    .frame(width: 118)
+                }
+                .frame(height: BakingTouchTarget.secondaryAction)
+            }
+        }
+        .padding(.horizontal, BakingSpace.md)
+        .padding(.vertical, BakingSpace.sm)
     }
 
     private var materialPickerContent: some View {
@@ -1036,12 +1162,38 @@ private struct StepTextEditorSheetView: View {
     private func toggleMaterials() {
         withAnimation(BakingMotion.standard) {
             showingMaterials.toggle()
-            presentationDetent = showingMaterials ? .large : .height(560)
         }
+    }
+
+    private func toggleStarterPicker() {
+        withAnimation(BakingMotion.standard) {
+            showingStarterPicker.toggle()
+        }
+    }
+
+    private func selectCategory(_ category: StepCategory) {
+        selectedCategory = category
+        guard category == .makeStarter else { return }
+        var next = currentStep
+        next.name = BakingTerms.stepsCategoryMakeStarter
+        store.updateStep(next)
     }
 
     private var currentStep: JournalStep {
         store.steps.first { $0.id == step.id } ?? step
+    }
+
+    private var isStarterCategory: Bool {
+        selectedCategory == .makeStarter
+    }
+
+    private var starterItems: [RecipeItem] {
+        store.items.filter { $0.category == .starter }
+    }
+
+    private var selectedStarter: RecipeItem? {
+        guard let selectedStarterID else { return nil }
+        return starterItems.first { $0.id == selectedStarterID }
     }
 
     private var stepNotesBinding: Binding<String> {
@@ -1137,15 +1289,211 @@ private struct StepTextEditorSheetView: View {
         let lines = selectedMaterials.map { allocated in
             "\(allocated.item.name)\(BakingFormat.weight(allocated.weight, gramPrecision: allocated.item.tag == .yeast ? 1 : 0))"
         }
+        appendNoteLines(lines, clearsMaterialAllocations: true)
+        showingMaterials = false
+    }
+
+    private func appendSelectedStarterComponents() {
+        guard let selectedStarter else { return }
+        appendNoteLines(starterComponentLines(for: selectedStarter).map(\.noteText), clearsMaterialAllocations: true)
+        showingStarterPicker = false
+    }
+
+    private func appendNoteLines(_ lines: [String], clearsMaterialAllocations: Bool = false) {
         guard !lines.isEmpty else { return }
 
         let trimmedExisting = currentStep.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         var next = currentStep
         next.notes = trimmedExisting.isEmpty ? lines.joined(separator: "\n") : trimmedExisting + "\n" + lines.joined(separator: "\n")
-        next.materialAllocations = []
+        if clearsMaterialAllocations {
+            next.materialAllocations = []
+        }
         store.updateStep(next)
-        showingMaterials = false
-        presentationDetent = .height(560)
+    }
+
+    private func starterComponentLines(for item: RecipeItem) -> [StepStarterComponentLine] {
+        var lines = [
+            StepStarterComponentLine(kind: .flour, name: BakingTerms.flour, weight: store.flourContribution(item), icon: .flour),
+            StepStarterComponentLine(kind: .water, name: BakingTerms.water, weight: store.starterBaseWater(item), icon: .water)
+        ]
+
+        if let yeastWeight = item.starterYeastWeight, yeastWeight > 0 {
+            lines.append(StepStarterComponentLine(kind: .yeast, name: BakingTerms.yeast, weight: yeastWeight, icon: .yeast))
+        }
+
+        let eggWeight = store.starterEggWeight(item)
+        if eggWeight > 0 {
+            lines.append(StepStarterComponentLine(kind: .egg, name: BakingTerms.egg, weight: eggWeight, icon: .egg))
+        }
+
+        return lines
+    }
+}
+
+private enum StepCategory: CaseIterable, Identifiable {
+    case makeStarter
+    case prepWork
+    case mixing
+    case fermentation
+    case baking
+    case shaping
+    case proofing
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .makeStarter: BakingTerms.stepsCategoryMakeStarter
+        case .prepWork: BakingTerms.stepsCategoryPrepWork
+        case .mixing: BakingTerms.stepsCategoryMixing
+        case .fermentation: BakingTerms.stepsCategoryFermentation
+        case .baking: BakingTerms.stepsCategoryBaking
+        case .shaping: BakingTerms.stepsCategoryShaping
+        case .proofing: BakingTerms.stepsCategoryProofing
+        }
+    }
+
+    var icon: BakingIcon {
+        switch self {
+        case .makeStarter: .starter
+        case .prepWork: .other
+        case .mixing: .mixing
+        case .fermentation: .fermentation
+        case .baking: .baking
+        case .shaping: .shaping
+        case .proofing: .timer
+        }
+    }
+
+    static func defaultCategory(for step: JournalStep) -> StepCategory {
+        switch step.type {
+        case .prep: .prepWork
+        case .mixing: .mixing
+        case .fermentation: .fermentation
+        case .rest: .proofing
+        case .shaping: .shaping
+        case .baking: .baking
+        case .other: .prepWork
+        }
+    }
+}
+
+private enum StepStarterComponentKind {
+    case flour
+    case water
+    case yeast
+    case egg
+}
+
+private struct StepStarterComponentLine: Identifiable {
+    let id = UUID()
+    let kind: StepStarterComponentKind
+    let name: String
+    let weight: Double
+    let icon: BakingIcon
+
+    var weightText: String {
+        BakingFormat.weight(weight)
+    }
+
+    var noteText: String {
+        "\(name)\(weightText)"
+    }
+}
+
+private struct StepStarterSelectionCard: View {
+    let item: RecipeItem
+    let componentLines: [StepStarterComponentLine]
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: BakingSpace.sm) {
+                header
+
+                if isSelected {
+                    VStack(spacing: BakingSpace.xs) {
+                        ForEach(componentLines) { line in
+                            StepStarterComponentRow(line: line, palette: item.materialPalette)
+                        }
+                    }
+                    .padding(BakingSpace.sm)
+                    .bakingInsetSurface()
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .padding(BakingSpace.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .bakingMaterialCard(palette: item.materialPalette, isSelected: isSelected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.name)
+        .accessibilityValue(isSelected ? BakingTerms.stepsStarterPickerAccessibility : "")
+    }
+
+    private var header: some View {
+        HStack(spacing: BakingSpace.sm) {
+            BakingIconView(icon: .starter, size: BakingTouchTarget.inlineIconGlyph, color: item.materialPalette.tint)
+                .frame(width: BakingTouchTarget.inlineIconSurface, height: BakingTouchTarget.inlineIconSurface)
+                .background(item.materialPalette.iconSurface)
+                .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
+
+            VStack(alignment: .leading, spacing: BakingSpace.xs) {
+                Text(item.name)
+                    .bakingLabelStyle(.inputLabel)
+                    .lineLimit(1)
+
+                Text(BakingTerms.formulaStarterDetail(
+                    flour: BakingFormat.weight(componentWeight(.flour)),
+                    water: BakingFormat.weight(componentWeight(.water))
+                ))
+                .bakingLabelStyle(.helperText)
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: BakingSpace.sm)
+
+            if isSelected {
+                BakingIconView(icon: .complete, size: BakingTouchTarget.dropdownIconGlyph, color: item.materialPalette.tint)
+            }
+        }
+    }
+
+    private func componentWeight(_ kind: StepStarterComponentKind) -> Double {
+        componentLines.first { $0.kind == kind }?.weight ?? 0
+    }
+}
+
+private struct StepStarterComponentRow: View {
+    let line: StepStarterComponentLine
+    let palette: MaterialPalette
+
+    var body: some View {
+        HStack(spacing: BakingSpace.sm) {
+            BakingIconView(icon: line.icon, size: 13, color: palette.tint)
+                .frame(width: 18, height: 18)
+                .background(palette.iconSurface)
+                .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.compactIconCornerRadius, style: .continuous))
+
+            BakingLabel(text: line.name, role: .fieldLabel)
+
+            Spacer(minLength: BakingSpace.sm)
+
+            Text(line.weightText)
+                .font(BakingTypography.tableNumber)
+                .foregroundStyle(Color.brandText)
+                .lineLimit(1)
+        }
+        .frame(minHeight: BakingTouchTarget.dropdownIconSurface)
+    }
+}
+
+private struct StepEditorContentHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
@@ -1153,6 +1501,7 @@ private struct StepPopupNameTableRow: View {
     let title: String
     @Binding var text: String
     let placeholder: String
+    @State private var isFocused = false
 
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.sm) {
@@ -1165,11 +1514,12 @@ private struct StepPopupNameTableRow: View {
             BakingInlineTextField(
                 text: $text,
                 placeholder: placeholder,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: BakingTypography.popupInputValueUIFont,
                 textAlignment: .right
             )
-            .bakingFittedInputField(.long)
+            .bakingFittedInputField(.long, kind: isFocused ? .focused : .field)
         }
         .padding(.horizontal, BakingSpace.md)
         .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
@@ -1857,6 +2207,7 @@ private struct MaterialPercentagePopover: View {
     let maxPercentage: Double
     @Binding var isPresented: Bool
     let confirm: () -> Void
+    @State private var weightFieldFocused = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1877,6 +2228,7 @@ private struct MaterialPercentagePopover: View {
                     BakingNumericTextField(
                         value: weightBinding,
                         fractionDigits: item.tag == .yeast ? 0...1 : 0...0,
+                        isFocused: $weightFieldFocused,
                         color: UIColor(Color.brandText),
                         font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
                     )
@@ -1890,7 +2242,7 @@ private struct MaterialPercentagePopover: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
-            .bakingSurface(.inputSurface)
+            .bakingSurface(weightFieldFocused ? .focused : .inputSurface)
         }
         .padding(12)
         .bakingPopoverSurface(width: BakingComponentMetrics.popoverMediumWidth)

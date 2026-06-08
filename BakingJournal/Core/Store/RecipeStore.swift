@@ -81,7 +81,6 @@ final class RecipeStore: ObservableObject {
         BakingTerms.yolk: 48.0,
         BakingTerms.white: 88.0
     ]
-    // TODO: When starter notifications are added, schedule nextFeedingDate at these local reminder hours.
     static let starterReminderHours = [9, 12, 17]
 
     static var starterReminderTimeLabels: [String] {
@@ -146,11 +145,11 @@ final class RecipeStore: ObservableObject {
     }
 
     func starterFeedFlourWeight(for profile: StarterProfile) -> Double {
-        starterFinalWeight(for: profile) * profile.feedingRatio.feedMultiplier
+        max(0, profile.feedFlourWeight)
     }
 
     func starterFeedWaterWeight(for profile: StarterProfile) -> Double {
-        starterFinalWeight(for: profile) * profile.feedingRatio.feedMultiplier
+        max(0, profile.feedWaterWeight)
     }
 
     var isStarterReminderDue: Bool {
@@ -432,7 +431,13 @@ final class RecipeStore: ObservableObject {
 
     func updateStarterProfile(_ profile: StarterProfile) {
         guard let index = starterProfiles.firstIndex(where: { $0.id == profile.id }) else { return }
+        let previous = starterProfiles[index]
         starterProfiles[index] = profile
+        if previous.isReminderEnabled != profile.isReminderEnabled
+            || !Calendar.current.isDate(previous.nextFeedingDate, inSameDayAs: profile.nextFeedingDate)
+            || previous.name != profile.name {
+            rescheduleStarterReminders()
+        }
     }
 
     func deleteStarterProfile(_ profile: StarterProfile) {
@@ -440,11 +445,33 @@ final class RecipeStore: ObservableObject {
         if starterProfiles.isEmpty {
             starterProfiles = [StarterProfile()]
         }
+        rescheduleStarterReminders()
     }
 
     func updateStarterFinalWeight(_ finalWeight: Double, for profile: StarterProfile) {
         var next = profile
         next.measuredWeight = max(0, finalWeight) + next.containerWeight
+        updateStarterProfile(next)
+    }
+
+    func updateStarterFeedingRatio(_ ratio: StarterFeedingRatio, for profile: StarterProfile) {
+        var next = profile
+        next.feedingRatio = ratio
+        let defaultFeedWeight = starterFinalWeight(for: next) * ratio.feedMultiplier
+        next.feedFlourWeight = defaultFeedWeight
+        next.feedWaterWeight = defaultFeedWeight
+        updateStarterProfile(next)
+    }
+
+    func updateStarterFeedFlourWeight(_ weight: Double, for profile: StarterProfile) {
+        var next = profile
+        next.feedFlourWeight = max(0, weight)
+        updateStarterProfile(next)
+    }
+
+    func updateStarterFeedWaterWeight(_ weight: Double, for profile: StarterProfile) {
+        var next = profile
+        next.feedWaterWeight = max(0, weight)
         updateStarterProfile(next)
     }
 
@@ -455,6 +482,7 @@ final class RecipeStore: ObservableObject {
         next.lastFedAt = Date()
         next.measuredWeight = currentWeight + addedWeight + next.containerWeight
         updateStarterProfile(next)
+        rescheduleStarterReminders()
     }
 
     func updateBakeRecordNotes(_ notes: String, for record: BakeRecord) {
@@ -676,6 +704,7 @@ final class RecipeStore: ObservableObject {
     func removeStep(_ step: JournalStep) {
         steps.removeAll { $0.id == step.id }
         cookState.checked[step.id] = nil
+        cookState.completedStepIDs.remove(step.id)
         cookState.currentIndex = min(cookState.currentIndex, max(steps.count - 1, 0))
     }
 
@@ -798,6 +827,20 @@ final class RecipeStore: ObservableObject {
         cookState.checked[stepId] = checked
     }
 
+    func isCookStepCompleted(_ step: JournalStep) -> Bool {
+        cookState.completedStepIDs.contains(step.id)
+    }
+
+    func completeCookStep(at index: Int) {
+        guard ensureCookStarted(), steps.indices.contains(index) else { return }
+        if index != cookState.currentIndex {
+            goToCookStep(index)
+        }
+        guard steps.indices.contains(cookState.currentIndex) else { return }
+        cookState.completedStepIDs.insert(steps[cookState.currentIndex].id)
+        moveCookStep(1)
+    }
+
     func startTimer(for step: JournalStep) {
         guard ensureCookStarted() else { return }
         let now = Date()
@@ -859,6 +902,9 @@ final class RecipeStore: ObservableObject {
     func completeBake() {
         guard ensureCookStarted() else { return }
         let finishedAt = Date()
+        if steps.indices.contains(cookState.currentIndex) {
+            cookState.completedStepIDs.insert(steps[cookState.currentIndex].id)
+        }
         closeCurrentStepTiming(at: finishedAt)
         cookState.completedAt = finishedAt
         finalizeBakeRecord()
@@ -939,7 +985,7 @@ final class RecipeStore: ObservableObject {
     }
 
     func waterContribution(_ item: RecipeItem) -> Double {
-        if item.tag == .water { return item.weight }
+        if item.tag == .water { return item.weight * ((item.waterContentPct ?? 100) / 100) }
         if item.category == .starter { return starterBaseWater(item) + starterEggWater(item) }
         if item.tag == .egg { return item.weight * (Self.waterContent(forEggType: item.eggType) / 100) }
         if item.category == .other { return item.weight * ((item.waterContentPct ?? 0) / 100) }
@@ -1015,6 +1061,52 @@ final class RecipeStore: ObservableObject {
     private func cancelCookTimerReminder() {
         Task { [notifications] in
             await notifications.cancel(scope: .cookTimer)
+        }
+    }
+
+    private func rescheduleStarterReminders() {
+        let profiles = starterProfiles
+        Task { [notifications] in
+            await notifications.cancel(scope: .starterReminder)
+
+            let calendar = Calendar.current
+            let now = Date()
+            let todayStart = calendar.startOfDay(for: now)
+
+            for profile in profiles where profile.isReminderEnabled {
+                let starterName = starterDisplayName(for: profile)
+                let reminderDay = calendar.startOfDay(for: profile.nextFeedingDate)
+
+                if reminderDay < todayStart {
+                    guard let fireDate = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: now) else {
+                        continue
+                    }
+                    _ = await notifications.schedule(
+                        .starterFeedingReminder(
+                            profileId: profile.id,
+                            starterName: starterName,
+                            fireDate: fireDate,
+                            repeatsDaily: true
+                        )
+                    )
+                    continue
+                }
+
+                for hour in Self.starterReminderHours {
+                    guard let fireDate = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: reminderDay),
+                          fireDate > now else {
+                        continue
+                    }
+                    _ = await notifications.schedule(
+                        .starterFeedingReminder(
+                            profileId: profile.id,
+                            starterName: starterName,
+                            fireDate: fireDate,
+                            repeatsDaily: false
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -1178,6 +1270,7 @@ final class RecipeStore: ObservableObject {
         defer {
             isLoading = false
             hasLoadedPersistedState = true
+            rescheduleStarterReminders()
         }
         guard let data = UserDefaults.standard.data(forKey: storageKey) else {
             recipeName = BakingTerms.toastRecipeName
@@ -1383,7 +1476,7 @@ final class RecipeStore: ObservableObject {
 
     private static let defaultItems: [RecipeItem] = [
         RecipeItem(id: UUID(), category: .flour, tag: .flour, name: BakingTerms.flour, weight: 500),
-        RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.water, weight: 350),
+        RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.water, weight: 350, waterContentPct: 100),
         RecipeItem(id: UUID(), category: .basic, tag: .salt, name: BakingTerms.salt, weight: 10),
         RecipeItem(id: UUID(), category: .basic, tag: .butter, name: BakingTerms.butter, weight: 40),
         RecipeItem(id: UUID(), category: .basic, tag: .yeast, name: BakingTerms.yeast, weight: 5),
@@ -1394,17 +1487,17 @@ final class RecipeStore: ObservableObject {
         RecipeItem(id: UUID(), category: .flour, tag: .flour, name: BakingTerms.lowGlutenFlour, weight: 90),
         RecipeItem(id: UUID(), category: .basic, tag: .egg, name: BakingTerms.egg, weight: 250, waterContentPct: 75, eggType: BakingTerms.beatenEgg),
         RecipeItem(id: UUID(), category: .basic, tag: .sugar, name: BakingTerms.granulatedSugar, weight: 80),
-        RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.milk, weight: 60),
-        RecipeItem(id: UUID(), category: .other, tag: .other, name: BakingTerms.cornOil, weight: 55)
+        RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.milk, weight: 60, waterContentPct: 100),
+        RecipeItem(id: UUID(), category: .other, tag: .other, name: BakingTerms.cornOil, weight: 55, waterContentPct: 0)
     ]
 
     private static let countryBreadItems: [RecipeItem] = [
         RecipeItem(id: UUID(), category: .flour, tag: .flour, name: BakingTerms.highGlutenFlour, weight: 420),
         RecipeItem(id: UUID(), category: .flour, tag: .flour, name: BakingTerms.wholeWheatFlour, weight: 80),
-        RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.water, weight: 380),
+        RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.water, weight: 380, waterContentPct: 100),
         RecipeItem(id: UUID(), category: .basic, tag: .salt, name: BakingTerms.salt, weight: 10),
         RecipeItem(id: UUID(), category: .basic, tag: .yeast, name: BakingTerms.yeast, weight: 4),
-        RecipeItem(id: UUID(), category: .other, tag: .other, name: BakingTerms.oliveOil, weight: 12)
+        RecipeItem(id: UUID(), category: .other, tag: .other, name: BakingTerms.oliveOil, weight: 12, waterContentPct: 0)
     ]
 
     private static let defaultStarterRatio = [
@@ -1438,7 +1531,7 @@ final class RecipeStore: ObservableObject {
         case .starter:
             return RecipeItem(id: UUID(), category: category, tag: .starter, name: BakingTerms.starterDisplayName(BakingTerms.levainStarter), weight: 100, hydrationPct: 100, starterFlour: 50, starterRatio: "1:1", starterWater: 50, starterType: BakingTerms.levainStarter)
         case .other:
-            return RecipeItem(id: UUID(), category: category, tag: .other, name: BakingTerms.custom, weight: 20)
+            return RecipeItem(id: UUID(), category: category, tag: .other, name: BakingTerms.custom, weight: 20, waterContentPct: 0)
         case .basic:
             switch tag ?? .water {
             case .egg:
@@ -1452,7 +1545,7 @@ final class RecipeStore: ObservableObject {
             case .butter:
                 return RecipeItem(id: UUID(), category: category, tag: .butter, name: BakingTerms.butter, weight: 50)
             default:
-                return RecipeItem(id: UUID(), category: category, tag: .water, name: BakingTerms.water, weight: 50)
+                return RecipeItem(id: UUID(), category: category, tag: .water, name: BakingTerms.water, weight: 50, waterContentPct: 100)
             }
         }
     }

@@ -6,23 +6,12 @@ struct EggMiniRecipeEditor: View {
     let item: RecipeItem
     let canRemove: Bool
     @Binding var name: String
+    @State private var nameFieldFocused = false
 
     var body: some View {
         VStack(spacing: 0) {
             EggTableRow {
                 HStack(spacing: BakingSpace.sm) {
-                    BakingIconView(
-                        icon: BakingIcon.material(for: currentItem),
-                        size: BakingComponentMetrics.popupIconGlyph,
-                        color: currentItem.materialPalette.tint
-                    )
-                    .frame(
-                        width: BakingComponentMetrics.popupIconSurface,
-                        height: BakingComponentMetrics.popupIconSurface
-                    )
-                    .background(currentItem.materialPalette.iconSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
-
                     BakingLabel(text: BakingTerms.egg, role: .inputLabel)
                         .lineLimit(1)
 
@@ -47,11 +36,12 @@ struct EggMiniRecipeEditor: View {
                 BakingInlineTextField(
                     text: $name,
                     placeholder: BakingTerms.egg,
+                    isFocused: $nameFieldFocused,
                     color: UIColor(Color.brandText),
                     font: BakingTypography.popupInputValueUIFont,
                     textAlignment: .right
                 )
-                .bakingFittedInputField(.long)
+                .bakingFittedInputField(.long, kind: nameFieldFocused ? .focused : .field)
             }
 
             EggTableDivider()
@@ -133,7 +123,7 @@ private struct EggTypePicker: View {
             dropdownPresenter.present(
                 ActiveDropdownMenu(
                     frame: triggerFrame,
-                    width: 156,
+                    width: BakingComponentMetrics.popupTypeDropdownMenuWidth,
                     alignment: .leading,
                     reservesLeadingIconSlot: false,
                     items: RecipeStore.eggOptions.map { option in
@@ -146,7 +136,7 @@ private struct EggTypePicker: View {
         } label: {
             RectangularDropdownTrigger(
                 title: BakingTerms.eggDisplayName(selection),
-                width: 156
+                width: BakingComponentMetrics.popupTypeDropdownWidth
             )
         }
         .buttonStyle(.plain)
@@ -175,7 +165,7 @@ private struct EggWaterSummaryRow: View {
                 title: BakingTerms.formulaWaterContent,
                 value: BakingFormat.number(waterPercent, precision: 0),
                 unit: "%",
-                role: .success
+                isWater: true
             )
 
             Spacer(minLength: BakingSpace.sm)
@@ -184,7 +174,7 @@ private struct EggWaterSummaryRow: View {
                 title: BakingTerms.formulaWaterContribution,
                 value: BakingFormat.number(waterWeight, precision: 0),
                 unit: BakingTerms.unitGram,
-                role: .success
+                isWater: true
             )
         }
         .padding(.horizontal, BakingSpace.md)

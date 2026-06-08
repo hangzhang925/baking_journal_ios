@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import Photos
 
 enum RecipeWorkspaceStage: String, CaseIterable, Hashable, Identifiable {
     case preview
@@ -41,6 +43,9 @@ struct RecipeWorkspaceView: View {
     @State private var stage: RecipeWorkspaceStage
     @State private var pendingWorkspaceAction: WorkspaceConfirmationAction?
     @State private var showingWorkspaceActions = false
+    @State private var showingTextTutorial = false
+    @State private var exportError: String?
+    @State private var exportSuccessMessage: String?
 
     init(initialStage: RecipeWorkspaceStage = .formula) {
         _stage = State(initialValue: initialStage)
@@ -76,6 +81,29 @@ struct RecipeWorkspaceView: View {
             if let pendingWorkspaceAction {
                 Text(pendingWorkspaceAction.message(recipeName: store.currentRecipeDisplayName))
             }
+        }
+        .sheet(isPresented: $showingTextTutorial) {
+            RecipePreviewTextTutorialSheet(text: previewShareContent.textTutorial)
+        }
+        .alert(BakingTerms.recipePreviewExportFailed, isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button(BakingTerms.ok, role: .cancel) {
+                exportError = nil
+            }
+        } message: {
+            Text(exportError ?? "")
+        }
+        .alert(BakingTerms.recipePreviewSaveImageSucceeded, isPresented: Binding(
+            get: { exportSuccessMessage != nil },
+            set: { if !$0 { exportSuccessMessage = nil } }
+        )) {
+            Button(BakingTerms.ok, role: .cancel) {
+                exportSuccessMessage = nil
+            }
+        } message: {
+            Text(exportSuccessMessage ?? "")
         }
     }
 
@@ -115,7 +143,23 @@ struct RecipeWorkspaceView: View {
                     .buttonStyle(BakingPressFeedbackButtonStyle())
                     .accessibilityLabel(BakingTerms.moreActions)
                     .popover(isPresented: $showingWorkspaceActions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                        BakingDropdownPopover(width: 164) {
+                        BakingDropdownPopover(width: 188) {
+                            workspaceDirectActionRow(
+                                title: BakingTerms.saveAsImage,
+                                icon: .save,
+                                iconColor: .brandPrimary
+                            ) {
+                                saveLongImage()
+                            }
+
+                            workspaceDirectActionRow(
+                                title: BakingTerms.generateTextTutorial,
+                                icon: .copy,
+                                iconColor: .brandText
+                            ) {
+                                showingTextTutorial = true
+                            }
+
                             workspaceActionRow(
                                 action: store.isReadyToBake ? .startBake : .reviewBeforeBake,
                                 icon: .bakes,
@@ -161,6 +205,32 @@ struct RecipeWorkspaceView: View {
         return store.savedRecipes.first { $0.id == currentRecipeID }
     }
 
+    private var previewShareContent: RecipePreviewShareContent {
+        RecipePreviewShareContent(store: store)
+    }
+
+    private func workspaceDirectActionRow(
+        title: String,
+        icon: BakingIcon,
+        iconColor: Color,
+        foreground: Color = .brandText,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            showingWorkspaceActions = false
+            action()
+        } label: {
+            BakingDropdownRow(title: title, foreground: foreground) {
+                BakingIconView(
+                    icon: icon,
+                    size: BakingTouchTarget.dropdownIconGlyph,
+                    color: iconColor
+                )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     private func workspaceActionRow(
         action: WorkspaceConfirmationAction,
         icon: BakingIcon,
@@ -199,6 +269,49 @@ struct RecipeWorkspaceView: View {
                 store.deleteRecipe(currentRecipe)
             }
             navigationController.popToHome()
+        }
+    }
+
+    private func saveLongImage() {
+        guard let image = previewShareContent.renderLongImage() else {
+            exportError = BakingTerms.recipePreviewExportRenderFailed
+            return
+        }
+        saveImageToPhotoLibrary(image)
+    }
+
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
+        switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
+        case .authorized, .limited:
+            performPhotoLibrarySave(image)
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                Task { @MainActor in
+                    if status == .authorized || status == .limited {
+                        performPhotoLibrarySave(image)
+                    } else {
+                        exportError = BakingTerms.recipePreviewPhotoAccessDenied
+                    }
+                }
+            }
+        case .denied, .restricted:
+            exportError = BakingTerms.recipePreviewPhotoAccessDenied
+        @unknown default:
+            exportError = BakingTerms.recipePreviewPhotoAccessDenied
+        }
+    }
+
+    private func performPhotoLibrarySave(_ image: UIImage) {
+        PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.creationRequestForAsset(from: image)
+        } completionHandler: { success, error in
+            Task { @MainActor in
+                if success {
+                    exportSuccessMessage = BakingTerms.recipePreviewSaveImageSucceededMessage
+                } else {
+                    exportError = error?.localizedDescription ?? BakingTerms.recipePreviewSaveImageFailed
+                }
+            }
         }
     }
 }

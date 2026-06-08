@@ -184,11 +184,6 @@ struct BakeHistoryRow: View {
                     .foregroundStyle(Color.brandText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
-
-                Text(stepCountText)
-                    .font(BakingTypography.rowMeta.monospacedDigit())
-                    .foregroundStyle(Color.brandSecondaryText)
-                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -221,10 +216,6 @@ struct BakeHistoryRow: View {
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.vertical, BakingSpace.sm)
         .contentShape(Rectangle())
-    }
-
-    private var stepCountText: String {
-        BakingTerms.recipeMetadataLine(BakingTerms.stepCount, BakingFormat.number(Double(record.stepCount), precision: 0))
     }
 }
 

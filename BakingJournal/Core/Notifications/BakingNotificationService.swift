@@ -8,11 +8,14 @@ struct BakingNotificationID: Hashable, RawRepresentable {
 
 enum BakingNotificationScope {
     case cookTimer
+    case starterReminder
 
     var identifierPrefix: String {
         switch self {
         case .cookTimer:
             return "cook.timer."
+        case .starterReminder:
+            return "starter.reminder."
         }
     }
 }
@@ -30,11 +33,20 @@ enum BakingNotificationEvent {
         stepName: String,
         fireDate: Date
     )
+    case starterFeedingReminder(
+        profileId: UUID,
+        starterName: String,
+        fireDate: Date,
+        repeatsDaily: Bool
+    )
 
     var id: BakingNotificationID {
         switch self {
         case .cookTimerFinished(_, let stepId, _, _):
             return BakingNotificationID(rawValue: "\(BakingNotificationScope.cookTimer.identifierPrefix)\(stepId.uuidString)")
+        case .starterFeedingReminder(let profileId, _, let fireDate, let repeatsDaily):
+            let suffix = repeatsDaily ? "daily" : String(Int(fireDate.timeIntervalSince1970))
+            return BakingNotificationID(rawValue: "\(BakingNotificationScope.starterReminder.identifierPrefix)\(profileId.uuidString).\(suffix)")
         }
     }
 
@@ -42,6 +54,8 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished:
             return .cookTimer
+        case .starterFeedingReminder:
+            return .starterReminder
         }
     }
 
@@ -49,6 +63,8 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished:
             return BakingTerms.cookTimerFinishedNotificationTitle
+        case .starterFeedingReminder:
+            return BakingTerms.starterFeedingReminderNotificationTitle
         }
     }
 
@@ -56,6 +72,10 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished(_, _, let stepName, _):
             return BakingTerms.cookTimerFinishedNotificationBody(stepName: stepName)
+        case .starterFeedingReminder(_, let starterName, _, let repeatsDaily):
+            return repeatsDaily
+                ? BakingTerms.starterFeedingPastDueNotificationBody(starterName: starterName)
+                : BakingTerms.starterFeedingReminderNotificationBody(starterName: starterName)
         }
     }
 
@@ -63,6 +83,17 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished(_, _, _, let fireDate):
             return fireDate
+        case .starterFeedingReminder(_, _, let fireDate, _):
+            return fireDate
+        }
+    }
+
+    var repeatsDaily: Bool {
+        switch self {
+        case .cookTimerFinished:
+            return false
+        case .starterFeedingReminder(_, _, _, let repeatsDaily):
+            return repeatsDaily
         }
     }
 
@@ -74,6 +105,13 @@ enum BakingNotificationEvent {
                 "recipeName": recipeName,
                 "stepId": stepId.uuidString,
                 "stepName": stepName
+            ]
+        case .starterFeedingReminder(let profileId, let starterName, _, let repeatsDaily):
+            return [
+                "event": "starterFeedingReminder",
+                "profileId": profileId.uuidString,
+                "starterName": starterName,
+                "repeatsDaily": repeatsDaily
             ]
         }
     }
@@ -166,8 +204,15 @@ final class BakingNotificationService: NSObject, ObservableObject, BakingNotific
         content.sound = .default
         content.userInfo = event.userInfo
 
-        let interval = max(1, event.fireDate.timeIntervalSinceNow)
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+        let trigger: UNNotificationTrigger
+        if event.repeatsDaily {
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.hour, .minute], from: event.fireDate)
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        } else {
+            let interval = max(1, event.fireDate.timeIntervalSinceNow)
+            trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+        }
         let request = UNNotificationRequest(identifier: event.id.rawValue, content: content, trigger: trigger)
 
         do {
