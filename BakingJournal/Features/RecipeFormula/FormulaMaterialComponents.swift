@@ -111,8 +111,7 @@ struct AddItemControl: View {
 }
 
 struct FormulaItemDisplayRow: View {
-    static let iconColumnWidth: CGFloat = 40
-    static let separatorLeadingInset: CGFloat = BakingSpace.sm + iconColumnWidth + BakingSpace.lg
+    static let separatorLeadingInset: CGFloat = BakingSpace.sm
     static let percentColumnWidth: CGFloat = 54
     static let weightValueWidth: CGFloat = 48
     static let weightUnitWidth: CGFloat = 14
@@ -133,8 +132,6 @@ struct FormulaItemDisplayRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.lg) {
-            iconBlock
-
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(currentItem.name)
@@ -235,7 +232,7 @@ struct FormulaItemDisplayRow: View {
         } label: {
             BakingSystemIconButtonLabel(
                 systemImage: "trash",
-                tint: canDelete ? .brandPrimary : .brandSecondaryText.opacity(0.45),
+                tint: canDelete ? BakingComponentTheme.action(role: .destructive).foreground : .brandSecondaryText.opacity(0.45),
                 visualSize: BakingTouchTarget.secondaryActionVisual,
                 font: .caption.weight(.semibold)
             )
@@ -243,14 +240,6 @@ struct FormulaItemDisplayRow: View {
         .buttonStyle(BakingPressFeedbackButtonStyle())
         .disabled(!canDelete)
         .accessibilityLabel(BakingTerms.formulaDeleteMaterial)
-    }
-
-    private var iconBlock: some View {
-        BakingIconView(icon: BakingIcon.material(for: currentItem), size: BakingTouchTarget.inlineIconGlyph, color: itemTint)
-            .frame(width: BakingTouchTarget.inlineIconSurface, height: BakingTouchTarget.inlineIconSurface)
-            .background(iconBackground)
-            .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
-            .frame(width: Self.iconColumnWidth, alignment: .center)
     }
 
     private var currentItem: RecipeItem {
@@ -263,14 +252,6 @@ struct FormulaItemDisplayRow: View {
 
     private var isPureWaterItem: Bool {
         currentItem.tag == .water
-    }
-
-    private var itemTint: Color {
-        currentItem.materialPalette.tint
-    }
-
-    private var iconBackground: Color {
-        currentItem.materialPalette.iconSurface
     }
 
     private var rowBackground: Color {
@@ -299,9 +280,6 @@ struct FormulaIngredientTableHeader: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.lg) {
-            Color.clear
-                .frame(width: FormulaItemDisplayRow.iconColumnWidth, height: 1)
-
             Text(BakingTerms.formulaTableIngredient)
                 .bakingLabelStyle(.tableHeader)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -598,7 +576,7 @@ struct FormulaItemCard: View {
                             } label: {
                                 BakingSystemIconButtonLabel(
                                     systemImage: "trash",
-                                    tint: .brandPrimary,
+                                    tint: BakingComponentTheme.action(role: .destructive).foreground,
                                     background: BakingSurfaceTheme.theme(for: .destructive).background,
                                     shape: .rounded(BakingRadius.card)
                                 )
@@ -768,11 +746,11 @@ private struct OtherMiniRecipeEditor: View {
 
             BakingPercentageField(
                 value: waterContentBinding,
-                precision: 0,
+                precision: 1,
                 font: .caption,
-                color: waterContentPct > 0 ? .waterText : .brandSecondaryText,
-                fieldWidth: 30,
-                totalWidth: 64,
+                color: .brandText,
+                fieldWidth: 40,
+                totalWidth: 74,
                 isWaterStyle: true,
                 height: 32
             )
@@ -790,7 +768,7 @@ private struct OtherMiniRecipeEditor: View {
                 } label: {
                     BakingSystemIconButtonLabel(
                         systemImage: "trash",
-                        tint: .brandPrimary,
+                        tint: BakingComponentTheme.action(role: .destructive).foreground,
                         background: BakingSurfaceTheme.theme(for: .destructive).background,
                         shape: .rounded(BakingRadius.card)
                     )

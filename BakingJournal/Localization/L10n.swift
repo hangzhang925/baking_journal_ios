@@ -109,6 +109,7 @@ enum BakingTerms {
     static var share: String { L10n.tr("common.share", default: "分享") }
     static var edit: String { L10n.tr("common.edit", default: "编辑") }
     static var copy: String { L10n.tr("common.copy", default: "复制") }
+    static var copiedToClipboard: String { L10n.tr("common.copied_to_clipboard", default: "已复制") }
     static var delete: String { L10n.tr("common.delete", default: "删除") }
     static var cancel: String { L10n.tr("common.cancel", default: "取消") }
     static var ok: String { L10n.tr("common.ok", default: "好") }
@@ -135,6 +136,9 @@ enum BakingTerms {
     static var startBake: String { L10n.tr("home.action.start_bake", default: "开始制作") }
     static var viewIncompleteSteps: String { L10n.tr("home.action.view_incomplete_steps", default: "查看未完成步骤") }
     static var exportLongImage: String { L10n.tr("home.action.export_long_image", default: "导出长图") }
+    static var saveLongImage: String { L10n.tr("home.action.save_long_image", default: "保存长图") }
+    static var saveAsImage: String { L10n.tr("home.action.save_as_image", default: "保存为图片") }
+    static var generateTextTutorial: String { L10n.tr("home.action.generate_text_tutorial", default: "生成文字教程") }
     static var bakeAction: String { L10n.tr("home.action.bake", default: "烘焙") }
     static var activeBakeSection: String { L10n.tr("home.section.active_bake", default: "正在制作") }
     static var bakeRecordOngoing: String { L10n.tr("bake_record.status.ongoing", default: "正在制作") }
@@ -308,7 +312,11 @@ enum BakingTerms {
     static var cookRestartTimer: String { L10n.tr("cook.action.restart_timer", default: "重新开始计时") }
     static var cookPreviousStep: String { L10n.tr("cook.action.previous_step", default: "上一步") }
     static var cookNextStep: String { L10n.tr("cook.action.next_step", default: "下一步") }
+    static var cookReturnToCurrentStep: String { L10n.tr("cook.action.return_to_current_step", default: "回到当前步骤") }
+    static var cookCompleteStep: String { L10n.tr("cook.action.complete_step", default: "完成步骤") }
     static var cookFinish: String { L10n.tr("cook.action.finish", default: "完成") }
+    static var cookFinishBake: String { L10n.tr("cook.action.finish_bake", default: "完成制作") }
+    static var cookStepCompleted: String { L10n.tr("cook.status.step_completed", default: "已完成") }
     static var cookCompletedTitle: String { L10n.tr("cook.completed.title", default: "制作完成") }
     static var cookCompletedBody: String { L10n.tr("cook.completed.body", default: "这次流程已经完整跑完，可以顺手记一点复盘。") }
     static var cookActualTime: String { L10n.tr("cook.summary.actual_time", default: "实际耗时") }
@@ -319,6 +327,10 @@ enum BakingTerms {
 
     static func cookStepProgress(stepIndex: Int, totalSteps: Int) -> String {
         L10n.format("cook.label.step_progress", default: "步骤 %d/%d", stepIndex, totalSteps)
+    }
+
+    static func cookCurrentStepProgress(stepIndex: Int, totalSteps: Int) -> String {
+        L10n.format("cook.label.current_step_progress", default: "当前 · 步骤 %d/%d", stepIndex, totalSteps)
     }
 
     static func cookIngredientProgress(checked: Int, total: Int) -> String {
@@ -343,6 +355,18 @@ enum BakingTerms {
 
     static func cookTimerFinishedNotificationBody(stepName: String) -> String {
         L10n.format("notification.cook_timer.finished.body", default: "「%@」时间到了。", stepName)
+    }
+
+    static var starterFeedingReminderNotificationTitle: String {
+        L10n.tr("notification.starter_feeding.title", default: "酵种喂养提醒")
+    }
+
+    static func starterFeedingReminderNotificationBody(starterName: String) -> String {
+        L10n.format("notification.starter_feeding.body", default: "今天记得喂养「%@」。", starterName)
+    }
+
+    static func starterFeedingPastDueNotificationBody(starterName: String) -> String {
+        L10n.format("notification.starter_feeding.past_due.body", default: "「%@」已经超过喂养日期，今天早上记得处理。", starterName)
     }
 
     static var kitchenTimerTitle: String { L10n.tr("kitchen_timer.title", default: "厨房计时器") }
@@ -516,6 +540,17 @@ enum BakingTerms {
     static var stepsNotReadyTooltipTitle: String { L10n.tr("steps.tooltip.not_ready.title", default: "还不能烘焙") }
     static var stepsDeleteConfirmationTitle: String { L10n.tr("steps.dialog.delete.title", default: "删除这个步骤？") }
     static var stepsDeleteConfirmationMessage: String { L10n.tr("steps.dialog.delete.message", default: "删除后，这一步的材料分配也会移除。") }
+    static var stepsFieldCategory: String { L10n.tr("steps.field.category", default: "分类") }
+    static var stepsCategoryMakeStarter: String { L10n.tr("steps.category.make_starter", default: "制作种面") }
+    static var stepsCategoryPrepWork: String { L10n.tr("steps.category.prep_work", default: "准备工作") }
+    static var stepsCategoryMixing: String { L10n.tr("steps.category.mixing", default: "打面") }
+    static var stepsCategoryFermentation: String { L10n.tr("steps.category.fermentation", default: "发酵") }
+    static var stepsCategoryBaking: String { L10n.tr("steps.category.baking", default: "烘焙") }
+    static var stepsCategoryShaping: String { L10n.tr("steps.category.shaping", default: "整形") }
+    static var stepsCategoryProofing: String { L10n.tr("steps.category.proofing", default: "醒发") }
+    static var stepsStarterPickerSection: String { L10n.tr("steps.starter_picker.section", default: "种面") }
+    static var stepsStarterPickerEmpty: String { L10n.tr("steps.starter_picker.empty", default: "配方里还没有种面。") }
+    static var stepsStarterPickerAccessibility: String { L10n.tr("steps.starter_picker.accessibility", default: "选择种面") }
     static var stepsFieldName: String { L10n.tr("steps.field.name", default: "名称") }
     static var stepsFieldType: String { L10n.tr("steps.field.type", default: "类型") }
     static var stepsFieldDuration: String { L10n.tr("steps.field.duration", default: "耗时") }
@@ -585,6 +620,24 @@ enum BakingTerms {
     }
     static var recipePreviewExportRenderFailed: String {
         L10n.tr("recipe_preview.alert.render_failed", default: "暂时没能生成长图，请再试一次。")
+    }
+    static var recipePreviewSaveImageSucceeded: String {
+        L10n.tr("recipe_preview.alert.save_image_succeeded", default: "已保存到照片")
+    }
+    static var recipePreviewSaveImageSucceededMessage: String {
+        L10n.tr("recipe_preview.alert.save_image_succeeded_message", default: "这张配方长图已经保存到照片。")
+    }
+    static var recipePreviewSaveImageFailed: String {
+        L10n.tr("recipe_preview.alert.save_image_failed", default: "暂时没能保存长图，请再试一次。")
+    }
+    static var recipePreviewPhotoAccessDenied: String {
+        L10n.tr("recipe_preview.alert.photo_access_denied", default: "需要允许添加照片，才能把长图保存到相册。")
+    }
+    static var textTutorialTitle: String {
+        L10n.tr("recipe_preview.text_tutorial.title", default: "文字教程")
+    }
+    static var copyTextTutorial: String {
+        L10n.tr("recipe_preview.text_tutorial.copy", default: "复制文字教程")
     }
     static var recipePreviewIngredients: String {
         L10n.tr("recipe_preview.section.ingredients", default: "材料")

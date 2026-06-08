@@ -5,6 +5,7 @@ struct StarterMiniRecipeEditor: View {
     @EnvironmentObject private var store: RecipeStore
     let item: RecipeItem
     let canRemove: Bool
+    @State private var nameFieldFocused = false
 
     var body: some View {
         VStack(spacing: BakingSpace.md) {
@@ -18,18 +19,6 @@ struct StarterMiniRecipeEditor: View {
         VStack(spacing: 0) {
             StarterTableRow {
                 HStack(spacing: BakingSpace.sm) {
-                    BakingIconView(
-                        icon: BakingIcon.material(for: currentItem),
-                        size: BakingComponentMetrics.popupIconGlyph,
-                        color: currentItem.materialPalette.tint
-                    )
-                    .frame(
-                        width: BakingComponentMetrics.popupIconSurface,
-                        height: BakingComponentMetrics.popupIconSurface
-                    )
-                    .background(currentItem.materialPalette.iconSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.inlineIconCornerRadius, style: .continuous))
-
                     BakingLabel(text: currentItem.tag.label, role: .inputLabel)
                         .lineLimit(1)
 
@@ -59,11 +48,12 @@ struct StarterMiniRecipeEditor: View {
                         set: { updateName($0) }
                     ),
                     placeholder: currentItem.tag.label,
+                    isFocused: $nameFieldFocused,
                     color: UIColor(Color.brandText),
                     font: BakingTypography.popupInputValueUIFont,
                     textAlignment: .right
                 )
-                .bakingFittedInputField(.long)
+                .bakingFittedInputField(.long, kind: nameFieldFocused ? .focused : .field)
             }
         }
         .bakingCard()
@@ -415,17 +405,21 @@ private struct StarterTypePicker: View {
             dropdownPresenter.present(
                 ActiveDropdownMenu(
                     frame: triggerFrame,
-                    width: 156,
+                    width: BakingComponentMetrics.popupTypeDropdownMenuWidth,
                     alignment: .leading,
+                    reservesLeadingIconSlot: false,
                     items: RecipeStore.starterOptions.map { option in
-                        DropdownMenuItem(title: BakingTerms.starterDisplayName(option), icon: .starter, isSelected: option == selection) {
+                        DropdownMenuItem(title: BakingTerms.starterDisplayName(option), isSelected: option == selection) {
                             selection = option
                         }
                     }
                 )
             )
         } label: {
-            RectangularDropdownTrigger(title: BakingTerms.starterDisplayName(selection))
+            RectangularDropdownTrigger(
+                title: BakingTerms.starterDisplayName(selection),
+                width: BakingComponentMetrics.popupTypeDropdownWidth
+            )
         }
         .buttonStyle(.plain)
         .zIndex(3)

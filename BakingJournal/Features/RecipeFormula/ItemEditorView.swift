@@ -37,6 +37,7 @@ struct RecipeItemEditorRouteView: View {
 
 struct ItemEditorSheetView: View {
     let item: RecipeItem
+    var isScrollEnabled = true
     var onDismiss: () -> Void
     var onContentHeightChange: (CGFloat) -> Void = { _ in }
     @StateObject private var dropdownPresenter = DropdownPresenter()
@@ -58,7 +59,11 @@ struct ItemEditorSheetView: View {
                     }
                 )
 
-                ItemEditorView(item: item, onContentHeightChange: onContentHeightChange)
+                ItemEditorView(
+                    item: item,
+                    isScrollEnabled: isScrollEnabled,
+                    onContentHeightChange: onContentHeightChange
+                )
                     .id(item.id)
             }
 
@@ -74,7 +79,8 @@ struct ItemEditorSheetView: View {
 
     private func dropdownOverlay(_ menu: ActiveDropdownMenu) -> some View {
         GeometryReader { proxy in
-            let layout = dropdownLayout(for: menu, in: proxy.size)
+            let width = dropdownWidth(for: menu, in: proxy.size)
+            let layout = dropdownLayout(for: menu, width: width, in: proxy.size)
 
             Color.clear
                 .contentShape(Rectangle())
@@ -82,7 +88,7 @@ struct ItemEditorSheetView: View {
                     dropdownPresenter.dismiss()
                 }
 
-            BakingDropdownPopover(width: menu.width) {
+            BakingDropdownPopover(width: width) {
                 ForEach(menu.items) { item in
                     Button {
                         dropdownPresenter.dismiss()
@@ -97,28 +103,39 @@ struct ItemEditorSheetView: View {
                                 }
                             }
                         } else {
-                            BakingDropdownTextRow(title: item.title, isSelected: item.isSelected)
+                            BakingDropdownRow(
+                                title: item.title,
+                                isSelected: item.isSelected,
+                                showsLeadingSlot: false
+                            ) {
+                                EmptyView()
+                            }
                         }
                     }
                     .buttonStyle(.plain)
                 }
             }
             .position(
-                x: layout.origin.x + menu.width / 2,
+                x: layout.origin.x + width / 2,
                 y: layout.origin.y + layout.height / 2
             )
             .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .topLeading)))
         }
     }
 
-    private func dropdownLayout(for menu: ActiveDropdownMenu, in containerSize: CGSize) -> (origin: CGPoint, height: CGFloat) {
+    private func dropdownWidth(for menu: ActiveDropdownMenu, in containerSize: CGSize) -> CGFloat {
+        min(menu.width, max(0, containerSize.width - 16))
+    }
+
+    private func dropdownLayout(for menu: ActiveDropdownMenu, width: CGFloat, in containerSize: CGSize) -> (origin: CGPoint, height: CGFloat) {
         let rowHeight: CGFloat = 44
         let verticalPadding: CGFloat = 16
         let menuHeight = CGFloat(menu.items.count) * rowHeight + verticalPadding
         let horizontalInset: CGFloat = 8
         let verticalGap: CGFloat = 2
-        let rawX = menu.alignment == .trailing ? (menu.frame.maxX - menu.width) : menu.frame.minX
-        let x = min(max(horizontalInset, rawX), containerSize.width - menu.width - horizontalInset)
+        let rawX = menu.alignment == .trailing ? (menu.frame.maxX - width) : menu.frame.minX
+        let maxX = max(horizontalInset, containerSize.width - width - horizontalInset)
+        let x = min(max(horizontalInset, rawX), maxX)
 
         let availableBelow = containerSize.height - menu.frame.maxY
         let showAbove = availableBelow < menuHeight + 20 && menu.frame.minY > menuHeight + 20
@@ -130,38 +147,10 @@ struct ItemEditorSheetView: View {
     }
 }
 
-struct BakingDropdownTextRow: View {
-    let title: String
-    var isSelected = false
-
-    var body: some View {
-        HStack(spacing: BakingSpace.sm) {
-            Text(title)
-                .font(isSelected ? BakingTypography.appPrimaryText.weight(.bold) : BakingTypography.appPrimaryText)
-                .foregroundStyle(isSelected ? Color.brandPrimaryLight : Color.brandText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-
-            Spacer(minLength: 0)
-
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.brandPrimaryLight)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
-        .padding(.horizontal, BakingSpace.sm)
-        .padding(.vertical, BakingSpace.sm)
-        .background(isSelected ? Color.selectedSurface : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous))
-        .contentShape(Rectangle())
-    }
-}
-
 struct ItemEditorView: View {
     @EnvironmentObject private var store: RecipeStore
     let item: RecipeItem
+    var isScrollEnabled = true
     var onContentHeightChange: (CGFloat) -> Void = { _ in }
 
     var body: some View {
@@ -180,6 +169,8 @@ struct ItemEditorView: View {
         .onPreferenceChange(ItemEditorContentHeightPreferenceKey.self) { height in
             onContentHeightChange(height)
         }
+        .scrollDisabled(!isScrollEnabled)
+        .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
         .background(Color.brandBackground)
     }
@@ -249,10 +240,7 @@ private struct CompactItemEditorCard: View {
     private var stackedPopupEditor: some View {
         VStack(spacing: 0) {
             PopupIdentityTableRow(
-                categoryIcon: BakingIcon.material(for: currentItem),
                 categoryTitle: currentItem.tag.label,
-                itemTint: itemTint,
-                iconBackground: iconBackground,
                 attributeIcons: popupAttributeIcons
             )
 
@@ -273,22 +261,24 @@ private struct CompactItemEditorCard: View {
                 )
             )
 
-            PopupTableDivider()
+            if currentItem.category != .flour {
+                PopupTableDivider()
 
-            if currentItem.category == .flour {
-                PopupReadOnlyMetricCell(
-                    title: BakingTerms.formulaTablePercentage,
-                    value: BakingFormat.number(percent, precision: 1),
-                    unit: "%",
-                    valueColor: .brandText
-                )
-            } else {
                 PopupPercentMetricCell(
                     title: BakingTerms.formulaTablePercentage,
                     value: Binding(
                         get: { percent },
                         set: { store.updateItemPercent(currentItem, percent: $0) }
                     )
+                )
+            }
+
+            if showsWaterContentEditor {
+                PopupTableDivider()
+
+                PopupPercentMetricCell(
+                    title: BakingTerms.formulaWaterContent,
+                    value: waterContentBinding
                 )
             }
         }
@@ -466,6 +456,17 @@ private struct CompactItemEditorCard: View {
         currentItem.tag == .water
     }
 
+    private var showsWaterContentEditor: Bool {
+        currentItem.tag == .water || currentItem.category == .other
+    }
+
+    private var waterContentPct: Double {
+        if let waterContentPct = currentItem.waterContentPct {
+            return waterContentPct
+        }
+        return currentItem.tag == .water ? 100 : 0
+    }
+
     private var itemTint: Color {
         currentItem.materialPalette.tint
     }
@@ -509,6 +510,17 @@ private struct CompactItemEditorCard: View {
             }
         )
     }
+
+    private var waterContentBinding: Binding<Double> {
+        Binding(
+            get: { waterContentPct },
+            set: { value in
+                var next = currentItem
+                next.waterContentPct = min(max(0, value), 100)
+                store.updateItem(next)
+            }
+        )
+    }
 }
 
 struct PopupAttributeIconStyle {
@@ -518,18 +530,13 @@ struct PopupAttributeIconStyle {
 }
 
 struct PopupIdentityTableRow: View {
-    let categoryIcon: BakingIcon
     let categoryTitle: String
-    let itemTint: Color
-    let iconBackground: Color
     let attributeIcons: [PopupAttributeIconStyle]
 
     var body: some View {
         GeometryReader { proxy in
             HStack(spacing: 0) {
                 HStack(spacing: BakingSpace.sm) {
-                    PopupMainIcon(icon: categoryIcon, color: itemTint, background: iconBackground)
-
                     BakingLabel(text: categoryTitle, role: .inputLabel)
                         .lineLimit(1)
 
@@ -554,6 +561,7 @@ struct PopupIdentityTableRow: View {
 struct PopupNameTableRow: View {
     @Binding var text: String
     let placeholder: String
+    @State private var isFocused = false
 
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.sm) {
@@ -566,11 +574,12 @@ struct PopupNameTableRow: View {
             BakingInlineTextField(
                 text: $text,
                 placeholder: placeholder,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: BakingTypography.popupInputValueUIFont,
                 textAlignment: .right
             )
-            .bakingFittedInputField(.long)
+            .bakingFittedInputField(.long, kind: isFocused ? .focused : .field)
         }
         .padding(.horizontal, BakingSpace.md)
         .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
@@ -580,21 +589,20 @@ struct PopupNameTableRow: View {
 private struct PopupPercentMetricCell: View {
     let title: String
     @Binding var value: Double
+    var color: Color = .brandText
 
     var body: some View {
-        PopupMetricCell(title: title) {
-            BakingPercentageField(
-                value: $value,
-                maxValue: 100,
-                precision: 1,
-                font: BakingTypography.rowMeta,
-                valueFont: BakingTypography.popupNumericInputValue,
-                color: .brandText,
-                fieldWidth: 46,
-                totalWidth: BakingCompactInputFieldSize.short.width,
-                height: BakingComponentMetrics.compactInputFieldHeight
-            )
-        }
+        BakingPercentagePickerControl(
+            value: $value,
+            title: title,
+            maxValue: 100,
+            precision: 1,
+            tint: color,
+            surface: BakingSurface.fieldBackground
+        )
+        .padding(.horizontal, BakingSpace.md)
+        .padding(.vertical, BakingSpace.sm)
+        .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.popupInlinePercentageControlMinHeight, alignment: .leading)
     }
 }
 
@@ -655,12 +663,14 @@ struct PopupMetricCell<Content: View>: View {
 
 private struct PopupInlineWeightValue: View {
     @Binding var value: Double
+    @State private var isFocused = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 4) {
             BakingNumericTextField(
                 value: $value,
                 fractionDigits: 0...0,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: BakingTypography.popupNumericInputValueUIFont,
                 textAlignment: .right
@@ -672,7 +682,7 @@ private struct PopupInlineWeightValue: View {
                 .foregroundStyle(Color.brandSecondaryText)
                 .frame(height: BakingComponentMetrics.compactInputFieldHeight, alignment: .center)
         }
-        .bakingFittedInputField(.short)
+        .bakingFittedInputField(.short, kind: isFocused ? .focused : .field)
     }
 }
 
@@ -733,6 +743,7 @@ struct PopupAttributeIcon: View {
 private struct PopupNameInputRow: View {
     @Binding var text: String
     let placeholder: String
+    @State private var isFocused = false
 
     var body: some View {
         HStack(spacing: BakingSpace.sm) {
@@ -743,12 +754,13 @@ private struct PopupNameInputRow: View {
             BakingInlineTextField(
                 text: $text,
                 placeholder: placeholder,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: .systemFont(ofSize: 16, weight: .semibold)
             )
             .padding(.horizontal, BakingSpace.sm)
             .frame(width: BakingComponentMetrics.popupNameFieldWidth, height: BakingComponentMetrics.popupInputHeight, alignment: .leading)
-            .bakingSurface(.field)
+            .bakingSurface(isFocused ? .focused : .field)
         }
         .frame(width: BakingComponentMetrics.popupFormWidth, alignment: .leading)
     }
@@ -788,7 +800,7 @@ private struct PopupWeightField: View {
                 .lineLimit(1)
                 .frame(width: BakingComponentMetrics.popupLabelWidth, alignment: .leading)
 
-            popupNumberContent(
+            PopupNumberContent(
                 value: $value,
                 valueColor: Color.brandText,
                 unitColor: Color.brandSecondaryText
@@ -825,41 +837,47 @@ private struct PopupReadOnlyNumberField: View {
     }
 }
 
-private func popupNumberContent(
-    value: Binding<Double>,
-    valueColor: Color,
-    unitColor: Color
-) -> some View {
-    HStack(alignment: .center, spacing: BakingSpace.xs) {
-        BakingNumericTextField(
-            value: value,
-            fractionDigits: 0...0,
-            color: UIColor(valueColor),
-            font: .monospacedDigitSystemFont(ofSize: 16, weight: .semibold),
-            textAlignment: .right
-        )
-        .frame(width: BakingComponentMetrics.popupNumericFieldWidth - 32)
+private struct PopupNumberContent: View {
+    @Binding var value: Double
+    let valueColor: Color
+    let unitColor: Color
+    @State private var isFocused = false
 
-        Text(BakingTerms.unitGram)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(unitColor)
+    var body: some View {
+        HStack(alignment: .center, spacing: BakingSpace.xs) {
+            BakingNumericTextField(
+                value: $value,
+                fractionDigits: 0...0,
+                isFocused: $isFocused,
+                color: UIColor(valueColor),
+                font: .monospacedDigitSystemFont(ofSize: 16, weight: .semibold),
+                textAlignment: .right
+            )
+            .frame(width: BakingComponentMetrics.popupNumericFieldWidth - 32)
+
+            Text(BakingTerms.unitGram)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(unitColor)
+        }
+        .padding(.horizontal, BakingSpace.sm)
+        .frame(width: BakingComponentMetrics.popupNumericFieldWidth, height: BakingComponentMetrics.popupInputHeight, alignment: .trailing)
+        .bakingSurface(isFocused ? .focused : .field)
+        .contentShape(Rectangle())
     }
-    .padding(.horizontal, BakingSpace.sm)
-    .frame(width: BakingComponentMetrics.popupNumericFieldWidth, height: BakingComponentMetrics.popupInputHeight, alignment: .trailing)
-    .bakingSurface(.field)
-    .contentShape(Rectangle())
 }
 
 private struct ItemEditorPlainNameField: View {
     @Binding var text: String
     let placeholder: String
     let tint: Color
+    @State private var isFocused = false
 
     var body: some View {
         VStack(spacing: 3) {
             BakingInlineTextField(
                 text: $text,
                 placeholder: placeholder,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: .systemFont(ofSize: 15, weight: .semibold)
             )
@@ -867,7 +885,7 @@ private struct ItemEditorPlainNameField: View {
             .padding(.vertical, 5)
             .frame(width: 132, alignment: .leading)
             .frame(minHeight: 36)
-            .bakingFieldSurface()
+            .bakingSurface(isFocused ? .focused : .field)
         }
         .frame(width: 132, alignment: .leading)
     }
@@ -887,12 +905,14 @@ private struct ItemEditorReadOnlyNameLabel: View {
 
 private struct ItemEditorPercentField: View {
     @Binding var value: Double
+    @State private var isFocused = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             BakingNumericTextField(
                 value: $value,
                 fractionDigits: 0...0,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold),
                 textAlignment: .right
@@ -906,19 +926,21 @@ private struct ItemEditorPercentField: View {
         .frame(width: 58, alignment: .trailing)
         .frame(minHeight: BakingTouchTarget.secondaryActionVisual)
         .padding(.horizontal, 6)
-        .bakingFieldSurface()
+        .bakingSurface(isFocused ? .focused : .field)
         .contentShape(Rectangle())
     }
 }
 
 private struct ItemEditorWeightField: View {
     @Binding var value: Double
+    @State private var isFocused = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             BakingNumericTextField(
                 value: $value,
                 fractionDigits: 0...0,
+                isFocused: $isFocused,
                 color: UIColor(Color.brandText),
                 font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold),
                 textAlignment: .right
@@ -932,7 +954,7 @@ private struct ItemEditorWeightField: View {
         .frame(width: 76, alignment: .trailing)
         .frame(minHeight: BakingTouchTarget.secondaryActionVisual)
         .padding(.horizontal, 6)
-        .bakingFieldSurface()
+        .bakingSurface(isFocused ? .focused : .field)
         .contentShape(Rectangle())
     }
 }

@@ -9,6 +9,7 @@ struct StarterView: View {
     @State private var starterSearchText = ""
     @State private var starterPendingDeletion: StarterProfile?
     @State private var showingDeleteStarterConfirmation = false
+    @State private var starterNameFieldFocused = false
 
     var body: some View {
         BakingLibraryListShell(
@@ -148,7 +149,8 @@ struct StarterDetailRouteView: View {
     @EnvironmentObject private var navigationController: AppNavigationController
     let starterID: UUID
     @State private var showingFedToast = false
-    @State private var showingRatioPicker = false
+    @State private var showingFeedingPopup = false
+    @State private var starterNameFieldFocused = false
     @State private var fedFeedbackTask: Task<Void, Never>?
 
     var body: some View {
@@ -168,9 +170,8 @@ struct StarterDetailRouteView: View {
                 VStack(spacing: BakingLayout.cardStackSpacing) {
                     nameSection
                     weightSection
-                    feedingSection
-                    reminderSection
                     lastFedSection
+                    reminderSection
                 }
                 .padding(.horizontal, BakingLayout.screenHorizontalInset)
                 .padding(.top, BakingLayout.contentTopInset)
@@ -182,6 +183,11 @@ struct StarterDetailRouteView: View {
         .toolbar(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
             feedBar
+        }
+        .overlay {
+            if showingFeedingPopup {
+                feedingPopup
+            }
         }
         .overlay(alignment: .bottom) {
             if showingFedToast {
@@ -205,24 +211,20 @@ struct StarterDetailRouteView: View {
     }
 
     private var nameSection: some View {
-        starterSection(BakingTerms.starterSectionName) {
-            HStack(spacing: BakingSpace.sm) {
-                BakingMaterialIconBadge(icon: .starter)
-
+        VStack(spacing: 0) {
+            StarterMetricRow(title: BakingTerms.starterSectionName) {
                 BakingInlineTextField(
                     text: profileBinding(\.name),
                     placeholder: BakingTerms.starterProfileDefaultName,
+                    isFocused: $starterNameFieldFocused,
                     color: UIColor(Color.brandText),
                     font: BakingTypography.popupInputValueUIFont,
-                    textAlignment: .left
+                    textAlignment: .right
                 )
-                .padding(.horizontal, BakingSpace.sm)
-                .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.compactInputFieldHeight, alignment: .leading)
-                .bakingSurface(.field)
+                .bakingFittedInputField(.long, kind: starterNameFieldFocused ? .focused : .field)
             }
-            .padding(.horizontal, BakingSpace.md)
-            .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
         }
+        .bakingCard()
     }
 
     private var weightSection: some View {
@@ -241,54 +243,6 @@ struct StarterDetailRouteView: View {
 
             StarterMetricRow(title: BakingTerms.starterFinalWeight) {
                 StarterReadOnlyField(value: store.starterFinalWeight(for: profile))
-            }
-        }
-    }
-
-    private var feedingSection: some View {
-        starterSection(BakingTerms.starterSectionFeedingMethod) {
-            StarterMetricRow(title: BakingTerms.starterRatio) {
-                Button {
-                    showingRatioPicker = true
-                } label: {
-                    RectangularDropdownTrigger(
-                        title: profile.feedingRatio.label,
-                        width: BakingCompactInputFieldSize.short.width,
-                        textAlignment: .trailing,
-                        font: BakingTypography.appPrimaryText
-                    )
-                }
-                .buttonStyle(.plain)
-                .popover(isPresented: $showingRatioPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                    BakingDropdownPopover(width: 156) {
-                        ForEach(StarterFeedingRatio.allCases) { ratio in
-                            Button {
-                                profileBinding(\.feedingRatio).wrappedValue = ratio
-                                showingRatioPicker = false
-                            } label: {
-                                BakingDropdownRow(
-                                    title: ratio.label,
-                                    isSelected: ratio == profile.feedingRatio
-                                ) {
-                                    Color.clear
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-
-            PopupTableDivider()
-
-            StarterMetricRow(title: BakingTerms.starterFeedFlour) {
-                StarterReadOnlyField(value: store.starterFeedFlourWeight(for: profile))
-            }
-
-            PopupTableDivider()
-
-            StarterMetricRow(title: BakingTerms.starterFeedWater) {
-                StarterReadOnlyField(value: store.starterFeedWaterWeight(for: profile), color: .waterText)
             }
         }
     }
@@ -312,26 +266,6 @@ struct StarterDetailRouteView: View {
                     .labelsHidden()
                     .tint(.brandPrimary)
                 }
-
-                PopupTableDivider()
-
-                VStack(alignment: .leading, spacing: BakingSpace.sm) {
-                    BakingLabel(text: BakingTerms.starterReminderTimes, role: .popupRowLabel)
-
-                    HStack(spacing: BakingSpace.sm) {
-                        ForEach(RecipeStore.starterReminderTimeLabels, id: \.self) { time in
-                            Text(time)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.brandPrimary)
-                                .padding(.horizontal, BakingSpace.md)
-                                .padding(.vertical, BakingSpace.xs)
-                                .bakingSurface(.inputSurface)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, BakingSpace.md)
-                .padding(.vertical, BakingSpace.sm)
             }
         }
     }
@@ -339,7 +273,7 @@ struct StarterDetailRouteView: View {
     private var lastFedSection: some View {
         starterSection(BakingTerms.starterSectionLastFed) {
             StarterMetricRow(title: BakingTerms.starterLastFed) {
-                Text(BakingFormat.starterTimestamp(profile.lastFedAt))
+                Text(BakingFormat.starterDate(profile.lastFedAt))
                     .font(BakingTypography.tableNumber)
                     .foregroundStyle(Color.brandText)
                     .lineLimit(1)
@@ -349,14 +283,15 @@ struct StarterDetailRouteView: View {
     }
 
     private var feedBar: some View {
-        BakingSlideActionBar(
-            icon: .complete,
+        BakingActionButton(
+            title: BakingTerms.starterFeedTitle,
             accessibilityLabel: BakingTerms.starterMarkFed,
-            direction: .trailingToLeading,
-            tint: .brandPrimary
+            icon: .complete,
+            role: .primary
         ) {
-            store.markStarterFed(profile)
-            showFedToast()
+            withAnimation(BakingMotion.standard) {
+                showingFeedingPopup = true
+            }
         }
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.top, BakingSpace.md)
@@ -366,6 +301,30 @@ struct StarterDetailRouteView: View {
             Rectangle()
                 .fill(BakingSurfaceTheme.separator)
                 .frame(height: 0.6)
+            }
+    }
+
+    private var feedingPopup: some View {
+        BakingCenteredPopupEditHost(
+            identity: profile.id,
+            defaultHeight: BakingCenteredPopupMetrics.defaultHeight(for: .compact)
+        ) {
+            showingFeedingPopup = false
+        } content: { isScrollEnabled, onContentHeightChange in
+            StarterFeedingPopupView(
+                profile: profile,
+                isScrollEnabled: isScrollEnabled,
+                onDismiss: {
+                    showingFeedingPopup = false
+                },
+                onFeed: {
+                    store.markStarterFed(profile)
+                    showingFeedingPopup = false
+                    showFedToast()
+                },
+                onContentHeightChange: onContentHeightChange
+            )
+            .environmentObject(store)
         }
     }
 
@@ -378,10 +337,9 @@ struct StarterDetailRouteView: View {
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: BakingSpace.sm) {
-            BakingLabel(text: title, role: .sectionHeader)
-                .padding(.horizontal, BakingSpace.xxl)
-
+        VStack(alignment: .leading, spacing: 0) {
+            BakingTableHeader(title: title)
+            PopupTableDivider()
             VStack(spacing: 0) {
                 content()
             }
@@ -425,6 +383,141 @@ struct StarterDetailRouteView: View {
                 showingFedToast = false
             }
         }
+    }
+}
+
+private struct StarterFeedingPopupView: View {
+    @EnvironmentObject private var store: RecipeStore
+    let profile: StarterProfile
+    var isScrollEnabled = true
+    var onDismiss: () -> Void
+    var onFeed: () -> Void
+    var onContentHeightChange: (CGFloat) -> Void = { _ in }
+    @State private var showingRatioPicker = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            BakingTopActionRow(
+                trailing: {
+                    BakingSystemIconButton(
+                        systemImage: "xmark",
+                        accessibilityLabel: BakingTerms.done,
+                        role: .secondary,
+                        size: .secondary,
+                        font: .caption.weight(.bold)
+                    ) {
+                        onDismiss()
+                    }
+                }
+            )
+
+            ScrollView {
+                VStack(spacing: BakingSpace.xxl) {
+                    feedingTable
+
+                    BakingActionButton(
+                        title: BakingTerms.starterFeedTitle,
+                        accessibilityLabel: BakingTerms.starterMarkFed,
+                        icon: .complete,
+                        role: .primary
+                    ) {
+                        onFeed()
+                    }
+                }
+                .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                .padding(.top, BakingSpace.xs)
+                .padding(.bottom, BakingSpace.xxl)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(key: StarterFeedingPopupContentHeightPreferenceKey.self, value: proxy.size.height)
+                    }
+                )
+            }
+            .scrollDisabled(!isScrollEnabled)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .background(Color.brandBackground)
+        .onPreferenceChange(StarterFeedingPopupContentHeightPreferenceKey.self) { height in
+            onContentHeightChange(height)
+        }
+    }
+
+    private var currentProfile: StarterProfile {
+        store.starterProfiles.first(where: { $0.id == profile.id }) ?? profile
+    }
+
+    private var feedingTable: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            BakingTableHeader(title: BakingTerms.starterSectionFeedingMethod)
+            PopupTableDivider()
+
+            VStack(spacing: 0) {
+                StarterMetricRow(title: BakingTerms.starterRatio) {
+                    Button {
+                        showingRatioPicker = true
+                    } label: {
+                        RectangularDropdownTrigger(
+                            title: currentProfile.feedingRatio.label,
+                            width: BakingCompactInputFieldSize.short.width,
+                            textAlignment: .trailing,
+                            font: BakingTypography.appPrimaryText
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showingRatioPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                        BakingDropdownPopover(width: 156) {
+                            ForEach(StarterFeedingRatio.allCases) { ratio in
+                                Button {
+                                    store.updateStarterFeedingRatio(ratio, for: currentProfile)
+                                    showingRatioPicker = false
+                                } label: {
+                                    BakingDropdownRow(
+                                        title: ratio.label,
+                                        isSelected: ratio == currentProfile.feedingRatio
+                                    ) {
+                                        Color.clear
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                PopupTableDivider()
+
+                StarterMetricRow(title: BakingTerms.starterFeedFlour) {
+                    StarterWeightField(
+                        value: Binding(
+                            get: { store.starterFeedFlourWeight(for: currentProfile) },
+                            set: { store.updateStarterFeedFlourWeight($0, for: currentProfile) }
+                        )
+                    )
+                }
+
+                PopupTableDivider()
+
+                StarterMetricRow(title: BakingTerms.starterFeedWater) {
+                    StarterWeightField(
+                        value: Binding(
+                            get: { store.starterFeedWaterWeight(for: currentProfile) },
+                            set: { store.updateStarterFeedWaterWeight($0, for: currentProfile) }
+                        )
+                    )
+                }
+            }
+            .bakingCard()
+        }
+    }
+}
+
+private struct StarterFeedingPopupContentHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

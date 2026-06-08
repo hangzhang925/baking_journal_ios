@@ -24,6 +24,8 @@
 	<string>public.app-category.food-and-drink</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Bready uses alarms to alert you when a kitchen timer finishes.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Bready saves recipe long images to your photo library.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>

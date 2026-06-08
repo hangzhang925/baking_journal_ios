@@ -64,9 +64,11 @@ enum BakingSurface {
     static let cardBackground: Color = .brandSurface
     static let cardStroke: Color = .brandDivider
     static let rowBackground: Color = .brandBackground
-    static let sectionRowBackground: Color = .brandSurface
+    static let sectionRowBackground: Color = .brandSurfaceStrong
     static let fieldBackground: Color = .brandFieldSurface
+    static let focusedFieldBackground: Color = .brandFieldSurfaceFocused
     static let fieldStroke: Color = .brandFieldStroke
+    static let readOnlyBackground: Color = .brandReadOnlySurface
     static let selectedRowBackground: Color = .selectedSurface
     static let selectedStroke: Color = .selectedSurfaceStroke
     static let warmHairline: Color = Color.brandDivider
@@ -255,11 +257,16 @@ enum BakingComponentMetrics {
     static let statusCapsuleIconGlyph: CGFloat = 20
     static let statusCapsuleTextSlot: CGFloat = 58
     static let statusCapsuleChevronSlot: CGFloat = 14
+    static let metricStripCellMinHeight: CGFloat = 44
+    static let metricStripDividerWidth: CGFloat = 0.6
+    static let metricStripDividerHeight: CGFloat = 38
     static let titleInputMinHeight: CGFloat = 44
     static let compactFieldHeight: CGFloat = 38
     static let compactPillHeight: CGFloat = 30
     static let optionChipHeight: CGFloat = 40
     static let dropdownTriggerWidth: CGFloat = 104
+    static let popupTypeDropdownWidth: CGFloat = dropdownTriggerWidth
+    static let popupTypeDropdownMenuWidth: CGFloat = 132
     static let compactOptionWidth: CGFloat = 58
     static let materialChipWidth: CGFloat = 72
     static let materialChipIcon: CGFloat = 18
@@ -279,6 +286,7 @@ enum BakingComponentMetrics {
     static let popupTableRowMinHeight: CGFloat = 54
     static let popupTableMetricRowMinHeight: CGFloat = 62
     static let popupTableMetricCellMinWidth: CGFloat = 118
+    static let popupInlinePercentageControlMinHeight: CGFloat = 98
     static let compactInputFieldHeight: CGFloat = 38
     static let compactInputShortFieldWidth: CGFloat = 96
     static let compactInputMediumFieldWidth: CGFloat = 136
@@ -313,6 +321,7 @@ enum BakingPopupSheetMetrics {
     static let compactDefaultHeight: CGFloat = 280
     static let notesEditorDefaultHeight: CGFloat = 390
     static let expandedDefaultHeight: CGFloat = 720
+    static let editSheetTallDetent = PresentationDetent.fraction(0.66)
     static let maximumScreenRatio: CGFloat = 0.96
 
     static var topChromeHeight: CGFloat {
@@ -337,6 +346,133 @@ enum BakingPopupSheetMetrics {
         guard let screenHeight else { return height }
         let maximumHeight = screenHeight * maximumScreenRatio
         return min(height, maximumHeight)
+    }
+}
+
+enum BakingCenteredPopupMetrics {
+    static let compactDefaultHeight: CGFloat = 390
+    static let compactPercentageDefaultHeight: CGFloat = 470
+    static let compactWaterContentDefaultHeight: CGFloat = 560
+    static let expandedDefaultHeight: CGFloat = BakingPopupSheetMetrics.expandedDefaultHeight
+    static let maximumScreenRatio: CGFloat = 0.82
+    static let maximumWidth: CGFloat = 430
+    static let transitionScale: CGFloat = 0.96
+    static let backdrop: Color = Color.black.opacity(0.18)
+
+    static var horizontalInset: CGFloat {
+        BakingLayout.screenHorizontalInset * 2
+    }
+
+    static var verticalInset: CGFloat {
+        BakingSpace.xxl * 2
+    }
+
+    static func width(for containerWidth: CGFloat) -> CGFloat {
+        max(0, min(containerWidth - horizontalInset, maximumWidth))
+    }
+
+    static func defaultHeight(for size: BakingPopupSheetSize) -> CGFloat {
+        switch size {
+        case .compact:
+            return compactDefaultHeight
+        case .expanded:
+            return expandedDefaultHeight
+        }
+    }
+
+    static func height(
+        defaultHeight: CGFloat,
+        measuredContentHeight: CGFloat,
+        screenHeight: CGFloat
+    ) -> CGFloat {
+        layout(
+            defaultHeight: defaultHeight,
+            measuredContentHeight: measuredContentHeight,
+            screenHeight: screenHeight
+        ).height
+    }
+
+    static func layout(
+        defaultHeight: CGFloat,
+        measuredContentHeight: CGFloat,
+        screenHeight: CGFloat
+    ) -> (height: CGFloat, isScrollEnabled: Bool) {
+        let maximumHeight = max(0, screenHeight * maximumScreenRatio)
+        let availableHeight = max(0, screenHeight - verticalInset)
+        let cappedMaximumHeight = min(maximumHeight, availableHeight)
+        let cappedDefaultHeight = min(defaultHeight, cappedMaximumHeight)
+        guard measuredContentHeight > 0 else {
+            return (cappedDefaultHeight, false)
+        }
+
+        let contentHeight = measuredContentHeight + BakingPopupSheetMetrics.topChromeHeight + BakingSpace.md
+        if contentHeight <= cappedDefaultHeight {
+            return (cappedDefaultHeight, false)
+        }
+
+        if contentHeight <= cappedMaximumHeight {
+            return (ceil(contentHeight), false)
+        }
+
+        return (cappedMaximumHeight, true)
+    }
+}
+
+struct BakingCenteredPopupEditHost<Content: View>: View {
+    let identity: AnyHashable
+    let defaultHeight: CGFloat
+    var maxZIndex: Double = 30
+    var onDismiss: () -> Void
+    @ViewBuilder var content: (_ isScrollEnabled: Bool, _ onContentHeightChange: @escaping (CGFloat) -> Void) -> Content
+
+    @State private var measuredContentHeight: CGFloat = 0
+
+    init<ID: Hashable>(
+        identity: ID,
+        defaultHeight: CGFloat,
+        maxZIndex: Double = 30,
+        onDismiss: @escaping () -> Void,
+        @ViewBuilder content: @escaping (_ isScrollEnabled: Bool, _ onContentHeightChange: @escaping (CGFloat) -> Void) -> Content
+    ) {
+        self.identity = AnyHashable(identity)
+        self.defaultHeight = defaultHeight
+        self.maxZIndex = maxZIndex
+        self.onDismiss = onDismiss
+        self.content = content
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = BakingCenteredPopupMetrics.width(for: proxy.size.width)
+            let layout = BakingCenteredPopupMetrics.layout(
+                defaultHeight: defaultHeight,
+                measuredContentHeight: measuredContentHeight,
+                screenHeight: proxy.size.height
+            )
+
+            BakingCenteredPopupMetrics.backdrop
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onDismiss()
+                }
+
+            content(layout.isScrollEnabled) { height in
+                measuredContentHeight = height
+            }
+            .id(identity)
+            .frame(width: width, height: layout.height)
+            .bakingCenteredPopupSurface(width: width)
+            .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            .transition(.opacity.combined(with: .scale(scale: BakingCenteredPopupMetrics.transitionScale)))
+            .zIndex(maxZIndex)
+            .onAppear {
+                measuredContentHeight = 0
+            }
+            .onChange(of: identity) { _, _ in
+                measuredContentHeight = 0
+            }
+        }
     }
 }
 
@@ -418,15 +554,15 @@ struct BakingSurfaceTheme {
             )
         case .popoverSurface:
             BakingSurfaceTheme(
-                background: Color.brandBackground,
+                background: Color.brandSurface,
                 stroke: BakingSurface.warmHairline,
                 radius: BakingRadius.popover,
                 lineWidth: 0.6
             )
         case .destructive:
             BakingSurfaceTheme(
-                background: BakingSurface.selectedRowBackground,
-                stroke: Color.brandPrimary.opacity(0.28),
+                background: Color.semanticErrorSoft,
+                stroke: Color.semanticError.opacity(0.28),
                 radius: BakingRadius.card,
                 lineWidth: 0.7
             )
@@ -462,7 +598,7 @@ struct BakingSurfaceTheme {
             )
         case .readOnly:
             BakingSurfaceTheme(
-                background: BakingSurface.cardBackground,
+                background: BakingSurface.readOnlyBackground,
                 stroke: BakingSurface.cardStroke,
                 radius: BakingRadius.field,
                 lineWidth: 0.5
@@ -476,15 +612,15 @@ struct BakingSurfaceTheme {
             )
         case .focused:
             BakingSurfaceTheme(
-                background: BakingSurface.selectedRowBackground,
-                stroke: BakingSurface.selectedStroke,
+                background: BakingSurface.focusedFieldBackground,
+                stroke: Color.brandPrimary,
                 radius: BakingRadius.field,
-                lineWidth: 0.9
+                lineWidth: 1.0
             )
         case .warning:
             BakingSurfaceTheme(
-                background: BakingSurface.selectedRowBackground,
-                stroke: BakingSurface.selectedStroke,
+                background: Color.semanticWarningSoft,
+                stroke: Color.semanticWarning.opacity(0.28),
                 radius: BakingRadius.card,
                 lineWidth: 0.7
             )
@@ -589,13 +725,13 @@ struct BakingComponentTheme {
             )
         case .destructive:
             BakingComponentTheme(
-                foreground: .brandPrimary,
-                selectedForeground: .brandPrimary,
+                foreground: .semanticErrorDeep,
+                selectedForeground: .semanticErrorDeep,
                 disabledForeground: .brandSecondaryText.opacity(0.45),
                 background: .clear,
-                selectedBackground: BakingSurface.selectedRowBackground,
+                selectedBackground: Color.semanticErrorSoft,
                 stroke: .clear,
-                selectedStroke: BakingSurface.selectedStroke
+                selectedStroke: Color.semanticError.opacity(0.28)
             )
         }
     }
@@ -818,6 +954,24 @@ extension View {
                         x: 0,
                         y: BakingShadow.popoverY
                     )
+            )
+    }
+
+    func bakingCenteredPopupSurface(width: CGFloat? = nil) -> some View {
+        let theme = BakingSurfaceTheme.theme(for: .popoverSurface)
+        return self
+            .frame(width: width)
+            .background(theme.background)
+            .clipShape(RoundedRectangle(cornerRadius: theme.radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: theme.radius, style: .continuous)
+                    .stroke(theme.stroke, lineWidth: theme.lineWidth)
+            }
+            .shadow(
+                color: BakingShadow.popoverColor,
+                radius: BakingShadow.popoverRadius,
+                x: 0,
+                y: BakingShadow.popoverY
             )
     }
 
@@ -1588,6 +1742,7 @@ struct BakingInlineMetricLabel: View {
     let value: String
     var unit: String? = nil
     var role: BakingComponentRole = .secondary
+    var isWater = false
     var width: CGFloat? = nil
 
     var body: some View {
@@ -1622,6 +1777,14 @@ struct BakingInlineMetricLabel: View {
     }
 
     private var inlineTheme: (background: Color, stroke: Color, labelColor: Color, valueColor: Color) {
+        if isWater {
+            return (
+                background: BakingSurfaceTheme.theme(for: .waterSurface).background,
+                stroke: BakingSurfaceTheme.theme(for: .waterSurface).stroke,
+                labelColor: .waterText,
+                valueColor: .waterText
+            )
+        }
         let theme = BakingInlineLabelTheme.theme(for: role)
         return (
             background: theme.background,
@@ -1649,10 +1812,10 @@ struct BakingInlineLabelTheme {
             )
         case .success:
             BakingInlineLabelTheme(
-                background: Color.waterSurfaceStrong.opacity(0.42),
-                stroke: Color.waterSurfaceStrong,
-                labelColor: .waterText,
-                valueColor: .waterText
+                background: Color.semanticSuccessSoft,
+                stroke: Color.semanticSuccess.opacity(0.22),
+                labelColor: .semanticSuccessDeep,
+                valueColor: .semanticSuccessDeep
             )
         default:
             BakingInlineLabelTheme(
@@ -1738,6 +1901,7 @@ struct BakingSearchField: View {
 struct BakingActionButton: View {
     let title: String
     let accessibilityLabel: String
+    var icon: BakingIcon? = nil
     var role: BakingComponentRole = .primary
     var state: BakingComponentState = .normal
     var action: () -> Void
@@ -1747,12 +1911,23 @@ struct BakingActionButton: View {
         let isDisabled = state == .disabled
 
         Button(action: action) {
-            Text(title)
-                .font(BakingTypography.actionLabel)
-                .foregroundStyle(foregroundColor(theme: theme, isDisabled: isDisabled))
-                .frame(maxWidth: .infinity)
-                .frame(height: BakingTouchTarget.primaryAction)
-                .contentShape(RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous))
+            HStack(spacing: BakingSpace.sm) {
+                if let icon {
+                    BakingIconView(
+                        icon: icon,
+                        size: BakingTouchTarget.inlineIconGlyph,
+                        color: foregroundColor(theme: theme, isDisabled: isDisabled)
+                    )
+                    .accessibilityHidden(true)
+                }
+
+                Text(title)
+                    .font(BakingTypography.actionLabel)
+            }
+            .foregroundStyle(foregroundColor(theme: theme, isDisabled: isDisabled))
+            .frame(maxWidth: .infinity)
+            .frame(height: BakingTouchTarget.primaryAction)
+            .contentShape(RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous))
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
         .bakingSurface(surfaceKind)
@@ -1770,6 +1945,8 @@ struct BakingActionButton: View {
             .warning
         case .success:
             .success
+        case .destructive:
+            .destructive
         default:
             role == .primary ? .primaryAction : .readOnly
         }
@@ -1777,6 +1954,16 @@ struct BakingActionButton: View {
 
     private func foregroundColor(theme: BakingComponentTheme, isDisabled: Bool) -> Color {
         guard !isDisabled else { return theme.disabledForeground }
+        switch state {
+        case .warning:
+            return .semanticWarningDeep
+        case .success:
+            return .semanticSuccessDeep
+        case .destructive:
+            return .semanticErrorDeep
+        default:
+            break
+        }
         return role == .primary ? .brandOnPrimary : theme.foreground
     }
 }
@@ -1959,12 +2146,14 @@ struct BakingTextInputRow: View {
     var placeholder: String
     var subtitle: String? = nil
     var state: BakingComponentState = .normal
+    @State private var isFieldFocused = false
 
     var body: some View {
         BakingFormRow(title: title, subtitle: subtitle, state: state) {
             BakingInlineTextField(
                 text: $text,
                 placeholder: placeholder,
+                isFocused: $isFieldFocused,
                 color: UIColor(state == .disabled ? Color.brandSecondaryText : Color.brandText),
                 font: .preferredFont(forTextStyle: .body),
                 textAlignment: .right
@@ -1977,13 +2166,13 @@ struct BakingTextInputRow: View {
     }
 
     private var inputSurfaceKind: BakingSurfaceKind {
+        guard state != .disabled else { return .readOnly }
+        if isFieldFocused { return .focused }
         switch state {
         case .focused, .editing:
-            .focused
-        case .disabled:
-            .readOnly
+            return .focused
         default:
-            .field
+            return .field
         }
     }
 }
@@ -1996,6 +2185,7 @@ struct BakingNumberInputRow: View {
     var fractionDigits: ClosedRange<Int> = 0...1
     var minValue: Double = 0
     var state: BakingComponentState = .normal
+    @State private var isFieldFocused = false
 
     var body: some View {
         BakingFormRow(title: title, subtitle: subtitle, state: state) {
@@ -2004,6 +2194,7 @@ struct BakingNumberInputRow: View {
                     value: $value,
                     fractionDigits: fractionDigits,
                     minValue: minValue,
+                    isFocused: $isFieldFocused,
                     color: UIColor(state == .disabled ? Color.brandSecondaryText : Color.brandText),
                     font: .monospacedDigitSystemFont(ofSize: 15, weight: .semibold),
                     isEnabled: state != .disabled
@@ -2023,13 +2214,13 @@ struct BakingNumberInputRow: View {
     }
 
     private var inputSurfaceKind: BakingSurfaceKind {
+        guard state != .disabled else { return .readOnly }
+        if isFieldFocused { return .focused }
         switch state {
         case .focused, .editing:
-            .focused
-        case .disabled:
-            .readOnly
+            return .focused
         default:
-            .field
+            return .field
         }
     }
 }
@@ -2442,6 +2633,7 @@ final class BakingScrollFriendlyTextField: UITextField {
 struct BakingInlineTextField: UIViewRepresentable {
     @Binding var text: String
     let placeholder: String
+    var isFocused: Binding<Bool>? = nil
     var color: UIColor = UIColor(Color.brandText)
     var font: UIFont = .preferredFont(forTextStyle: .body)
     var textAlignment: NSTextAlignment = .left
@@ -2511,6 +2703,14 @@ struct BakingInlineTextField: UIViewRepresentable {
             return true
         }
 
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            parent.isFocused?.wrappedValue = true
+        }
+
+        func textFieldDidEndEditing(_ textField: UITextField) {
+            parent.isFocused?.wrappedValue = false
+        }
+
         func textField(
             _ textField: UITextField,
             shouldChangeCharactersIn range: NSRange,
@@ -2536,6 +2736,7 @@ struct BakingNumericTextField: UIViewRepresentable {
     let fractionDigits: ClosedRange<Int>
     var minValue: Double = 0
     var maxValue: Double? = nil
+    var isFocused: Binding<Bool>? = nil
     var color: UIColor = UIColor(Color.brandText)
     var font: UIFont = .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
     var textAlignment: NSTextAlignment = .right
@@ -2615,6 +2816,7 @@ struct BakingNumericTextField: UIViewRepresentable {
         }
 
         func textFieldDidBeginEditing(_ textField: UITextField) {
+            parent.isFocused?.wrappedValue = true
             DispatchQueue.main.async { [weak textField] in
                 guard let textField, textField.isFirstResponder else { return }
                 self.moveCaretToEnd(of: textField)
@@ -2622,6 +2824,7 @@ struct BakingNumericTextField: UIViewRepresentable {
         }
 
         func textFieldDidEndEditing(_ textField: UITextField) {
+            parent.isFocused?.wrappedValue = false
             if (textField.text ?? "").isEmpty {
                 parent.value = parent.minValue
             }
@@ -2760,7 +2963,7 @@ struct BakingPercentageField: View {
             .padding(.vertical, 2)
             .frame(width: totalWidth, alignment: .trailing)
             .frame(height: height)
-            .bakingSurface(.field)
+            .bakingSurface(isShowingPicker ? .focused : .field)
             .contentShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
@@ -2820,6 +3023,106 @@ struct BakingPercentageField: View {
         }
     }
 
+}
+
+struct BakingInlinePercentageSliderControl: View {
+    @Binding var value: Double
+    var title: String?
+    var range: ClosedRange<Int> = 1...100
+    var tint: Color = .brandPrimary
+
+    var body: some View {
+        VStack(spacing: BakingSpace.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                if let title {
+                    BakingLabel(text: title, role: .popupRowLabel)
+                        .lineLimit(1)
+
+                    Spacer(minLength: BakingSpace.sm)
+                }
+
+                Text("\(integerValue)")
+                    .font(BakingTypography.popupNumericInputValue)
+                    .foregroundStyle(Color.brandText)
+                    .monospacedDigit()
+
+                Text("%")
+                    .font(BakingTypography.rowMeta)
+                    .foregroundStyle(Color.brandSecondaryText)
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: BakingSpace.sm) {
+                stepButton(
+                    systemImage: "minus",
+                    accessibilityLabel: BakingTerms.percentagePickerDecrease,
+                    isDisabled: integerValue <= range.lowerBound
+                ) {
+                    setIntegerValue(integerValue - 1)
+                }
+
+                Slider(
+                    value: sliderBinding,
+                    in: Double(range.lowerBound)...Double(range.upperBound),
+                    step: 1
+                )
+                .tint(tint)
+                .accessibilityHidden(true)
+
+                stepButton(
+                    systemImage: "plus",
+                    accessibilityLabel: BakingTerms.percentagePickerIncrease,
+                    isDisabled: integerValue >= range.upperBound
+                ) {
+                    setIntegerValue(integerValue + 1)
+                }
+            }
+        }
+        .padding(.horizontal, BakingSpace.md)
+        .padding(.vertical, BakingSpace.sm)
+        .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.popupInlinePercentageControlMinHeight)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(BakingTerms.percentagePickerAccessibility)
+        .accessibilityValue("\(integerValue)%")
+    }
+
+    private func stepButton(
+        systemImage: String,
+        accessibilityLabel: String,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(isDisabled ? Color.brandSecondaryText.opacity(0.44) : tint)
+                .frame(width: BakingTouchTarget.iconButton, height: BakingTouchTarget.iconButton)
+                .contentShape(Rectangle())
+                .accessibilityHidden(true)
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .disabled(isDisabled)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var sliderBinding: Binding<Double> {
+        Binding(
+            get: { Double(integerValue) },
+            set: { setIntegerValue(Int($0.rounded())) }
+        )
+    }
+
+    private var integerValue: Int {
+        clamped(Int(value.rounded()))
+    }
+
+    private func setIntegerValue(_ nextValue: Int) {
+        value = Double(clamped(nextValue))
+    }
+
+    private func clamped(_ nextValue: Int) -> Int {
+        min(max(range.lowerBound, nextValue), range.upperBound)
+    }
 }
 
 struct BakingCenteredPercentagePicker: View {
@@ -2907,32 +3210,27 @@ struct BakingPercentagePickerCard: View {
 
 struct BakingPercentagePickerControl: View {
     @Binding var value: Double
+    var title: String? = nil
     var maxValue: Double = 100
     var precision: Int = 1
     var tint: Color = .brandPrimary
     var surface: Color = BakingSurface.fieldBackground
+    @State private var inputFocused = false
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .center, spacing: 4) {
-                BakingNumericTextField(
-                    value: sliderBinding,
-                    fractionDigits: 0...1,
-                    maxValue: effectiveMaxValue,
-                    color: UIColor(tint),
-                    font: .monospacedDigitSystemFont(ofSize: 18, weight: .semibold),
-                    textAlignment: .right
-                )
-                .frame(width: 50, height: BakingComponentMetrics.compactInputFieldHeight)
-                Text("%")
-                    .font(BakingTypography.rowMeta)
-                    .foregroundStyle(Color.brandSecondaryText)
-                    .frame(height: BakingComponentMetrics.compactInputFieldHeight, alignment: .center)
+            HStack(alignment: .center, spacing: BakingSpace.sm) {
+                if let title {
+                    BakingLabel(text: title, role: .popupRowLabel)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+
+                    Spacer(minLength: BakingSpace.sm)
+                }
+
+                numericInputField
             }
-            .padding(.horizontal, 8)
-            .frame(width: BakingCompactInputFieldSize.short.width, height: BakingComponentMetrics.compactInputFieldHeight)
-            .background(surface)
-            .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
+            .frame(maxWidth: .infinity)
 
             HStack(spacing: BakingSpace.sm) {
                 stepButton(
@@ -2968,6 +3266,34 @@ struct BakingPercentagePickerControl: View {
         .fixedSize(horizontal: false, vertical: true)
         .onChange(of: maxValue) { _, _ in
             value = clamped(value)
+        }
+    }
+
+    private var numericInputField: some View {
+        HStack(alignment: .center, spacing: 4) {
+            BakingNumericTextField(
+                value: sliderBinding,
+                fractionDigits: 0...1,
+                maxValue: effectiveMaxValue,
+                isFocused: $inputFocused,
+                color: UIColor(tint),
+                font: .monospacedDigitSystemFont(ofSize: 18, weight: .semibold),
+                textAlignment: .right
+            )
+            .frame(width: 50, height: BakingComponentMetrics.compactInputFieldHeight)
+
+            Text("%")
+                .font(BakingTypography.rowMeta)
+                .foregroundStyle(Color.brandSecondaryText)
+                .frame(height: BakingComponentMetrics.compactInputFieldHeight, alignment: .center)
+        }
+        .padding(.horizontal, 8)
+        .frame(width: BakingCompactInputFieldSize.short.width, height: BakingComponentMetrics.compactInputFieldHeight)
+        .background(inputFocused ? BakingSurface.focusedFieldBackground : surface)
+        .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous)
+                .stroke(inputFocused ? Color.brandPrimary : BakingSurface.fieldStroke, lineWidth: inputFocused ? 1.0 : 0.6)
         }
     }
 
@@ -3345,7 +3671,7 @@ struct BakingSwipeToDeleteRow<Content: View>: View {
 
                 Image(systemName: "trash")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.brandPrimary)
+                    .foregroundStyle(BakingComponentTheme.action(role: .destructive).foreground)
                     .frame(width: actionWidth, height: buttonSize.height)
             }
             .frame(width: deleteActionWidth)

@@ -10,7 +10,7 @@ import UIKit
 // vivid in both light and warm-black dark mode, like the saturated primaries in
 // WeChat / RedNote / Instagram. Secondary is a calm water blue tied to the legacy
 // `Color.water*` tokens. Surfaces follow a white-canvas → warm-cream-card model with
-// no cold grey. Filled primary controls take WHITE text.
+// no cold grey. Filled primary controls take white text on the bright gold fill.
 //
 // All app color routes through the semantic `Color.brand*`, `Color.water*`, semantic,
 // and material tokens below — recolor here and the change propagates app-wide.
@@ -110,9 +110,17 @@ extension Color {
         light: RGB(0.993, 0.953, 0.876),           // field-fill (gold wash on cream)
         dark: RGB(0.216, 0.164, 0.075)
     )
+    static let brandFieldSurfaceFocused = adaptiveColor(
+        light: RGB(0.988, 0.922, 0.792),           // field-fill-focus · deeper gold wash
+        dark: RGB(0.282, 0.208, 0.082)
+    )
     static let brandFieldStroke = adaptiveColor(
         light: RGB(0.942, 0.788, 0.500),           // field-border (soft gold hairline)
         dark: RGB(0.415, 0.310, 0.120)
+    )
+    static let brandReadOnlySurface = adaptiveColor(
+        light: RGB(0.937, 0.918, 0.878),           // warm neutral grey · read-only/computed
+        dark: RGB(0.149, 0.133, 0.106)
     )
 
     // MARK: Primary accent
@@ -129,7 +137,7 @@ extension Color {
         dark: RGB(0.953, 0.757, 0.314)             // accent-press (dark → p-300)
     )
     static let brandOnPrimary = adaptiveColor(
-        light: RGB(1.0, 1.0, 1.0),                 // white text on the gold fill
+        light: RGB(1.0, 1.0, 1.0),                 // on-accent · #FFFFFF
         dark: RGB(1.0, 1.0, 1.0)
     )
 

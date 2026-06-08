@@ -1,1 +1,2 @@
 "NSAlarmKitUsageDescription" = "Bready uses alarms to alert you when a kitchen timer finishes.";
+"NSPhotoLibraryAddUsageDescription" = "Bready saves recipe long images to your photo library.";

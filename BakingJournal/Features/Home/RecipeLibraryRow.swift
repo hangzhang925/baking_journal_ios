@@ -2,7 +2,6 @@ import SwiftUI
 
 struct RecipeLibraryRow: View {
     let recipe: SavedRecipe
-    let summary: RecipeSummary
     let bakeCount: Int
 
     var body: some View {
@@ -15,18 +14,6 @@ struct RecipeLibraryRow: View {
                     .foregroundStyle(Color.brandText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
-
-                HStack(spacing: BakingSpace.xs) {
-                    BakingIconView(icon: .water, size: BakingComponentMetrics.materialChipIcon, color: .brandSecondaryText)
-
-                    Text(hydrationLabel)
-                        .font(BakingTypography.rowMeta.monospacedDigit())
-                        .foregroundStyle(Color.brandSecondaryText)
-                        .lineLimit(1)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(BakingTerms.formulaMetricHydration)
-                .accessibilityValue(hydrationLabel)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -49,10 +36,6 @@ struct RecipeLibraryRow: View {
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.vertical, BakingSpace.sm)
         .contentShape(Rectangle())
-    }
-
-    private var hydrationLabel: String {
-        "\(BakingFormat.number(summary.hydration, precision: 1))%"
     }
 }
 

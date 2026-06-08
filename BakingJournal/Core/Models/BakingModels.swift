@@ -372,17 +372,56 @@ struct BakeRecord: Identifiable, Codable, Equatable {
 
 struct CookState: Codable, Equatable {
     var checked: [UUID: Set<UUID>] = [:]
+    var completedStepIDs: Set<UUID> = []
     var completedAt: Date?
     var currentIndex: Int = 0
     var stepStartedAt: Date?
     var timerEndsAt: Date?
     var timerStepId: UUID?
     var totalStartedAt: Date?
+
+    private enum CodingKeys: String, CodingKey {
+        case checked
+        case completedStepIDs
+        case completedAt
+        case currentIndex
+        case stepStartedAt
+        case timerEndsAt
+        case timerStepId
+        case totalStartedAt
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        checked = try container.decodeIfPresent([UUID: Set<UUID>].self, forKey: .checked) ?? [:]
+        completedStepIDs = try container.decodeIfPresent(Set<UUID>.self, forKey: .completedStepIDs) ?? []
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+        currentIndex = try container.decodeIfPresent(Int.self, forKey: .currentIndex) ?? 0
+        stepStartedAt = try container.decodeIfPresent(Date.self, forKey: .stepStartedAt)
+        timerEndsAt = try container.decodeIfPresent(Date.self, forKey: .timerEndsAt)
+        timerStepId = try container.decodeIfPresent(UUID.self, forKey: .timerStepId)
+        totalStartedAt = try container.decodeIfPresent(Date.self, forKey: .totalStartedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(checked, forKey: .checked)
+        try container.encode(completedStepIDs, forKey: .completedStepIDs)
+        try container.encodeIfPresent(completedAt, forKey: .completedAt)
+        try container.encode(currentIndex, forKey: .currentIndex)
+        try container.encodeIfPresent(stepStartedAt, forKey: .stepStartedAt)
+        try container.encodeIfPresent(timerEndsAt, forKey: .timerEndsAt)
+        try container.encodeIfPresent(timerStepId, forKey: .timerStepId)
+        try container.encodeIfPresent(totalStartedAt, forKey: .totalStartedAt)
+    }
 }
 
 enum StarterFeedingRatio: String, Codable, CaseIterable, Identifiable {
     case oneToOneToOne = "1:1:1"
     case oneToTwoToTwo = "1:2:2"
+    case oneToThreeToThree = "1:3:3"
     case oneToFourToFour = "1:4:4"
 
     var id: String { rawValue }
@@ -392,6 +431,7 @@ enum StarterFeedingRatio: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .oneToOneToOne: 1
         case .oneToTwoToTwo: 2
+        case .oneToThreeToThree: 3
         case .oneToFourToFour: 4
         }
     }
@@ -405,6 +445,8 @@ struct StarterProfile: Identifiable, Codable, Equatable {
     var measuredWeight: Double
     var lastFedAt: Date
     var feedingRatio: StarterFeedingRatio
+    var feedFlourWeight: Double
+    var feedWaterWeight: Double
     var isReminderEnabled: Bool
     var nextFeedingDate: Date
 
@@ -416,9 +458,13 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         measuredWeight: Double = 100,
         lastFedAt: Date = Date(),
         feedingRatio: StarterFeedingRatio = .oneToOneToOne,
+        feedFlourWeight: Double? = nil,
+        feedWaterWeight: Double? = nil,
         isReminderEnabled: Bool = false,
         nextFeedingDate: Date = Date()
     ) {
+        let starterWeight = max(0, measuredWeight - containerWeight)
+        let defaultFeedWeight = starterWeight * feedingRatio.feedMultiplier
         self.id = id
         self.name = name
         self.isContainerWeightEnabled = isContainerWeightEnabled
@@ -426,6 +472,8 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         self.measuredWeight = measuredWeight
         self.lastFedAt = lastFedAt
         self.feedingRatio = feedingRatio
+        self.feedFlourWeight = max(0, feedFlourWeight ?? defaultFeedWeight)
+        self.feedWaterWeight = max(0, feedWaterWeight ?? defaultFeedWeight)
         self.isReminderEnabled = isReminderEnabled
         self.nextFeedingDate = nextFeedingDate
     }
@@ -438,6 +486,8 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         case measuredWeight
         case lastFedAt
         case feedingRatio
+        case feedFlourWeight
+        case feedWaterWeight
         case isReminderEnabled
         case nextFeedingDate
     }
@@ -451,6 +501,9 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         measuredWeight = try container.decode(Double.self, forKey: .measuredWeight)
         lastFedAt = try container.decode(Date.self, forKey: .lastFedAt)
         feedingRatio = try container.decode(StarterFeedingRatio.self, forKey: .feedingRatio)
+        let defaultFeedWeight = max(0, measuredWeight - containerWeight) * feedingRatio.feedMultiplier
+        feedFlourWeight = try container.decodeIfPresent(Double.self, forKey: .feedFlourWeight) ?? defaultFeedWeight
+        feedWaterWeight = try container.decodeIfPresent(Double.self, forKey: .feedWaterWeight) ?? defaultFeedWeight
         isReminderEnabled = try container.decode(Bool.self, forKey: .isReminderEnabled)
         nextFeedingDate = try container.decode(Date.self, forKey: .nextFeedingDate)
     }
