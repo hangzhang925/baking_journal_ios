@@ -44,6 +44,7 @@ final class RecipeStore: ObservableObject {
     }
     @Published var steps: [JournalStep] = [] {
         didSet {
+            syncStepModeBackupFromActiveSteps()
             if steps.isEmpty {
                 currentWorkflowState = .draft
             }
@@ -69,6 +70,18 @@ final class RecipeStore: ObservableObject {
             autosaveCurrentRecipeIfNeeded()
         }
     }
+    @Published var formulaIngredientLockMode: FormulaIngredientLockMode = .weight {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
+    @Published var stepsMode: RecipeStepsMode = .simple {
+        didSet {
+            persist()
+            autosaveCurrentRecipeIfNeeded()
+        }
+    }
     @Published private(set) var hasLoadedPersistedState = false
 
     static let starterOptions = [BakingTerms.levainStarter, BakingTerms.liquidStarter, BakingTerms.tangzhongStarter, BakingTerms.scaldedStarter, BakingTerms.poolishStarter]
@@ -86,6 +99,7 @@ final class RecipeStore: ObservableObject {
     static var starterReminderTimeLabels: [String] {
         let calendar = Calendar.current
         let formatter = DateFormatter()
+        formatter.locale = L10n.locale
         formatter.timeStyle = .short
         formatter.dateStyle = .none
 
@@ -99,6 +113,8 @@ final class RecipeStore: ObservableObject {
     private let notifications: BakingNotificationScheduling
     private let storageKey = "baking-journal-ios:state"
     private var isLoading = false
+    private var simpleStep = RecipeStore.makeSimpleStep()
+    private var customSteps: [JournalStep] = []
 
     init(notifications: BakingNotificationScheduling) {
         self.notifications = notifications
@@ -123,6 +139,12 @@ final class RecipeStore: ObservableObject {
             waterWeight: waterWeight,
             hydration: flourWeight > 0 ? waterWeight / flourWeight * 100 : 0
         )
+    }
+
+    func flourTablePercentage(for item: RecipeItem, in tableItems: [RecipeItem]) -> Double {
+        let totalFlour = tableItems.reduce(0) { $0 + flourContribution($1) }
+        guard totalFlour > 0 else { return 0 }
+        return flourContribution(item) / totalFlour * 100
     }
 
     var currentRecipeDisplayName: String {
@@ -162,8 +184,15 @@ final class RecipeStore: ObservableObject {
         guard profile.isReminderEnabled else { return false }
         let calendar = Calendar.current
         let todayStart = calendar.startOfDay(for: Date())
-        let nextFeedingStart = calendar.startOfDay(for: profile.nextFeedingDate)
+        let nextFeedingStart = calendar.startOfDay(for: starterNextFeedingDate(for: profile))
         return todayStart >= nextFeedingStart && profile.lastFedAt < nextFeedingStart
+    }
+
+    func starterNextFeedingDate(for profile: StarterProfile) -> Date {
+        StarterProfile.scheduledNextFeedingDate(
+            after: profile.lastFedAt,
+            frequencyDays: profile.feedingFrequencyDays
+        )
     }
 
     var bakesThisWeek: Int {
@@ -200,15 +229,23 @@ final class RecipeStore: ObservableObject {
     }
 
     var canMarkReadyToBake: Bool {
-        !steps.isEmpty
+        Self.hasReadyStepContent(
+            steps: steps,
+            stepsMode: stepsMode,
+            simpleStep: simpleStep
+        )
     }
 
     func isReadyToBake(_ recipe: SavedRecipe) -> Bool {
-        recipe.workflowState == .ready && !recipe.steps.isEmpty
+        recipe.workflowState == .ready && Self.hasReadyStepContent(
+            steps: recipe.steps,
+            stepsMode: recipe.stepsMode,
+            simpleStep: recipe.simpleStep
+        )
     }
 
     var readinessMessage: String {
-        if steps.isEmpty {
+        if !canMarkReadyToBake {
             return BakingTerms.readinessNeedsSteps
         }
 
@@ -233,10 +270,33 @@ final class RecipeStore: ObservableObject {
         currentWorkflowState = .draft
     }
 
+    func setStepsMode(_ mode: RecipeStepsMode) {
+        guard mode != stepsMode else {
+            ensureActiveStepsForCurrentMode()
+            return
+        }
+
+        captureActiveStepsForCurrentMode()
+        stepsMode = mode
+        switch mode {
+        case .simple:
+            simpleStep = Self.simpleStepApplyingBackwardCompatibleUpdates(simpleStep, kind: currentRecipeKind, items: items)
+            steps = [simpleStep]
+        case .custom:
+            steps = customSteps.isEmpty ? [makeStep(type: .prep)] : customSteps
+        }
+        cookState = CookState()
+        activeBakeRecordID = nil
+        cancelCookTimerReminder()
+    }
+
     @discardableResult
     func addItem(category: ItemCategory, tag: ItemTag? = nil) -> RecipeItem {
         let item = Self.makeItem(category: category, tag: tag)
-        items.append(item)
+        let snapshots = materialPercentageSnapshotsIfNeeded(forFlourChangeIn: [item])
+        var nextItems = items
+        nextItems.append(item)
+        items = applyingMaterialPercentageSnapshots(snapshots, to: nextItems)
         return item
     }
 
@@ -248,11 +308,15 @@ final class RecipeStore: ObservableObject {
         recipeOverallNotes = ""
         stepText = ""
         items = []
-        steps = []
+        stepsMode = .simple
+        simpleStep = Self.makeSimpleStep()
+        customSteps = []
+        steps = [simpleStep]
         cookState = CookState()
         currentRecipeID = nil
         activeBakeRecordID = nil
         currentWorkflowState = .draft
+        formulaIngredientLockMode = .weight
         isLoading = false
         persist()
     }
@@ -274,7 +338,11 @@ final class RecipeStore: ObservableObject {
         recipeOverallNotes = recipe.overallNotes
         stepText = recipe.stepText
         items = recipe.items
-        steps = recipe.steps
+        stepsMode = recipe.stepsMode
+        simpleStep = Self.simpleStepApplyingBackwardCompatibleUpdates(recipe.simpleStep ?? recipe.steps.first, kind: recipe.kind, items: recipe.items)
+        customSteps = customSteps(for: recipe)
+        steps = activeSteps(for: recipe)
+        formulaIngredientLockMode = recipe.formulaIngredientLockMode
         cookState = CookState()
         currentRecipeID = nil
         activeBakeRecordID = nil
@@ -294,7 +362,11 @@ final class RecipeStore: ObservableObject {
             overallNotes: recipeOverallNotes,
             stepText: stepText,
             items: items,
-            steps: steps,
+            steps: currentActiveStepsForPersistence(),
+            stepsMode: stepsMode,
+            simpleStep: currentSimpleStepForPersistence(),
+            customSteps: currentCustomStepsForPersistence(),
+            formulaIngredientLockMode: formulaIngredientLockMode,
             workflowState: recipeWorkflowState,
             createdAt: now,
             updatedAt: now
@@ -307,46 +379,60 @@ final class RecipeStore: ObservableObject {
     func applyTemplate(_ template: RecipeTemplate) {
         cancelCookTimerReminder()
         isLoading = true
+        let templateItems: [RecipeItem]
+        let templateKind: RecipeKind
+        let templateName: String
+
         switch template {
         case .toast:
-            recipeName = BakingTerms.toastRecipeName
-            currentRecipeKind = .toast
-            recipeOverallNotes = ""
-            stepText = ""
-            items = Self.defaultItems
-            steps = []
+            templateItems = Self.defaultItems
+            templateKind = .toast
+            templateName = BakingTerms.toastRecipeName
         case .chiffon:
-            recipeName = BakingTerms.chiffonRecipeName
-            currentRecipeKind = .chiffon
-            recipeOverallNotes = ""
-            stepText = ""
-            items = Self.chiffonItems
-            steps = []
+            templateItems = Self.chiffonItems
+            templateKind = .chiffon
+            templateName = BakingTerms.chiffonRecipeName
         case .countryBread:
-            recipeName = BakingTerms.countryBreadRecipeName
-            currentRecipeKind = .countryBread
-            recipeOverallNotes = ""
-            stepText = ""
-            items = Self.countryBreadItems
-            steps = []
+            templateItems = Self.countryBreadItems
+            templateKind = .countryBread
+            templateName = BakingTerms.countryBreadRecipeName
         }
+
+        let templateSteps = Self.templateTutorialSteps(kind: templateKind, items: templateItems)
+        recipeName = templateName
+        currentRecipeKind = templateKind
+        recipeOverallNotes = ""
+        stepText = ""
+        items = templateItems
+        stepsMode = .simple
+        simpleStep = templateSteps.simple
+        customSteps = templateSteps.custom
+        steps = [simpleStep]
         cookState = CookState()
         currentRecipeID = nil
         activeBakeRecordID = nil
         currentWorkflowState = .draft
+        formulaIngredientLockMode = .weight
         isLoading = false
         persist()
     }
 
     func saveCurrentRecipe() {
         let now = Date()
+        let activeSteps = currentActiveStepsForPersistence()
+        let simpleStepSnapshot = currentSimpleStepForPersistence()
+        let customStepsSnapshot = currentCustomStepsForPersistence()
         if let currentRecipeID, let index = savedRecipes.firstIndex(where: { $0.id == currentRecipeID }) {
             savedRecipes[index].name = currentRecipeDisplayName
             savedRecipes[index].kind = currentRecipeKind
             savedRecipes[index].overallNotes = recipeOverallNotes
             savedRecipes[index].stepText = stepText
             savedRecipes[index].items = items
-            savedRecipes[index].steps = steps
+            savedRecipes[index].steps = activeSteps
+            savedRecipes[index].stepsMode = stepsMode
+            savedRecipes[index].simpleStep = simpleStepSnapshot
+            savedRecipes[index].customSteps = customStepsSnapshot
+            savedRecipes[index].formulaIngredientLockMode = formulaIngredientLockMode
             savedRecipes[index].workflowState = recipeWorkflowState
             savedRecipes[index].updatedAt = now
         } else {
@@ -357,7 +443,11 @@ final class RecipeStore: ObservableObject {
                 overallNotes: recipeOverallNotes,
                 stepText: stepText,
                 items: items,
-                steps: steps,
+                steps: activeSteps,
+                stepsMode: stepsMode,
+                simpleStep: simpleStepSnapshot,
+                customSteps: customStepsSnapshot,
+                formulaIngredientLockMode: formulaIngredientLockMode,
                 workflowState: recipeWorkflowState,
                 createdAt: now,
                 updatedAt: now
@@ -375,13 +465,20 @@ final class RecipeStore: ObservableObject {
         }
 
         let workflowState = recipeWorkflowState
+        let activeSteps = currentActiveStepsForPersistence()
+        let simpleStepSnapshot = currentSimpleStepForPersistence()
+        let customStepsSnapshot = currentCustomStepsForPersistence()
         let currentRecipe = savedRecipes[index]
         guard currentRecipe.name != currentRecipeDisplayName
             || currentRecipe.kind != currentRecipeKind
             || currentRecipe.overallNotes != recipeOverallNotes
             || currentRecipe.stepText != stepText
             || currentRecipe.items != items
-            || currentRecipe.steps != steps
+            || currentRecipe.steps != activeSteps
+            || currentRecipe.stepsMode != stepsMode
+            || currentRecipe.simpleStep != simpleStepSnapshot
+            || currentRecipe.customSteps != customStepsSnapshot
+            || currentRecipe.formulaIngredientLockMode != formulaIngredientLockMode
             || currentRecipe.workflowState != workflowState else {
             return
         }
@@ -392,10 +489,60 @@ final class RecipeStore: ObservableObject {
         recipes[index].overallNotes = recipeOverallNotes
         recipes[index].stepText = stepText
         recipes[index].items = items
-        recipes[index].steps = steps
+        recipes[index].steps = activeSteps
+        recipes[index].stepsMode = stepsMode
+        recipes[index].simpleStep = simpleStepSnapshot
+        recipes[index].customSteps = customStepsSnapshot
+        recipes[index].formulaIngredientLockMode = formulaIngredientLockMode
         recipes[index].workflowState = workflowState
         recipes[index].updatedAt = Date()
         savedRecipes = recipes
+    }
+
+    func refreshCurrentRecipeForDisplay() {
+        var didChange = applyBackwardCompatibleRecipeUpdatesToSavedRecipes()
+
+        if let currentRecipeID,
+           let recipe = savedRecipes.first(where: { $0.id == currentRecipeID }) {
+            if recipeName != recipe.name
+                || currentRecipeKind != recipe.kind
+                || recipeOverallNotes != recipe.overallNotes
+                || stepText != recipe.stepText
+                || items != recipe.items
+                || steps != activeSteps(for: recipe)
+                || stepsMode != recipe.stepsMode
+                || simpleStep != Self.simpleStepApplyingBackwardCompatibleUpdates(recipe.simpleStep ?? recipe.steps.first, kind: recipe.kind, items: recipe.items)
+                || customSteps != customSteps(for: recipe)
+                || formulaIngredientLockMode != recipe.formulaIngredientLockMode
+                || currentWorkflowState != recipe.workflowState {
+                isLoading = true
+                recipeName = recipe.name
+                currentRecipeKind = recipe.kind
+                recipeOverallNotes = recipe.overallNotes
+                stepText = recipe.stepText
+                items = recipe.items
+                stepsMode = recipe.stepsMode
+                simpleStep = Self.simpleStepApplyingBackwardCompatibleUpdates(recipe.simpleStep ?? recipe.steps.first, kind: recipe.kind, items: recipe.items)
+                customSteps = customSteps(for: recipe)
+                steps = activeSteps(for: recipe)
+                formulaIngredientLockMode = recipe.formulaIngredientLockMode
+                currentWorkflowState = recipe.workflowState
+                isLoading = false
+                didChange = true
+            }
+        } else {
+            let normalizedSteps = Self.stepsApplyingBackwardCompatibleUpdates(steps, kind: currentRecipeKind)
+            if normalizedSteps != steps {
+                isLoading = true
+                steps = normalizedSteps
+                isLoading = false
+                didChange = true
+            }
+        }
+
+        if didChange {
+            persist()
+        }
     }
 
     func loadRecipe(_ recipe: SavedRecipe) {
@@ -406,7 +553,11 @@ final class RecipeStore: ObservableObject {
         recipeOverallNotes = recipe.overallNotes
         stepText = recipe.stepText
         items = recipe.items
-        steps = recipe.steps
+        stepsMode = recipe.stepsMode
+        simpleStep = Self.simpleStepApplyingBackwardCompatibleUpdates(recipe.simpleStep ?? recipe.steps.first, kind: recipe.kind, items: recipe.items)
+        customSteps = customSteps(for: recipe)
+        steps = activeSteps(for: recipe)
+        formulaIngredientLockMode = recipe.formulaIngredientLockMode
         cookState = CookState()
         currentRecipeID = recipe.id
         activeBakeRecordID = nil
@@ -432,10 +583,14 @@ final class RecipeStore: ObservableObject {
     func updateStarterProfile(_ profile: StarterProfile) {
         guard let index = starterProfiles.firstIndex(where: { $0.id == profile.id }) else { return }
         let previous = starterProfiles[index]
-        starterProfiles[index] = profile
-        if previous.isReminderEnabled != profile.isReminderEnabled
-            || !Calendar.current.isDate(previous.nextFeedingDate, inSameDayAs: profile.nextFeedingDate)
-            || previous.name != profile.name {
+        var nextProfile = profile
+        syncStarterFeedWeightsIfNeeded(from: previous, into: &nextProfile)
+        nextProfile.normalizeFeedingSchedule()
+        starterProfiles[index] = nextProfile
+        if previous.isReminderEnabled != nextProfile.isReminderEnabled
+            || !Calendar.current.isDate(previous.nextFeedingDate, inSameDayAs: nextProfile.nextFeedingDate)
+            || previous.feedingFrequencyDays != nextProfile.feedingFrequencyDays
+            || previous.name != nextProfile.name {
             rescheduleStarterReminders()
         }
     }
@@ -457,7 +612,7 @@ final class RecipeStore: ObservableObject {
     func updateStarterFeedingRatio(_ ratio: StarterFeedingRatio, for profile: StarterProfile) {
         var next = profile
         next.feedingRatio = ratio
-        let defaultFeedWeight = starterFinalWeight(for: next) * ratio.feedMultiplier
+        let defaultFeedWeight = defaultStarterFeedWeight(for: next)
         next.feedFlourWeight = defaultFeedWeight
         next.feedWaterWeight = defaultFeedWeight
         updateStarterProfile(next)
@@ -475,6 +630,13 @@ final class RecipeStore: ObservableObject {
         updateStarterProfile(next)
     }
 
+    func updateStarterFeedingFrequencyDays(_ days: Double, for profile: StarterProfile) {
+        var next = profile
+        next.feedingFrequencyDays = StarterProfile.normalizedFeedingFrequencyDays(Int(days.rounded()))
+        next.normalizeFeedingSchedule()
+        updateStarterProfile(next)
+    }
+
     func markStarterFed(_ profile: StarterProfile) {
         var next = profile
         let currentWeight = starterFinalWeight(for: profile)
@@ -482,7 +644,38 @@ final class RecipeStore: ObservableObject {
         next.lastFedAt = Date()
         next.measuredWeight = currentWeight + addedWeight + next.containerWeight
         updateStarterProfile(next)
-        rescheduleStarterReminders()
+    }
+
+    private func syncStarterFeedWeightsIfNeeded(from previous: StarterProfile, into next: inout StarterProfile) {
+        let didChangeBaseWeight = !Self.isSameWeight(
+            starterFinalWeight(for: previous),
+            starterFinalWeight(for: next)
+        )
+        let didChangeRatio = previous.feedingRatio != next.feedingRatio
+        guard didChangeBaseWeight || didChangeRatio else { return }
+
+        let previousDefaultFeedWeight = defaultStarterFeedWeight(for: previous)
+        let shouldSyncFlour = didChangeRatio
+            || Self.isSameWeight(previous.feedFlourWeight, previousDefaultFeedWeight)
+        let shouldSyncWater = didChangeRatio
+            || Self.isSameWeight(previous.feedWaterWeight, previousDefaultFeedWeight)
+        let nextDefaultFeedWeight = defaultStarterFeedWeight(for: next)
+
+        if shouldSyncFlour {
+            next.feedFlourWeight = nextDefaultFeedWeight
+        }
+
+        if shouldSyncWater {
+            next.feedWaterWeight = nextDefaultFeedWeight
+        }
+    }
+
+    private func defaultStarterFeedWeight(for profile: StarterProfile) -> Double {
+        starterFinalWeight(for: profile) * profile.feedingRatio.feedMultiplier
+    }
+
+    private static func isSameWeight(_ lhs: Double, _ rhs: Double) -> Bool {
+        abs(lhs - rhs) < 0.0001
     }
 
     func updateBakeRecordNotes(_ notes: String, for record: BakeRecord) {
@@ -502,8 +695,16 @@ final class RecipeStore: ObservableObject {
     func removeItem(_ item: RecipeItem) {
         let flourCount = items.filter { $0.category == .flour }.count
         guard item.category != .flour || flourCount > 1 else { return }
-        items.removeAll { $0.id == item.id }
+        let snapshots = materialPercentageSnapshotsIfNeeded(forFlourChangeIn: [item])
+        let nextItems = items.filter { $0.id != item.id }
+        items = applyingMaterialPercentageSnapshots(snapshots, to: nextItems)
         steps = steps.map { step in
+            var next = step
+            next.materialAllocations.removeAll { $0.itemId == item.id }
+            return next
+        }
+        simpleStep.materialAllocations.removeAll { $0.itemId == item.id }
+        customSteps = customSteps.map { step in
             var next = step
             next.materialAllocations.removeAll { $0.itemId == item.id }
             return next
@@ -512,7 +713,18 @@ final class RecipeStore: ObservableObject {
 
     func updateItem(_ item: RecipeItem) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
-        items[index] = item
+        let snapshots = materialPercentageSnapshotsIfNeeded(forFlourChangeIn: [items[index], item])
+        var nextItems = items
+        nextItems[index] = item
+        items = applyingMaterialPercentageSnapshots(snapshots, to: nextItems)
+    }
+
+    func toggleFormulaIngredientLockMode() {
+        guard currentRecipeKind.usesBakerPercentageSystem else {
+            formulaIngredientLockMode = .weight
+            return
+        }
+        formulaIngredientLockMode = formulaIngredientLockMode.toggled
     }
 
     func moveItem(_ itemId: UUID, before targetId: UUID) {
@@ -589,6 +801,29 @@ final class RecipeStore: ObservableObject {
         var insertedSection = false
         for item in items {
             if displayGroup(for: item.category) == targetGroup {
+                if !insertedSection {
+                    rebuilt.append(contentsOf: reorderedSectionItems)
+                    insertedSection = true
+                }
+            } else {
+                rebuilt.append(item)
+            }
+        }
+        items = rebuilt
+    }
+
+    func reorderCakeMaterialItems(orderedIDs: [UUID]) {
+        let sectionItems = items.filter { $0.category != .starter }
+        let sectionIDs = Set(sectionItems.map(\.id))
+        guard Set(orderedIDs) == sectionIDs else { return }
+
+        let itemsByID = Dictionary(uniqueKeysWithValues: sectionItems.map { ($0.id, $0) })
+        let reorderedSectionItems = orderedIDs.compactMap { itemsByID[$0] }
+
+        var rebuilt: [RecipeItem] = []
+        var insertedSection = false
+        for item in items {
+            if item.category != .starter {
                 if !insertedSection {
                     rebuilt.append(contentsOf: reorderedSectionItems)
                     insertedSection = true
@@ -690,13 +925,16 @@ final class RecipeStore: ObservableObject {
         updateItem(next)
     }
 
-    func addStep(type: StepType) {
-        steps.append(makeStep(type: type))
+    @discardableResult
+    func addStep(type: StepType) -> JournalStep {
+        let step = makeStep(type: type)
+        steps.append(step)
+        return step
     }
 
     @discardableResult
     func addTextStep() -> JournalStep {
-        let step = JournalStep(id: UUID(), type: .other, name: BakingTerms.stepDefaultName(steps.count + 1), notes: "", materialAllocations: [])
+        let step = JournalStep(id: UUID(), type: .prep, name: BakingTerms.stepsCategoryPrepWork, notes: "", materialAllocations: [])
         steps.append(step)
         return step
     }
@@ -740,6 +978,39 @@ final class RecipeStore: ObservableObject {
     func reorderSteps(_ reorderedSteps: [JournalStep]) {
         guard Set(reorderedSteps.map(\.id)) == Set(steps.map(\.id)) else { return }
         steps = reorderedSteps
+    }
+
+    private func ensureActiveStepsForCurrentMode() {
+        switch stepsMode {
+        case .simple:
+            let nextStep = Self.normalizedSimpleStep(steps.first ?? simpleStep)
+            simpleStep = nextStep
+            if steps != [nextStep] {
+                steps = [nextStep]
+            }
+        case .custom:
+            if steps.isEmpty, !customSteps.isEmpty {
+                steps = customSteps
+            }
+        }
+    }
+
+    private func captureActiveStepsForCurrentMode() {
+        switch stepsMode {
+        case .simple:
+            simpleStep = Self.normalizedSimpleStep(steps.first ?? simpleStep)
+        case .custom:
+            customSteps = steps
+        }
+    }
+
+    private func syncStepModeBackupFromActiveSteps() {
+        switch stepsMode {
+        case .simple:
+            simpleStep = Self.normalizedSimpleStep(steps.first ?? simpleStep)
+        case .custom:
+            customSteps = steps
+        }
     }
 
     func assign(itemId: UUID, to step: JournalStep) {
@@ -808,12 +1079,80 @@ final class RecipeStore: ObservableObject {
     }
 
     func stepMinutes(_ step: JournalStep) -> Double {
+        if let foldPlan = step.foldPlan {
+            return Double(foldPlan.totalMinutes)
+        }
+
         let value = step.timeValue ?? 0
         return step.timeUnit == .hr ? value * 60 : value
     }
 
     func totalStepMinutes() -> Double {
         steps.reduce(0) { $0 + stepMinutes($1) }
+    }
+
+    func cookStepStartedAt(for step: JournalStep) -> Date? {
+        if steps.indices.contains(cookState.currentIndex),
+           steps[cookState.currentIndex].id == step.id,
+           let stepStartedAt = cookState.stepStartedAt {
+            return stepStartedAt
+        }
+
+        return activeBakeRecord?.stepTimings.last(where: { $0.stepID == step.id })?.startedAt
+    }
+
+    func cookStepEstimatedCompletionAt(for step: JournalStep) -> Date? {
+        if let foldPlan = step.foldPlan {
+            let records = foldRecords(for: step)
+            let completedCount = min(records.count, foldPlan.normalizedTargetCount)
+            if completedCount >= foldPlan.normalizedTargetCount {
+                return records.last?.foldedAt ?? cookStepStartedAt(for: step)
+            }
+
+            guard let baseDate = records.last?.foldedAt ?? cookStepStartedAt(for: step) else { return nil }
+            let remainingCount = foldPlan.normalizedTargetCount - completedCount
+            return baseDate.addingTimeInterval(Double(remainingCount * foldPlan.normalizedIntervalMinutes) * 60)
+        }
+
+        guard let startedAt = cookStepStartedAt(for: step) else { return nil }
+        return startedAt.addingTimeInterval(stepMinutes(step) * 60)
+    }
+
+    func isFoldStep(_ step: JournalStep) -> Bool {
+        step.foldPlan != nil
+    }
+
+    func foldRecords(for step: JournalStep) -> [BakeFoldRecord] {
+        activeBakeRecord?.foldRecords
+            .filter { $0.stepID == step.id }
+            .sorted {
+                if $0.sequence == $1.sequence {
+                    return $0.foldedAt < $1.foldedAt
+                }
+                return $0.sequence < $1.sequence
+            } ?? []
+    }
+
+    func foldProgress(for step: JournalStep) -> (completed: Int, target: Int)? {
+        guard let foldPlan = step.foldPlan else { return nil }
+        return (min(foldRecords(for: step).count, foldPlan.normalizedTargetCount), foldPlan.normalizedTargetCount)
+    }
+
+    func nextFoldReminderDate(for step: JournalStep) -> Date? {
+        guard let foldPlan = step.foldPlan else { return nil }
+        let records = foldRecords(for: step)
+        guard records.count < foldPlan.normalizedTargetCount else { return nil }
+        guard let baseDate = records.last?.foldedAt ?? cookStepStartedAt(for: step) else { return nil }
+        return baseDate.addingTimeInterval(Double(foldPlan.normalizedIntervalMinutes) * 60)
+    }
+
+    func isStepCompletionReminderEnabled(for step: JournalStep) -> Bool {
+        guard cookState.timerStepId == step.id else { return false }
+        return cookState.timerPurpose == nil || cookState.timerPurpose == .stepCompletion
+    }
+
+    func isFoldReminderEnabled(for step: JournalStep) -> Bool {
+        cookState.timerStepId == step.id && cookState.timerPurpose == .foldReminder && cookState.timerEndsAt != nil
     }
 
     func toggleCookItem(stepId: UUID, itemId: UUID) {
@@ -831,29 +1170,106 @@ final class RecipeStore: ObservableObject {
         cookState.completedStepIDs.contains(step.id)
     }
 
-    func completeCookStep(at index: Int) {
-        guard ensureCookStarted(), steps.indices.contains(index) else { return }
-        if index != cookState.currentIndex {
-            goToCookStep(index)
-        }
-        guard steps.indices.contains(cookState.currentIndex) else { return }
+    @discardableResult
+    func completeCookStep(at index: Int) -> Bool {
+        guard ensureCookStarted(),
+              steps.indices.contains(index),
+              index == cookState.currentIndex else { return false }
+        guard steps.indices.contains(cookState.currentIndex) else { return false }
         cookState.completedStepIDs.insert(steps[cookState.currentIndex].id)
         moveCookStep(1)
+        return true
     }
 
     func startTimer(for step: JournalStep) {
         guard ensureCookStarted() else { return }
-        let now = Date()
-        let minutes = stepMinutes(step)
-        cookState.timerStepId = step.id
-        cookState.timerEndsAt = now.addingTimeInterval(minutes * 60)
-
-        guard minutes > 0, let timerEndsAt = cookState.timerEndsAt else {
+        guard let estimatedCompletionAt = cookStepEstimatedCompletionAt(for: step) else {
             cancelCookTimerReminder()
             return
         }
 
-        scheduleCookTimerReminder(for: step, endsAt: timerEndsAt)
+        scheduleCookStepReminder(for: step, at: estimatedCompletionAt)
+    }
+
+    func scheduleCookStepReminder(for step: JournalStep, at fireDate: Date) {
+        guard ensureCookStarted() else { return }
+        guard stepMinutes(step) > 0 else {
+            clearActiveCookTimerState()
+            cancelCookTimerReminder()
+            return
+        }
+
+        cookState.timerStepId = step.id
+        cookState.timerEndsAt = fireDate
+        cookState.timerPurpose = .stepCompletion
+
+        scheduleCookTimerReminder(for: step, endsAt: fireDate)
+    }
+
+    func clearCookStepReminder(for step: JournalStep) {
+        guard cookState.timerStepId == step.id else { return }
+        guard cookState.timerPurpose == nil || cookState.timerPurpose == .stepCompletion else { return }
+        clearActiveCookTimerState()
+        cancelCookTimerReminder()
+    }
+
+    func scheduleFoldReminder(for step: JournalStep) {
+        guard ensureCookStarted(),
+              let foldPlan = step.foldPlan,
+              let nextFoldDate = nextFoldReminderDate(for: step) else {
+            clearFoldReminder(for: step)
+            return
+        }
+
+        let fireDate = max(nextFoldDate, Date().addingTimeInterval(1))
+        let nextSequence = min(foldRecords(for: step).count + 1, foldPlan.normalizedTargetCount)
+        cookState.timerStepId = step.id
+        cookState.timerEndsAt = fireDate
+        cookState.timerPurpose = .foldReminder
+        scheduleCookFoldReminder(for: step, foldIndex: nextSequence, endsAt: fireDate)
+    }
+
+    func clearFoldReminder(for step: JournalStep) {
+        guard cookState.timerStepId == step.id, cookState.timerPurpose == .foldReminder else { return }
+        clearActiveCookTimerState()
+        cancelCookTimerReminder()
+    }
+
+    func recordFold(for step: JournalStep) {
+        guard ensureCookStarted(),
+              let foldPlan = step.foldPlan,
+              steps.indices.contains(cookState.currentIndex),
+              steps[cookState.currentIndex].id == step.id,
+              !isCookStepCompleted(step),
+              let activeBakeRecordID,
+              let recordIndex = bakeHistory.firstIndex(where: { $0.id == activeBakeRecordID }) else {
+            return
+        }
+
+        let existingRecords = bakeHistory[recordIndex].foldRecords
+            .filter { $0.stepID == step.id }
+        guard existingRecords.count < foldPlan.normalizedTargetCount else {
+            clearFoldReminder(for: step)
+            return
+        }
+
+        let sequence = (existingRecords.map(\.sequence).max() ?? 0) + 1
+        bakeHistory[recordIndex].foldRecords.append(
+            BakeFoldRecord(
+                id: UUID(),
+                stepID: step.id,
+                stepName: step.name,
+                sequence: sequence,
+                foldedAt: Date()
+            )
+        )
+
+        let updatedCount = existingRecords.count + 1
+        if updatedCount >= foldPlan.normalizedTargetCount {
+            clearFoldReminder(for: step)
+        } else if isFoldReminderEnabled(for: step) {
+            scheduleFoldReminder(for: step)
+        }
     }
 
     func moveCookStep(_ direction: Int) {
@@ -865,6 +1281,7 @@ final class RecipeStore: ObservableObject {
             closeCurrentStepTiming(at: finishedAt)
             cookState.completedAt = finishedAt
             finalizeBakeRecord()
+            clearActiveCookTimerState()
             cancelCookTimerReminder()
             return
         }
@@ -872,8 +1289,7 @@ final class RecipeStore: ObservableObject {
         closeCurrentStepTiming(at: now)
         cookState.currentIndex = nextIndex
         cookState.stepStartedAt = now
-        cookState.timerEndsAt = nil
-        cookState.timerStepId = nil
+        clearActiveCookTimerState()
         startTimingForCurrentStep(at: now)
         cancelCookTimerReminder()
     }
@@ -887,8 +1303,7 @@ final class RecipeStore: ObservableObject {
         closeCurrentStepTiming(at: now)
         cookState.currentIndex = clamped
         cookState.stepStartedAt = now
-        cookState.timerEndsAt = nil
-        cookState.timerStepId = nil
+        clearActiveCookTimerState()
         startTimingForCurrentStep(at: now)
         cancelCookTimerReminder()
     }
@@ -897,6 +1312,20 @@ final class RecipeStore: ObservableObject {
         cookState = CookState()
         activeBakeRecordID = nil
         cancelCookTimerReminder()
+    }
+
+    @discardableResult
+    func startNewBake() -> Bool {
+        guard isReadyToBake else { return false }
+        cancelCookTimerReminder()
+
+        let startedAt = Date()
+        cookState = CookState()
+        cookState.totalStartedAt = startedAt
+        activeBakeRecordID = createBakeRecord(startedAt: startedAt)
+        cookState.stepStartedAt = startedAt
+        startTimingForCurrentStep(at: startedAt)
+        return true
     }
 
     func completeBake() {
@@ -908,6 +1337,7 @@ final class RecipeStore: ObservableObject {
         closeCurrentStepTiming(at: finishedAt)
         cookState.completedAt = finishedAt
         finalizeBakeRecord()
+        clearActiveCookTimerState()
         cancelCookTimerReminder()
     }
 
@@ -941,33 +1371,62 @@ final class RecipeStore: ObservableObject {
     }
 
     func exportRecipeData() throws -> Data {
-        let state = LegacyPersistedRecipe(
-            recipeName: recipeName,
-            overallNotes: recipeOverallNotes,
-            stepText: stepText,
-            items: items,
-            steps: steps
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(state)
+        try exportCurrentRecipeExchangeData()
     }
 
     func importRecipeData(_ data: Data) throws {
-        let decoded = try JSONDecoder().decode(LegacyPersistedRecipe.self, from: data)
+        _ = try importRecipeExchangeData(data)
+    }
+
+    func exportCurrentRecipeExchangeData() throws -> Data {
+        let document = RecipeExchangeDocumentV1.document(
+            name: currentRecipeDisplayName,
+            kind: currentRecipeKind,
+            overallNotes: recipeOverallNotes,
+            items: items,
+            steps: currentActiveStepsForPersistence()
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return try encoder.encode(document)
+    }
+
+    @discardableResult
+    func importRecipeExchangeJSONString(_ text: String) throws -> SavedRecipe {
+        try importRecipeExchangeData(RecipeExchangeDocumentV1.data(fromJSONString: text))
+    }
+
+    @discardableResult
+    func importRecipeExchangeData(_ data: Data) throws -> SavedRecipe {
+        let document: RecipeExchangeDocumentV1
+        do {
+            document = try RecipeExchangeDocumentV1.decode(from: data)
+        } catch let error as RecipeExchangeError {
+            throw error
+        } catch {
+            throw RecipeExchangeError.invalidJSON
+        }
+        let importedRecipe = try document.makeSavedRecipe()
         cancelCookTimerReminder()
         isLoading = true
-        recipeName = decoded.recipeName.isEmpty ? BakingTerms.toastRecipeName : decoded.recipeName
-        recipeOverallNotes = decoded.overallNotes
-        stepText = decoded.stepText
-        items = decoded.items.isEmpty ? Self.defaultItems : decoded.items
-        currentRecipeKind = RecipeKind.inferred(name: recipeName, items: items)
-        steps = decoded.steps
-        isLoading = false
+        recipeName = importedRecipe.name
+        currentRecipeKind = importedRecipe.kind
+        recipeOverallNotes = importedRecipe.overallNotes
+        stepText = importedRecipe.stepText
+        items = importedRecipe.items
+        stepsMode = importedRecipe.stepsMode
+        simpleStep = Self.simpleStepApplyingBackwardCompatibleUpdates(importedRecipe.simpleStep ?? importedRecipe.steps.first, kind: importedRecipe.kind, items: importedRecipe.items)
+        customSteps = customSteps(for: importedRecipe)
+        steps = activeSteps(for: importedRecipe)
+        formulaIngredientLockMode = importedRecipe.formulaIngredientLockMode
         cookState = CookState()
-        currentRecipeID = nil
+        currentRecipeID = importedRecipe.id
         activeBakeRecordID = nil
+        currentWorkflowState = importedRecipe.workflowState
+        savedRecipes.insert(importedRecipe, at: 0)
+        isLoading = false
         persist()
+        return importedRecipe
     }
 
     func flourContribution(_ item: RecipeItem) -> Double {
@@ -1058,6 +1517,28 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    private func scheduleCookFoldReminder(for step: JournalStep, foldIndex: Int, endsAt: Date) {
+        let recipeName = currentRecipeDisplayName
+        Task { [notifications] in
+            await notifications.cancel(scope: .cookTimer)
+            _ = await notifications.schedule(
+                .cookFoldReminder(
+                    recipeName: recipeName,
+                    stepId: step.id,
+                    stepName: step.name,
+                    foldIndex: foldIndex,
+                    fireDate: endsAt
+                )
+            )
+        }
+    }
+
+    private func clearActiveCookTimerState() {
+        cookState.timerEndsAt = nil
+        cookState.timerStepId = nil
+        cookState.timerPurpose = nil
+    }
+
     private func cancelCookTimerReminder() {
         Task { [notifications] in
             await notifications.cancel(scope: .cookTimer)
@@ -1075,7 +1556,13 @@ final class RecipeStore: ObservableObject {
 
             for profile in profiles where profile.isReminderEnabled {
                 let starterName = starterDisplayName(for: profile)
-                let reminderDay = calendar.startOfDay(for: profile.nextFeedingDate)
+                let reminderDay = calendar.startOfDay(
+                    for: StarterProfile.scheduledNextFeedingDate(
+                        after: profile.lastFedAt,
+                        frequencyDays: profile.feedingFrequencyDays,
+                        calendar: calendar
+                    )
+                )
 
                 if reminderDay < todayStart {
                     guard let fireDate = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: now) else {
@@ -1181,22 +1668,129 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    private func currentActiveStepsForPersistence() -> [JournalStep] {
+        switch stepsMode {
+        case .simple:
+            return [currentSimpleStepForPersistence()]
+        case .custom:
+            return currentCustomStepsForPersistence()
+        }
+    }
+
+    private func currentSimpleStepForPersistence() -> JournalStep {
+        Self.normalizedSimpleStep(stepsMode == .simple ? steps.first ?? simpleStep : simpleStep)
+    }
+
+    private func currentCustomStepsForPersistence() -> [JournalStep] {
+        Self.stepsApplyingBackwardCompatibleUpdates(stepsMode == .custom ? steps : customSteps, kind: currentRecipeKind)
+    }
+
+    private func activeSteps(for recipe: SavedRecipe) -> [JournalStep] {
+        switch recipe.stepsMode {
+        case .simple:
+            return [Self.simpleStepApplyingBackwardCompatibleUpdates(recipe.simpleStep ?? recipe.steps.first, kind: recipe.kind, items: recipe.items)]
+        case .custom:
+            return customSteps(for: recipe)
+        }
+    }
+
+    private func customSteps(for recipe: SavedRecipe) -> [JournalStep] {
+        Self.stepsApplyingBackwardCompatibleUpdates(
+            recipe.customSteps.isEmpty && recipe.stepsMode == .custom ? recipe.steps : recipe.customSteps,
+            kind: recipe.kind
+        )
+    }
+
+    private func currentDraftActiveSteps(_ draft: LegacyPersistedRecipe, kind: RecipeKind, items: [RecipeItem]) -> [JournalStep] {
+        switch draft.stepsMode {
+        case .simple:
+            return [Self.simpleStepApplyingBackwardCompatibleUpdates(draft.simpleStep ?? draft.steps.first, kind: kind, items: items)]
+        case .custom:
+            return customSteps(for: draft, kind: kind)
+        }
+    }
+
+    private func customSteps(for draft: LegacyPersistedRecipe, kind: RecipeKind) -> [JournalStep] {
+        Self.stepsApplyingBackwardCompatibleUpdates(
+            draft.customSteps.isEmpty && draft.stepsMode == .custom ? draft.steps : draft.customSteps,
+            kind: kind
+        )
+    }
+
+    private static func makeSimpleStep() -> JournalStep {
+        JournalStep(
+            id: UUID(),
+            type: .other,
+            name: BakingTerms.stepsSimpleStepName,
+            notes: "",
+            materialAllocations: []
+        )
+    }
+
+    private static func normalizedSimpleStep(_ step: JournalStep?) -> JournalStep {
+        var next = step ?? makeSimpleStep()
+        next.type = .other
+        if next.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            next.name = BakingTerms.stepsSimpleStepName
+        }
+        next.timeValue = nil
+        next.timeUnit = nil
+        next.temperature = nil
+        next.temperatureUnit = nil
+        next.productionMethod = nil
+        next.shapingPieceCount = nil
+        next.foldPlan = nil
+        return next
+    }
+
+    private static func simpleStepApplyingBackwardCompatibleUpdates(
+        _ step: JournalStep?,
+        kind: RecipeKind,
+        items: [RecipeItem]
+    ) -> JournalStep {
+        let normalized = normalizedSimpleStep(step)
+        let hasUserContent = !normalized.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !normalized.materialAllocations.isEmpty
+        guard !hasUserContent || isGeneratedSimpleTemplateSummary(normalized, kind: kind, items: items),
+              let template = templateSimpleStep(kind: kind, items: items) else {
+            return normalized
+        }
+        return normalizedSimpleStep(template)
+    }
+
+    private static func hasReadyStepContent(
+        steps: [JournalStep],
+        stepsMode: RecipeStepsMode,
+        simpleStep: JournalStep?
+    ) -> Bool {
+        switch stepsMode {
+        case .simple:
+            return hasSimpleStepText(steps.first ?? simpleStep)
+        case .custom:
+            return !steps.isEmpty
+        }
+    }
+
+    private static func hasSimpleStepText(_ step: JournalStep?) -> Bool {
+        guard let step else { return false }
+        return !step.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private func makeStep(type: StepType) -> JournalStep {
         let nextCount = steps.filter { $0.type == type }.count + 1
         switch type {
         case .prep:
-            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepPrepName, notes: nextCount == 1 ? BakingTerms.stepPrepNote : "", materialAllocations: [])
+            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepsCategoryPrepWork, notes: nextCount == 1 ? BakingTerms.stepPrepNote : "", materialAllocations: [])
         case .mixing:
-            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepMixingName, notes: nextCount == 1 ? BakingTerms.stepMixingFirstNote : BakingTerms.stepMixingLaterNote, materialAllocations: [], timeValue: 20, timeUnit: .min)
+            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepsCategoryMixing, notes: nextCount == 1 ? BakingTerms.stepMixingFirstNote : BakingTerms.stepMixingLaterNote, materialAllocations: [], timeValue: 20, timeUnit: .min)
         case .fermentation:
-            let stage = nextCount == 1 ? BakingTerms.fermentationStageFirst : BakingTerms.fermentationStageSecond
-            return JournalStep(id: UUID(), type: type, name: BakingTerms.fermentationStepName(stage: stage), notes: "", materialAllocations: [], timeValue: 60, timeUnit: .min, temperature: 85)
+            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepsCategoryFermentation, notes: "", materialAllocations: [], timeValue: 60, timeUnit: .min, temperature: 85)
         case .baking:
-            return JournalStep(id: UUID(), type: type, name: BakingTerms.productionStepName, notes: "", materialAllocations: [], timeValue: 30, timeUnit: .min, temperature: 350, temperatureUnit: .fahrenheit, productionMethod: .bake)
+            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepsCategoryBaking, notes: "", materialAllocations: [], timeValue: 30, timeUnit: .min, temperature: 350, temperatureUnit: .fahrenheit, productionMethod: .bake)
         case .rest:
-            return JournalStep(id: UUID(), type: type, name: type.label, notes: "", materialAllocations: [], timeValue: 20, timeUnit: .min)
+            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepsCategoryProofing, notes: "", materialAllocations: [], timeValue: 20, timeUnit: .min)
         case .shaping:
-            return JournalStep(id: UUID(), type: type, name: type.label, notes: "", materialAllocations: [], timeValue: 15, timeUnit: .min)
+            return JournalStep(id: UUID(), type: type, name: BakingTerms.stepsCategoryShaping, notes: "", materialAllocations: [], timeValue: 15, timeUnit: .min)
         case .other:
             return JournalStep(id: UUID(), type: type, name: BakingTerms.customStepName, notes: "", materialAllocations: [])
         }
@@ -1212,6 +1806,44 @@ final class RecipeStore: ObservableObject {
         let nextWeight = max(0, weight)
         item.waterContentPct = Self.waterContent(forEggType: item.eggType)
         item.weight = nextWeight
+    }
+
+    private func materialPercentageSnapshotsIfNeeded(forFlourChangeIn changedItems: [RecipeItem]) -> [UUID: Double] {
+        guard currentRecipeKind.usesBakerPercentageSystem,
+              formulaIngredientLockMode == .percentage,
+              changedItems.contains(where: { displayGroup(for: $0.category) == .flour }) else {
+            return [:]
+        }
+
+        let flourWeight = summary(for: items).flourWeight
+        guard flourWeight > 0 else { return [:] }
+        return Dictionary(uniqueKeysWithValues: items.compactMap { item in
+            guard displayGroup(for: item.category) == .basic else { return nil }
+            return (item.id, item.weight / flourWeight * 100)
+        })
+    }
+
+    private func applyingMaterialPercentageSnapshots(_ snapshots: [UUID: Double], to nextItems: [RecipeItem]) -> [RecipeItem] {
+        guard !snapshots.isEmpty else { return nextItems }
+        let flourWeight = summary(for: nextItems).flourWeight
+        return nextItems.map { item in
+            guard displayGroup(for: item.category) == .basic,
+                  let percentage = snapshots[item.id] else {
+                return item
+            }
+
+            var next = item
+            setMaterialWeight(&next, weight: flourWeight * percentage / 100)
+            return next
+        }
+    }
+
+    private func setMaterialWeight(_ item: inout RecipeItem, weight: Double) {
+        if item.tag == .egg {
+            setEggWeight(&item, weight: weight)
+        } else {
+            item.weight = max(0, weight)
+        }
     }
 
     private func displayGroup(for category: ItemCategory) -> ItemCategory {
@@ -1273,13 +1905,19 @@ final class RecipeStore: ObservableObject {
             rescheduleStarterReminders()
         }
         guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+            let templateItems = Self.defaultItems
+            let templateSteps = Self.templateTutorialSteps(kind: .toast, items: templateItems)
             recipeName = BakingTerms.toastRecipeName
             currentRecipeKind = .toast
             recipeOverallNotes = ""
             stepText = ""
-            items = Self.defaultItems
-            steps = []
+            items = templateItems
+            stepsMode = .simple
+            simpleStep = templateSteps.simple
+            customSteps = templateSteps.custom
+            steps = [simpleStep]
             starterProfiles = [StarterProfile()]
+            formulaIngredientLockMode = .weight
             return
         }
 
@@ -1288,11 +1926,15 @@ final class RecipeStore: ObservableObject {
             recipeOverallNotes = decoded.currentDraft.overallNotes
             stepText = decoded.currentDraft.stepText
             items = decoded.currentDraft.items.isEmpty ? Self.defaultItems : decoded.currentDraft.items
+            formulaIngredientLockMode = decoded.currentDraft.formulaIngredientLockMode
             currentRecipeKind = decoded.currentRecipeKind
-            steps = decoded.currentDraft.steps
+            stepsMode = decoded.currentDraft.stepsMode
+            simpleStep = Self.simpleStepApplyingBackwardCompatibleUpdates(decoded.currentDraft.simpleStep ?? decoded.currentDraft.steps.first, kind: currentRecipeKind, items: items)
+            customSteps = customSteps(for: decoded.currentDraft, kind: currentRecipeKind)
+            steps = currentDraftActiveSteps(decoded.currentDraft, kind: currentRecipeKind, items: items)
             cookState = decoded.cookState
             currentRecipeID = decoded.currentRecipeID
-            savedRecipes = decoded.savedRecipes
+            savedRecipes = decoded.savedRecipes.map(Self.recipeApplyingBackwardCompatibleUpdates)
             bakeHistory = decoded.bakeHistory
             activeBakeRecordID = decoded.activeBakeRecordID
             starterProfiles = decoded.starterProfiles.isEmpty ? [StarterProfile()] : decoded.starterProfiles
@@ -1305,8 +1947,12 @@ final class RecipeStore: ObservableObject {
             recipeOverallNotes = legacy.overallNotes
             stepText = legacy.stepText
             items = legacy.items.isEmpty ? Self.defaultItems : legacy.items
+            formulaIngredientLockMode = legacy.formulaIngredientLockMode
             currentRecipeKind = RecipeKind.inferred(name: recipeName, items: items)
-            steps = legacy.steps
+            stepsMode = legacy.stepsMode
+            simpleStep = Self.simpleStepApplyingBackwardCompatibleUpdates(legacy.simpleStep ?? legacy.steps.first, kind: currentRecipeKind, items: items)
+            customSteps = customSteps(for: legacy, kind: currentRecipeKind)
+            steps = currentDraftActiveSteps(legacy, kind: currentRecipeKind, items: items)
             cookState = CookState()
             currentRecipeID = nil
             savedRecipes = []
@@ -1321,8 +1967,13 @@ final class RecipeStore: ObservableObject {
         currentRecipeKind = .toast
         recipeOverallNotes = ""
         stepText = ""
-        items = Self.defaultItems
-        steps = []
+        let templateItems = Self.defaultItems
+        let templateSteps = Self.templateTutorialSteps(kind: .toast, items: templateItems)
+        items = templateItems
+        stepsMode = .simple
+        simpleStep = templateSteps.simple
+        customSteps = templateSteps.custom
+        steps = [simpleStep]
         cookState = CookState()
         currentRecipeID = nil
         savedRecipes = []
@@ -1330,6 +1981,7 @@ final class RecipeStore: ObservableObject {
         activeBakeRecordID = nil
         starterProfiles = [StarterProfile()]
         currentWorkflowState = .draft
+        formulaIngredientLockMode = .weight
     }
 
     private func persist() {
@@ -1340,7 +1992,11 @@ final class RecipeStore: ObservableObject {
                 overallNotes: recipeOverallNotes,
                 stepText: stepText,
                 items: items,
-                steps: steps
+                steps: steps,
+                stepsMode: stepsMode,
+                simpleStep: currentSimpleStepForPersistence(),
+                customSteps: currentCustomStepsForPersistence(),
+                formulaIngredientLockMode: formulaIngredientLockMode
             ),
             cookState: cookState,
             currentRecipeID: currentRecipeID,
@@ -1441,19 +2097,31 @@ final class RecipeStore: ObservableObject {
         var stepText: String
         var items: [RecipeItem]
         var steps: [JournalStep]
+        var stepsMode: RecipeStepsMode
+        var simpleStep: JournalStep?
+        var customSteps: [JournalStep]
+        var formulaIngredientLockMode: FormulaIngredientLockMode
 
         init(
             recipeName: String,
             overallNotes: String = "",
             stepText: String = "",
             items: [RecipeItem],
-            steps: [JournalStep]
+            steps: [JournalStep],
+            stepsMode: RecipeStepsMode = .simple,
+            simpleStep: JournalStep? = nil,
+            customSteps: [JournalStep] = [],
+            formulaIngredientLockMode: FormulaIngredientLockMode = .weight
         ) {
             self.recipeName = recipeName
             self.overallNotes = overallNotes
             self.stepText = stepText
             self.items = items
             self.steps = steps
+            self.stepsMode = stepsMode
+            self.simpleStep = simpleStep
+            self.customSteps = customSteps
+            self.formulaIngredientLockMode = formulaIngredientLockMode
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -1462,6 +2130,10 @@ final class RecipeStore: ObservableObject {
             case stepText
             case items
             case steps
+            case stepsMode
+            case simpleStep
+            case customSteps
+            case formulaIngredientLockMode
         }
 
         init(from decoder: Decoder) throws {
@@ -1471,6 +2143,12 @@ final class RecipeStore: ObservableObject {
             stepText = try container.decodeIfPresent(String.self, forKey: .stepText) ?? ""
             items = try container.decode([RecipeItem].self, forKey: .items)
             steps = try container.decode([JournalStep].self, forKey: .steps)
+            stepsMode = try container.decodeIfPresent(RecipeStepsMode.self, forKey: .stepsMode)
+                ?? (steps.count > 1 ? .custom : .simple)
+            simpleStep = try container.decodeIfPresent(JournalStep.self, forKey: .simpleStep)
+            customSteps = try container.decodeIfPresent([JournalStep].self, forKey: .customSteps)
+                ?? (stepsMode == .custom ? steps : [])
+            formulaIngredientLockMode = try container.decodeIfPresent(FormulaIngredientLockMode.self, forKey: .formulaIngredientLockMode) ?? .weight
         }
     }
 
@@ -1487,6 +2165,7 @@ final class RecipeStore: ObservableObject {
         RecipeItem(id: UUID(), category: .flour, tag: .flour, name: BakingTerms.lowGlutenFlour, weight: 90),
         RecipeItem(id: UUID(), category: .basic, tag: .egg, name: BakingTerms.egg, weight: 250, waterContentPct: 75, eggType: BakingTerms.beatenEgg),
         RecipeItem(id: UUID(), category: .basic, tag: .sugar, name: BakingTerms.granulatedSugar, weight: 80),
+        RecipeItem(id: UUID(), category: .basic, tag: .cream, name: BakingTerms.cream, weight: 100),
         RecipeItem(id: UUID(), category: .basic, tag: .water, name: BakingTerms.milk, weight: 60, waterContentPct: 100),
         RecipeItem(id: UUID(), category: .other, tag: .other, name: BakingTerms.cornOil, weight: 55, waterContentPct: 0)
     ]
@@ -1499,6 +2178,444 @@ final class RecipeStore: ObservableObject {
         RecipeItem(id: UUID(), category: .basic, tag: .yeast, name: BakingTerms.yeast, weight: 4),
         RecipeItem(id: UUID(), category: .other, tag: .other, name: BakingTerms.oliveOil, weight: 12, waterContentPct: 0)
     ]
+
+    private static let defaultCountryBreadFoldPlan = StepFoldPlan(targetCount: 4, intervalMinutes: 30)
+    private static let countryBreadFoldStepAliases = [
+        "折叠发酵",
+        "Fold and ferment"
+    ]
+
+    @discardableResult
+    private func applyBackwardCompatibleRecipeUpdatesToSavedRecipes() -> Bool {
+        let updatedRecipes = savedRecipes.map(Self.recipeApplyingBackwardCompatibleUpdates)
+        guard updatedRecipes != savedRecipes else { return false }
+        savedRecipes = updatedRecipes
+        return true
+    }
+
+    private static func recipeApplyingBackwardCompatibleUpdates(_ recipe: SavedRecipe) -> SavedRecipe {
+        var next = recipe
+        let simpleStep = simpleStepApplyingBackwardCompatibleUpdates(
+            recipe.simpleStep ?? recipe.steps.first,
+            kind: recipe.kind,
+            items: recipe.items
+        )
+        next.simpleStep = simpleStep
+        next.steps = recipe.stepsMode == .simple
+            ? [simpleStep]
+            : stepsApplyingBackwardCompatibleUpdates(recipe.steps, kind: recipe.kind)
+        let customSource = recipe.customSteps.isEmpty && recipe.stepsMode == .custom ? recipe.steps : recipe.customSteps
+        next.customSteps = stepsApplyingBackwardCompatibleUpdates(customSource, kind: recipe.kind)
+        return next
+    }
+
+    /// Applies additive schema updates to existing recipes without syncing them to the latest template.
+    ///
+    /// Template definitions are only the source of truth for newly created recipes. Existing recipes may
+    /// contain older template steps, renamed steps, or user-added steps, and those must be preserved.
+    /// Backward-compatible updates here may only fill missing metadata on existing steps.
+    /// Do not delete, reorder, rename, or replace steps from a newer template list.
+    private static func stepsApplyingBackwardCompatibleUpdates(_ steps: [JournalStep], kind: RecipeKind) -> [JournalStep] {
+        guard kind == .countryBread,
+              !steps.contains(where: { $0.foldPlan != nil }) else {
+            return steps
+        }
+
+        var nextSteps = steps
+        let explicitIndex = nextSteps.firstIndex(where: isCountryBreadFoldStep)
+        let fallbackIndex = nextSteps.firstIndex { $0.type == .fermentation }
+
+        guard let foldStepIndex = explicitIndex ?? fallbackIndex else {
+            return steps
+        }
+
+        nextSteps[foldStepIndex].foldPlan = defaultCountryBreadFoldPlan
+        return nextSteps
+    }
+
+    private static func isCountryBreadFoldStep(_ step: JournalStep) -> Bool {
+        guard step.type == .fermentation else { return false }
+        let normalizedName = step.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if countryBreadFoldStepAliases.contains(where: { alias in
+            normalizedName.localizedCaseInsensitiveContains(alias)
+        }) {
+            return true
+        }
+
+        let normalizedNotes = step.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalizedNotes.localizedCaseInsensitiveContains("拉伸折叠")
+            || normalizedNotes.localizedCaseInsensitiveContains("stretch-and-fold")
+            || normalizedNotes.localizedCaseInsensitiveContains("stretch and fold")
+    }
+
+    private static func templateTutorialSteps(kind: RecipeKind, items: [RecipeItem]) -> (simple: JournalStep, custom: [JournalStep]) {
+        let customSteps = templateCustomSteps(kind: kind, items: items)
+        return (
+            simple: templateSimpleStep(from: customSteps, items: items) ?? makeSimpleStep(),
+            custom: customSteps
+        )
+    }
+
+    private static func templateCustomSteps(kind: RecipeKind, items: [RecipeItem]) -> [JournalStep] {
+        switch kind {
+        case .toast:
+            return toastTemplateSteps(items: items)
+        case .chiffon:
+            return chiffonTemplateSteps(items: items)
+        case .countryBread:
+            return countryBreadTemplateSteps(items: items)
+        case .custom:
+            return []
+        }
+    }
+
+    private static func templateSimpleStep(kind: RecipeKind, items: [RecipeItem]) -> JournalStep? {
+        templateSimpleStep(from: templateCustomSteps(kind: kind, items: items), items: items)
+    }
+
+    private static func templateSimpleStep(from customSteps: [JournalStep], items: [RecipeItem]) -> JournalStep? {
+        let note = simpleTutorialNote(from: customSteps)
+        guard !note.isEmpty else { return nil }
+
+        return JournalStep(
+            id: UUID(),
+            type: .other,
+            name: BakingTerms.stepsSimpleStepName,
+            notes: note,
+            materialAllocations: allocations(in: items)
+        )
+    }
+
+    static func simpleStepForRecipeExchangeImport(steps: [JournalStep], items: [RecipeItem]) -> JournalStep {
+        JournalStep(
+            id: UUID(),
+            type: .other,
+            name: BakingTerms.stepsSimpleStepName,
+            notes: simpleTutorialNote(from: steps),
+            materialAllocations: allocations(in: items)
+        )
+    }
+
+    static func stepsForRecipeExchangeImport(_ steps: [JournalStep], kind: RecipeKind) -> [JournalStep] {
+        stepsApplyingBackwardCompatibleUpdates(steps, kind: kind)
+    }
+
+    private static func simpleTutorialNote(from steps: [JournalStep]) -> String {
+        steps.enumerated()
+            .map { index, step in
+                [
+                    "\(index + 1). \(step.name)",
+                    step.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                ]
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
+            }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    private static func isGeneratedSimpleTemplateSummary(
+        _ step: JournalStep,
+        kind: RecipeKind,
+        items: [RecipeItem]
+    ) -> Bool {
+        let summary: String?
+        switch kind {
+        case .toast:
+            summary = BakingTerms.templateToastSimpleNote
+        case .chiffon:
+            summary = BakingTerms.templateChiffonSimpleNote
+        case .countryBread:
+            summary = BakingTerms.templateCountryBreadSimpleNote
+        case .custom:
+            summary = nil
+        }
+
+        guard let summary else { return false }
+        let expectedNotes = templateNote(summary, materials: materialLines(in: items))
+        return step.notes.trimmingCharacters(in: .whitespacesAndNewlines) == expectedNotes
+    }
+
+    private static func toastTemplateSteps(items: [RecipeItem]) -> [JournalStep] {
+        let mixAllocations = allocations(in: items, tags: [.flour, .water, .sugar, .yeast])
+        let butterAllocations = allocations(in: items, tags: [.salt, .butter])
+
+        return [
+            templateStep(
+                type: .prep,
+                name: BakingTerms.templateToastPrepName,
+                notes: BakingTerms.templateToastPrepNote,
+                timeValue: 10,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .mixing,
+                name: BakingTerms.templateToastMixName,
+                notes: templateNote(
+                    BakingTerms.templateToastMixNote,
+                    materials: materialLines(in: items, allocations: mixAllocations)
+                ),
+                allocations: mixAllocations,
+                timeValue: 15,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .mixing,
+                name: BakingTerms.templateToastButterName,
+                notes: templateNote(
+                    BakingTerms.templateToastButterNote,
+                    materials: materialLines(in: items, allocations: butterAllocations)
+                ),
+                allocations: butterAllocations,
+                timeValue: 10,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .fermentation,
+                name: BakingTerms.templateToastBulkName,
+                notes: BakingTerms.templateToastBulkNote,
+                timeValue: 60,
+                timeUnit: .min,
+                temperature: 28,
+                temperatureUnit: .celsius
+            ),
+            templateStep(
+                type: .shaping,
+                name: BakingTerms.templateToastShapeName,
+                notes: BakingTerms.templateToastShapeNote,
+                timeValue: 15,
+                timeUnit: .min,
+                shapingPieceCount: 4
+            ),
+            templateStep(
+                type: .rest,
+                name: BakingTerms.templateToastProofName,
+                notes: BakingTerms.templateToastProofNote,
+                timeValue: 45,
+                timeUnit: .min,
+                temperature: 30,
+                temperatureUnit: .celsius
+            ),
+            templateStep(
+                type: .baking,
+                name: BakingTerms.templateToastBakeName,
+                notes: BakingTerms.templateToastBakeNote,
+                timeValue: 32,
+                timeUnit: .min,
+                temperature: 350,
+                temperatureUnit: .fahrenheit,
+                productionMethod: .bake
+            )
+        ]
+    }
+
+    private static func chiffonTemplateSteps(items: [RecipeItem]) -> [JournalStep] {
+        let yolkAllocations = allocations(in: items, tags: [.flour, .water, .cream, .other])
+            + allocations(in: items, tags: [.egg], percentage: 50)
+            + allocations(in: items, tags: [.sugar], percentage: 30)
+        let meringueAllocations = allocations(in: items, tags: [.egg], percentage: 50)
+            + allocations(in: items, tags: [.sugar], percentage: 70)
+
+        return [
+            templateStep(
+                type: .prep,
+                name: BakingTerms.templateChiffonPrepName,
+                notes: BakingTerms.templateChiffonPrepNote,
+                timeValue: 10,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .mixing,
+                name: BakingTerms.templateChiffonYolkName,
+                notes: templateNote(
+                    BakingTerms.templateChiffonYolkNote,
+                    materials: materialLines(in: items, allocations: yolkAllocations)
+                ),
+                allocations: yolkAllocations,
+                timeValue: 10,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .mixing,
+                name: BakingTerms.templateChiffonMeringueName,
+                notes: templateNote(
+                    BakingTerms.templateChiffonMeringueNote,
+                    materials: materialLines(in: items, allocations: meringueAllocations)
+                ),
+                allocations: meringueAllocations,
+                timeValue: 8,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .mixing,
+                name: BakingTerms.templateChiffonFoldName,
+                notes: BakingTerms.templateChiffonFoldNote,
+                timeValue: 8,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .baking,
+                name: BakingTerms.templateChiffonBakeName,
+                notes: BakingTerms.templateChiffonBakeNote,
+                timeValue: 50,
+                timeUnit: .min,
+                temperature: 340,
+                temperatureUnit: .fahrenheit,
+                productionMethod: .bake
+            ),
+            templateStep(
+                type: .rest,
+                name: BakingTerms.templateChiffonCoolName,
+                notes: BakingTerms.templateChiffonCoolNote,
+                timeValue: 60,
+                timeUnit: .min
+            )
+        ]
+    }
+
+    private static func countryBreadTemplateSteps(items: [RecipeItem]) -> [JournalStep] {
+        let mixAllocations = allocations(in: items)
+
+        return [
+            templateStep(
+                type: .mixing,
+                name: BakingTerms.templateCountryBreadMixName,
+                notes: templateNote(
+                    BakingTerms.templateCountryBreadMixNote,
+                    materials: materialLines(in: items, allocations: mixAllocations)
+                ),
+                allocations: mixAllocations,
+                timeValue: 10,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .fermentation,
+                name: BakingTerms.templateCountryBreadBulkName,
+                notes: BakingTerms.templateCountryBreadBulkNote,
+                temperature: 24,
+                temperatureUnit: .celsius,
+                foldPlan: defaultCountryBreadFoldPlan
+            ),
+            templateStep(
+                type: .rest,
+                name: BakingTerms.templateCountryBreadColdName,
+                notes: BakingTerms.templateCountryBreadColdNote,
+                timeValue: 8,
+                timeUnit: .hr
+            ),
+            templateStep(
+                type: .shaping,
+                name: BakingTerms.templateCountryBreadPreshapeName,
+                notes: BakingTerms.templateCountryBreadPreshapeNote,
+                timeValue: 30,
+                timeUnit: .min
+            ),
+            templateStep(
+                type: .rest,
+                name: BakingTerms.templateCountryBreadProofName,
+                notes: BakingTerms.templateCountryBreadProofNote,
+                timeValue: 150,
+                timeUnit: .min,
+                temperature: 24,
+                temperatureUnit: .celsius
+            ),
+            templateStep(
+                type: .baking,
+                name: BakingTerms.templateCountryBreadBakeName,
+                notes: BakingTerms.templateCountryBreadBakeNote,
+                timeValue: 45,
+                timeUnit: .min,
+                temperature: 450,
+                temperatureUnit: .fahrenheit,
+                productionMethod: .bake
+            )
+        ]
+    }
+
+    private static func templateNote(_ note: String, materials: [String] = []) -> String {
+        ([note.trimmingCharacters(in: .whitespacesAndNewlines)] + materials)
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+
+    private static func materialLines(in items: [RecipeItem]) -> [String] {
+        items.compactMap { item in
+            materialLine(name: item.name, item: item, weight: item.weight)
+        }
+    }
+
+    private static func materialLines(
+        in items: [RecipeItem],
+        allocations: [StepMaterialAllocation]
+    ) -> [String] {
+        let itemsByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        return allocations.compactMap { allocation in
+            guard let item = itemsByID[allocation.itemId] else { return nil }
+            return materialLine(
+                name: item.name,
+                item: item,
+                weight: item.weight * min(max(0, allocation.percentage), 100) / 100
+            )
+        }
+    }
+
+    private static func materialLine(name: String, item: RecipeItem, weight: Double) -> String? {
+        guard weight > 0 else { return nil }
+        let displayName = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? item.tag.label : name
+        return "\(displayName)\(BakingFormat.compactWeight(weight, gramPrecision: materialWeightPrecision(for: weight)))"
+    }
+
+    private static func materialWeightPrecision(for weight: Double) -> Int {
+        let roundedWhole = weight.rounded()
+        if abs(weight - roundedWhole) < 0.05 {
+            return 0
+        }
+
+        let roundedTenth = (weight * 10).rounded() / 10
+        return abs(weight - roundedTenth) < 0.005 ? 1 : 2
+    }
+
+    private static func templateStep(
+        type: StepType,
+        name: String,
+        notes: String,
+        allocations: [StepMaterialAllocation] = [],
+        timeValue: Double? = nil,
+        timeUnit: TimeUnit? = nil,
+        temperature: Double? = nil,
+        temperatureUnit: TemperatureUnit? = nil,
+        productionMethod: ProductionMethod? = nil,
+        shapingPieceCount: Double? = nil,
+        foldPlan: StepFoldPlan? = nil
+    ) -> JournalStep {
+        JournalStep(
+            id: UUID(),
+            type: type,
+            name: name,
+            notes: notes,
+            materialAllocations: allocations,
+            timeValue: timeValue,
+            timeUnit: timeUnit,
+            temperature: temperature,
+            temperatureUnit: temperatureUnit,
+            productionMethod: productionMethod,
+            shapingPieceCount: shapingPieceCount,
+            foldPlan: foldPlan
+        )
+    }
+
+    private static func allocations(
+        in items: [RecipeItem],
+        tags: Set<ItemTag>? = nil,
+        percentage: Double = 100
+    ) -> [StepMaterialAllocation] {
+        items
+            .filter { item in
+                guard let tags else { return true }
+                return tags.contains(item.tag)
+            }
+            .map { StepMaterialAllocation(itemId: $0.id, percentage: percentage) }
+    }
 
     private static let defaultStarterRatio = [
         BakingTerms.levainStarter: "1:1",
@@ -1544,6 +2661,8 @@ final class RecipeStore: ObservableObject {
                 return RecipeItem(id: UUID(), category: category, tag: .sugar, name: BakingTerms.sugar, weight: 35)
             case .butter:
                 return RecipeItem(id: UUID(), category: category, tag: .butter, name: BakingTerms.butter, weight: 50)
+            case .cream:
+                return RecipeItem(id: UUID(), category: category, tag: .cream, name: BakingTerms.cream, weight: 100)
             default:
                 return RecipeItem(id: UUID(), category: category, tag: .water, name: BakingTerms.water, weight: 50, waterContentPct: 100)
             }

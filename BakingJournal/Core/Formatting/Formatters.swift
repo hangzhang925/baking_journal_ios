@@ -12,12 +12,18 @@ enum BakingFormat {
         formatter.minimumFractionDigits = 0
         formatter.numberStyle = .decimal
         formatter.usesGroupingSeparator = false
+        formatter.locale = L10n.locale
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
     static func weight(_ grams: Double, gramPrecision: Int = 0) -> String {
         let parts = weightParts(grams, gramPrecision: gramPrecision)
         return "\(parts.value) \(parts.unit)"
+    }
+
+    static func compactWeight(_ grams: Double, gramPrecision: Int = 0) -> String {
+        let parts = weightParts(grams, gramPrecision: gramPrecision)
+        return "\(parts.value)\(parts.unit)"
     }
 
     static func weightParts(_ grams: Double, gramPrecision: Int = 0) -> BakingFormattedUnitValue {
@@ -39,22 +45,55 @@ enum BakingFormat {
 
     static func clockTime(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.locale = L10n.locale
         formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+
+    static func bakeRecordDateTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = L10n.locale
+        formatter.dateFormat = "yyyy-MM-dd H:mm"
+        return formatter.string(from: date)
+    }
+
+    static func bakeRecordClockTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = L10n.locale
+        formatter.dateFormat = "H:mm"
         return formatter.string(from: date)
     }
 
     static func starterTimestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.locale = L10n.locale
         formatter.dateFormat = "yyyy-MM-dd h:mma"
         return formatter.string(from: date)
     }
 
     static func starterDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.locale = L10n.locale
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+
+    static func daysSince(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> Int {
+        let dateStart = calendar.startOfDay(for: date)
+        let todayStart = calendar.startOfDay(for: now)
+        let days = calendar.dateComponents([.day], from: dateStart, to: todayStart).day ?? 0
+        return max(0, days)
+    }
+
+    static func relativeDaysAgo(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let days = daysSince(date, now: now, calendar: calendar)
+
+        if days <= 0 {
+            return BakingTerms.relativeToday
+        }
+        if days == 1 {
+            return BakingTerms.relativeYesterday
+        }
+        return BakingTerms.relativeDaysAgo(days)
     }
 }

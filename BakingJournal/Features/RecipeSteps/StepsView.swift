@@ -3,7 +3,7 @@ import UIKit
 import OSLog
 
 struct StepsView: View {
-    private static let reorderLog = Logger(subsystem: "com.hang.BakingJournal", category: "StepsReorder")
+    private static let reorderLog = Logger(subsystem: "com.openbakery.bready", category: "StepsReorder")
 
     @Environment(\.historySwipeSuppressionHandler) private var setHistorySwipeSuppressed
     @EnvironmentObject private var store: RecipeStore
@@ -19,7 +19,6 @@ struct StepsView: View {
     @State private var pendingDeleteStep: JournalStep?
     @State private var showingDeleteConfirmation = false
     @State private var editingStepID: UUID?
-    @State private var showingNotesEditor = false
 
     private let reorderCoordinateSpace = "stepsReorderSpace"
     var body: some View {
@@ -39,18 +38,14 @@ struct StepsView: View {
             ScrollView {
                 LazyVStack(spacing: BakingSpace.lg) {
                     StepsOverviewCard(
-                        totalMinutes: store.totalStepMinutes(),
-                        stepCount: store.steps.count
+                        totalMinutes: store.totalStepMinutes()
                     )
 
                     RecipeMaterialsRemainingCard()
                         .bakingCard()
 
+                    stepsModeControlCard
                     stepTableSection
-
-                    RecipeStepNotesDisplayCard {
-                        showingNotesEditor = true
-                    }
                 }
                 .padding(.horizontal, BakingLayout.screenHorizontalInset)
                 .padding(.top, BakingLayout.contentTopInset)
@@ -96,13 +91,6 @@ struct StepsView: View {
         )) {
             stepEditorSheet
         }
-        .sheet(isPresented: $showingNotesEditor) {
-            RecipeStepNotesEditorSheet()
-                .environmentObject(store)
-                .presentationDetents([.height(BakingPopupSheetMetrics.notesEditorDefaultHeight), .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.brandBackground)
-        }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -139,16 +127,61 @@ struct StepsView: View {
         }
         .simultaneousGesture(
             TapGesture().onEnded {
-                guard !showingDeleteConfirmation, pendingDeleteStep == nil else { return }
+                guard store.stepsMode == .custom,
+                      !showingDeleteConfirmation,
+                      pendingDeleteStep == nil else { return }
                 closeStepListEditingIfNeeded()
             }
         )
     }
 
+    @ViewBuilder
     private var stepTableSection: some View {
+        if store.stepsMode == .simple {
+            simpleStepSection
+        } else {
+            customStepTableSection
+        }
+    }
+
+    private var stepsModeControlCard: some View {
+        VStack(spacing: 0) {
+            BakingToggleRow(
+                title: BakingTerms.stepsModeCustomToggle,
+                isOn: customStepsEnabledBinding,
+                accessibilityValueOn: BakingTerms.stepsModeCustom,
+                accessibilityValueOff: BakingTerms.stepsModeSimple
+            )
+        }
+        .bakingCard()
+    }
+
+    private var simpleStepSection: some View {
+        Button {
+            presentSimpleStepEditor()
+        } label: {
+            BakingSectionCard(
+                title: BakingTerms.stepsSectionTitle,
+                headerBottomPadding: 0
+            ) {
+                Text(simpleStepNotesText)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(simpleStepHasText ? Color.brandText : Color.brandSecondaryText)
+                    .lineLimit(6)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
+                    .padding(.horizontal, BakingSpace.md)
+                    .padding(.vertical, BakingSpace.sm)
+            }
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .accessibilityLabel(BakingTerms.stepsSimpleEditAccessibility)
+        .accessibilityValue(simpleStepNotesText)
+    }
+
+    private var customStepTableSection: some View {
         BakingSectionCard(
             title: BakingTerms.stepsSectionTitle,
-            detail: BakingTerms.stepsCount(store.steps.count),
             headerBottomPadding: displayedSteps.isEmpty ? 0 : BakingSpace.xs,
             accessory: {
                 HStack(spacing: BakingSpace.xs) {
@@ -205,6 +238,26 @@ struct StepsView: View {
                 }
             }
         }
+    }
+
+    private var customStepsEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { store.stepsMode == .custom },
+            set: { store.setStepsMode($0 ? .custom : .simple) }
+        )
+    }
+
+    private var simpleStep: JournalStep? {
+        store.steps.first
+    }
+
+    private var simpleStepNotesText: String {
+        let trimmed = simpleStep?.notes.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? BakingTerms.stepsNoValue : trimmed
+    }
+
+    private var simpleStepHasText: Bool {
+        !(simpleStep?.notes.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
     }
 
     private var displayedSteps: [JournalStep] {
@@ -335,6 +388,18 @@ struct StepsView: View {
         editingStepID = step.id
     }
 
+    private func presentSimpleStepEditor() {
+        if let simpleStep {
+            presentStepEditor(simpleStep)
+            return
+        }
+
+        store.setStepsMode(.simple)
+        if let simpleStep = store.steps.first {
+            presentStepEditor(simpleStep)
+        }
+    }
+
     private func enterStepListEditing() {
         withAnimation(ReorderMotion.animation) {
             isStepListEditing = true
@@ -344,13 +409,25 @@ struct StepsView: View {
     @ViewBuilder
     private var stepEditorSheet: some View {
         if let editingStep {
-            StepTextEditorSheetView(
-                step: editingStep,
-                isScrollEnabled: true,
-                onDismiss: {
-                    editingStepID = nil
+            Group {
+                if store.stepsMode == .simple {
+                    SimpleStepEditorSheetView(
+                        step: editingStep,
+                        onDismiss: {
+                            editingStepID = nil
+                        }
+                    )
+                } else {
+                    StepTextEditorSheetView(
+                        step: editingStep,
+                        recipeKind: store.currentRecipeKind,
+                        isScrollEnabled: true,
+                        onDismiss: {
+                            editingStepID = nil
+                        }
+                    )
                 }
-            )
+            }
             .id(editingStep.id)
             .environmentObject(store)
             .presentationDetents([BakingPopupSheetMetrics.editSheetTallDetent])
@@ -403,48 +480,15 @@ struct StepsView: View {
 
 private struct StepsOverviewCard: View {
     let totalMinutes: Double
-    let stepCount: Int
 
     var body: some View {
-        HStack(spacing: 0) {
-            StepsOverviewMetricCell(
-                title: BakingTerms.stepsTotalDuration,
-                value: BakingFormat.duration(minutes: totalMinutes)
-            )
-
-            Divider()
-                .overlay(BakingSurfaceTheme.separator)
-                .padding(.vertical, BakingSpace.sm)
-
-            StepsOverviewMetricCell(
-                title: BakingTerms.stepsTableStep,
-                value: "\(stepCount)"
-            )
-        }
-        .frame(minHeight: 66)
+        BakingInfoRow(
+            title: BakingTerms.stepsTotalDuration,
+            value: BakingFormat.duration(minutes: totalMinutes),
+            valueFont: BakingTypography.appPrimaryText.monospacedDigit(),
+            valueColor: .brandText
+        )
         .bakingCard()
-    }
-}
-
-private struct StepsOverviewMetricCell: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(BakingTypography.readOnlyLabel)
-                .foregroundStyle(Color.brandSecondaryText)
-
-            Text(value)
-                .font(BakingTypography.tableNumber)
-                .foregroundStyle(Color.brandText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .padding(.horizontal, BakingSpace.md)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -454,141 +498,36 @@ private struct RecipeMaterialsRemainingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: isExpanded ? 10 : 0) {
-            Button {
+            BakingDisclosureRow(
+                title: BakingTerms.formulaTableIngredient,
+                value: BakingTerms.stepsAssignedCount(store.items.count),
+                isExpanded: isExpanded
+            ) {
                 withAnimation(BakingMotion.standard) {
                     isExpanded.toggle()
                 }
-            } label: {
-                HStack(spacing: BakingSpace.sm) {
-                    Text(BakingTerms.formulaTableIngredient)
-                        .font(BakingTypography.sectionTitle)
-                        .foregroundStyle(Color.brandText)
-
-                    Spacer(minLength: BakingSpace.sm)
-
-                    Text(BakingTerms.stepsAssignedCount(store.items.count))
-                        .font(BakingTypography.appSecondaryText.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(Color.brandSecondaryText)
-
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.brandPrimary)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .frame(width: 18, height: 18)
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(BakingTerms.formulaTableIngredient)
-            .accessibilityValue(BakingTerms.stepsAssignedCount(store.items.count))
 
             if isExpanded {
-                if store.items.isEmpty {
-                    Text(BakingTerms.stepsMaterialsEmpty)
-                        .font(BakingTypography.appPrimaryText)
-                        .foregroundStyle(Color.brandSecondaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, BakingSpace.sm)
-                } else {
-                    BakingFlowLayout(spacing: 8) {
-                        ForEach(store.items) { item in
-                            StepMaterialReferenceChip(item: item)
+                Group {
+                    if store.items.isEmpty {
+                        Text(BakingTerms.stepsMaterialsEmpty)
+                            .font(BakingTypography.appPrimaryText)
+                            .foregroundStyle(Color.brandSecondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, BakingSpace.sm)
+                    } else {
+                        BakingFlowLayout(spacing: 8) {
+                            ForEach(store.items) { item in
+                                StepMaterialReferenceChip(item: item)
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, BakingFormTheme.rowHorizontalPadding)
             }
         }
-        .padding(.horizontal, BakingSpace.md)
-        .padding(.vertical, BakingSpace.xs)
-    }
-}
-
-private struct RecipeStepNotesDisplayCard: View {
-    @EnvironmentObject private var store: RecipeStore
-    let onEdit: () -> Void
-
-    var body: some View {
-        Button(action: onEdit) {
-            BakingSectionCard(
-                title: BakingTerms.stepsPageNotes,
-                headerBottomPadding: noteText.isEmpty ? 0 : BakingSpace.xs,
-                accessory: {
-                    BakingSystemIconButtonLabel(
-                        systemImage: noteText.isEmpty ? "plus" : "pencil",
-                        visualSize: BakingTouchTarget.secondaryActionVisual,
-                        font: .caption.weight(.semibold)
-                    )
-                }
-            ) {
-                if !noteText.isEmpty {
-                    Text(noteText)
-                        .font(BakingTypography.appPrimaryText)
-                        .foregroundStyle(Color.brandText)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, BakingSpace.md)
-                        .padding(.bottom, BakingSpace.md)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous))
-        }
-        .buttonStyle(BakingPressFeedbackButtonStyle())
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(BakingTerms.stepsPageNotes)
-        .accessibilityValue(noteText)
-    }
-
-    private var noteText: String {
-        store.recipeOverallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-}
-
-private struct RecipeStepNotesEditorSheet: View {
-    @EnvironmentObject private var store: RecipeStore
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                BakingTopActionRow(trailing: {
-                    BakingSystemIconButton(
-                        systemImage: "xmark",
-                        accessibilityLabel: BakingTerms.done,
-                        role: .secondary,
-                        size: .secondary,
-                        font: .caption.weight(.bold)
-                    ) {
-                        dismiss()
-                    }
-                })
-
-                BakingSectionCard(title: BakingTerms.stepsPageNotes) {
-                    TextEditor(text: Binding(
-                        get: { store.recipeOverallNotes },
-                        set: { store.recipeOverallNotes = $0 }
-                    ))
-                    .font(BakingTypography.appPrimaryText)
-                    .foregroundStyle(Color.brandText)
-                    .frame(minHeight: BakingComponentMetrics.notesEditorMinHeight)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.clear)
-                    .padding(10)
-                    .bakingInsetSurface()
-                    .accessibilityLabel(BakingTerms.stepsPageNotes)
-                    .padding(.horizontal, BakingSpace.md)
-                    .padding(.bottom, BakingSpace.md)
-                }
-                .padding(.horizontal, BakingLayout.screenHorizontalInset)
-                .padding(.top, BakingSpace.sm)
-
-                Spacer(minLength: 0)
-            }
-            .background(Color.brandBackground)
-        }
-        .scrollDismissesKeyboard(.interactively)
+        .padding(.bottom, isExpanded ? BakingSpace.sm : 0)
     }
 }
 
@@ -598,21 +537,11 @@ private struct StepMaterialReferenceChip: View {
     var body: some View {
         let palette = item.materialPalette
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 5) {
-                BakingIconView(
-                    icon: BakingIcon.material(for: item),
-                    size: 13,
-                    color: palette.tint
-                )
-                .frame(width: 18, height: 18)
-                .background(palette.iconSurface)
-                .clipShape(RoundedRectangle(cornerRadius: BakingComponentMetrics.compactIconCornerRadius, style: .continuous))
-
-                Text(String(item.name.prefix(3)))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color.brandText)
-                    .lineLimit(1)
-            }
+            Text(item.name)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.brandText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
 
             Text(weightText)
                 .font(.caption2.monospacedDigit().weight(.semibold))
@@ -620,7 +549,7 @@ private struct StepMaterialReferenceChip: View {
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 6)
-        .frame(width: BakingComponentMetrics.materialChipWidth, alignment: .leading)
+        .frame(minWidth: BakingComponentMetrics.materialChipWidth, alignment: .leading)
         .background(palette.chipSurface)
         .clipShape(RoundedRectangle(cornerRadius: BakingRadius.compactCard, style: .continuous))
         .overlay {
@@ -656,16 +585,20 @@ private struct AddStepControl: View {
         .accessibilityLabel(BakingTerms.stepsAddStep)
         .popover(isPresented: $showingStepOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             BakingDropdownPopover(width: 158) {
-                ForEach(StepType.allCases) { type in
+                ForEach(StepCategory.available(for: store.currentRecipeKind)) { category in
                     Button {
-                        store.addStep(type: type)
-                        if let step = store.steps.last {
-                            onOpenEditor(step)
-                        }
+                        let step = store.addStep(type: category.stepType)
+                        var next = step
+                        next.name = category.label
+                        store.updateStep(next)
+                        onOpenEditor(next)
                         showingStepOptions = false
                     } label: {
-                        BakingDropdownRow(title: type.label) {
-                            BakingIconView(icon: BakingIcon.step(for: type), size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
+                        BakingDropdownRow(
+                            title: category.label,
+                            showsLeadingSlot: false
+                        ) {
+                            EmptyView()
                         }
                     }
                     .buttonStyle(.plain)
@@ -738,7 +671,7 @@ private struct StepDisplayRow: View {
 
             HStack(alignment: .firstTextBaseline, spacing: Self.numericColumnSpacing) {
                 BakingTableMetricValue(
-                    symbol: .bakingIcon(.timer, .brandPrimary),
+                    symbol: nil,
                     value: durationValue.value,
                     unit: durationValue.unit,
                     numericKind: .duration,
@@ -747,7 +680,7 @@ private struct StepDisplayRow: View {
                 )
 
                 BakingTableMetricValue(
-                    symbol: .systemImage("thermometer.medium", .waterText),
+                    symbol: nil,
                     value: temperatureValue.value,
                     unit: temperatureValue.unit,
                     numericKind: .temperature,
@@ -851,9 +784,186 @@ private struct StepDisplayRow: View {
     }
 }
 
+private struct SimpleStepEditorSheetView: View {
+    @EnvironmentObject private var store: RecipeStore
+    let step: JournalStep
+    var onDismiss: () -> Void
+    @State private var showingMaterials = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            editorToolbar
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: BakingLayout.cardStackSpacing) {
+                    materialsCard
+                    notesCard
+                }
+                .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                .padding(.top, BakingSpace.sm)
+                .padding(.bottom, 34)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .background(Color.brandBackground)
+        .animation(BakingMotion.standard, value: showingMaterials)
+    }
+
+    private var editorToolbar: some View {
+        BakingTopActionRow(trailing: {
+            BakingSystemIconButton(
+                systemImage: "xmark",
+                accessibilityLabel: BakingTerms.done,
+                role: .secondary,
+                size: .secondary,
+                font: .caption.weight(.bold)
+            ) {
+                onDismiss()
+            }
+        })
+    }
+
+    private var materialsCard: some View {
+        VStack(spacing: 0) {
+            StepPopupActionTableRow(title: BakingTerms.stepsMaterialsSection) {
+                Button {
+                    toggleMaterials()
+                } label: {
+                    BakingSystemIconButtonLabel(
+                        systemImage: "checklist",
+                        visualSize: BakingTouchTarget.secondaryActionVisual,
+                        font: .caption.weight(.semibold)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.stepsMaterialsSection)
+            }
+
+            if showingMaterials {
+                PopupTableDivider()
+
+                materialPickerContent
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .bakingCard()
+    }
+
+    private var materialPickerContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if store.items.isEmpty {
+                Text(BakingTerms.stepsMaterialsEmpty)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, BakingSpace.sm)
+            } else {
+                BakingFlowLayout(spacing: 8) {
+                    ForEach(store.items) { item in
+                        AssignmentMaterialChip(
+                            item: item,
+                            step: currentStep
+                        ) {
+                            toggleAssignment(item)
+                        }
+                    }
+                }
+
+                HStack {
+                    Spacer()
+
+                    BakingActionButton(
+                        title: BakingTerms.stepsInsertSelectedMaterials,
+                        accessibilityLabel: BakingTerms.stepsInsertSelectedMaterials,
+                        role: .primary,
+                        state: hasSelectedMaterials ? .normal : .disabled
+                    ) {
+                        appendSelectedMaterials()
+                    }
+                    .frame(width: 118)
+                }
+                .frame(height: BakingTouchTarget.secondaryAction)
+            }
+        }
+        .padding(.horizontal, BakingSpace.md)
+        .padding(.vertical, BakingSpace.sm)
+    }
+
+    private var notesCard: some View {
+        BakingSectionCard(title: BakingTerms.stepsFieldNotes) {
+            BakingMultilineTextEditor(text: stepNotesBinding)
+                .frame(minHeight: BakingComponentMetrics.popupNotesEditorMinHeight)
+                .background(Color.clear)
+                .padding(10)
+                .bakingInsetSurface()
+                .accessibilityLabel(BakingTerms.stepsTextBlockAccessibility)
+                .padding(.horizontal, BakingSpace.md)
+                .padding(.bottom, BakingSpace.md)
+        }
+    }
+
+    private var currentStep: JournalStep {
+        store.steps.first { $0.id == step.id } ?? step
+    }
+
+    private var stepNotesBinding: Binding<String> {
+        Binding(
+            get: { currentStep.notes },
+            set: {
+                var next = currentStep
+                next.notes = $0
+                store.updateStep(next)
+            }
+        )
+    }
+
+    private var selectedMaterials: [AllocatedRecipeItem] {
+        store.allocatedItems(for: currentStep)
+    }
+
+    private var hasSelectedMaterials: Bool {
+        !selectedMaterials.isEmpty
+    }
+
+    private func toggleMaterials() {
+        withAnimation(BakingMotion.standard) {
+            showingMaterials.toggle()
+        }
+    }
+
+    private func toggleAssignment(_ item: RecipeItem) {
+        if store.allocationPercentage(for: item.id, in: currentStep) > 0 {
+            store.removeAssignedItem(item.id, from: currentStep)
+        } else {
+            store.assign(itemId: item.id, to: currentStep)
+        }
+    }
+
+    private func appendSelectedMaterials() {
+        let lines = selectedMaterials.map { allocated in
+            "\(allocated.item.name)\(BakingFormat.compactWeight(allocated.weight, gramPrecision: allocated.item.tag == .yeast ? 1 : 0))"
+        }
+        appendNoteLines(lines, clearsMaterialAllocations: true)
+    }
+
+    private func appendNoteLines(_ lines: [String], clearsMaterialAllocations: Bool = false) {
+        guard !lines.isEmpty else { return }
+
+        let trimmedExisting = currentStep.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        var next = currentStep
+        next.notes = trimmedExisting.isEmpty ? lines.joined(separator: "\n") : trimmedExisting + "\n" + lines.joined(separator: "\n")
+        if clearsMaterialAllocations {
+            next.materialAllocations = []
+        }
+        store.updateStep(next)
+    }
+}
+
 private struct StepTextEditorSheetView: View {
     @EnvironmentObject private var store: RecipeStore
     let step: JournalStep
+    let recipeKind: RecipeKind
     var isScrollEnabled = true
     var onDismiss: () -> Void
     var onContentHeightChange: (CGFloat) -> Void = { _ in }
@@ -867,15 +977,17 @@ private struct StepTextEditorSheetView: View {
 
     init(
         step: JournalStep,
+        recipeKind: RecipeKind,
         isScrollEnabled: Bool = true,
         onDismiss: @escaping () -> Void,
         onContentHeightChange: @escaping (CGFloat) -> Void = { _ in }
     ) {
         self.step = step
+        self.recipeKind = recipeKind
         self.isScrollEnabled = isScrollEnabled
         self.onDismiss = onDismiss
         self.onContentHeightChange = onContentHeightChange
-        _selectedCategory = State(initialValue: StepCategory.defaultCategory(for: step))
+        _selectedCategory = State(initialValue: StepCategory.defaultCategory(for: step, recipeKind: recipeKind))
     }
 
     var body: some View {
@@ -885,6 +997,9 @@ private struct StepTextEditorSheetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BakingLayout.cardStackSpacing) {
                     primaryControlsCard
+                    if currentStep.foldPlan != nil {
+                        StepFoldPlanCard(step: currentStep)
+                    }
                     stepContentCard
 
                     notesEditorCard
@@ -910,6 +1025,12 @@ private struct StepTextEditorSheetView: View {
         .animation(BakingMotion.standard, value: showingMaterials)
         .animation(BakingMotion.standard, value: showingStarterPicker)
         .animation(BakingMotion.standard, value: selectedCategory)
+        .onAppear {
+            normalizeSelectedCategoryIfNeeded()
+        }
+        .onChange(of: store.currentRecipeKind) { _, _ in
+            normalizeSelectedCategoryIfNeeded()
+        }
     }
 
     private var editorToolbar: some View {
@@ -938,13 +1059,17 @@ private struct StepTextEditorSheetView: View {
                 .accessibilityLabel(BakingTerms.stepsFieldCategory)
                 .popover(isPresented: $showingCategoryPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
                     BakingDropdownPopover(width: 176) {
-                        ForEach(StepCategory.allCases) { category in
+                        ForEach(availableCategories) { category in
                             Button {
                                 selectCategory(category)
                                 showingCategoryPicker = false
                             } label: {
-                                BakingDropdownRow(title: category.label, isSelected: selectedCategory == category) {
-                                    BakingIconView(icon: category.icon, size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
+                                BakingDropdownRow(
+                                    title: category.label,
+                                    isSelected: selectedCategory == category,
+                                    showsLeadingSlot: false
+                                ) {
+                                    EmptyView()
                                 }
                             }
                             .buttonStyle(.plain)
@@ -983,17 +1108,19 @@ private struct StepTextEditorSheetView: View {
 
                 PopupTableDivider()
 
-                StepPopupActionTableRow(title: BakingTerms.stepsFieldDuration) {
-                    Button {
-                        showingDurationPicker = true
-                    } label: {
-                        StepCompactValueButton(systemImage: "timer", text: durationText, tint: .brandPrimary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(BakingTerms.stepsFieldDuration)
-                    .popover(isPresented: $showingDurationPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-                        DurationPopoverView(totalMinutes: durationMinutesBinding)
-                            .presentationCompactAdaptation(.popover)
+                if currentStep.foldPlan == nil {
+                    StepPopupActionTableRow(title: BakingTerms.stepsFieldDuration) {
+                        Button {
+                            showingDurationPicker = true
+                        } label: {
+                            StepCompactValueButton(systemImage: "timer", text: durationText, tint: .brandPrimary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(BakingTerms.stepsFieldDuration)
+                        .popover(isPresented: $showingDurationPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                            DurationPopoverView(totalMinutes: durationMinutesBinding)
+                                .presentationCompactAdaptation(.popover)
+                        }
                     }
                 }
             }
@@ -1003,10 +1130,15 @@ private struct StepTextEditorSheetView: View {
 
     @ViewBuilder
     private var stepContentCard: some View {
-        if isStarterCategory {
+        switch selectedCategory {
+        case .makeStarter:
             starterPickerCard
-        } else {
+        case .prepWork, .mixing, .batterMixing:
             materialControlsCard
+        case .shaping:
+            shapingDoughDividerCard
+        case .fermentation, .baking, .proofing, .cooling, .custom:
+            EmptyView()
         }
     }
 
@@ -1034,6 +1166,41 @@ private struct StepTextEditorSheetView: View {
             }
         }
         .bakingCard()
+    }
+
+    private var shapingDoughDividerCard: some View {
+        BakingSectionCard(title: BakingTerms.stepsDoughSplitSection, headerBottomPadding: 0) {
+            VStack(spacing: 0) {
+                StepPopupActionTableRow(title: BakingTerms.stepsDoughTotalWeight) {
+                    BakingNumericValue(
+                        value: totalDoughWeightParts.value,
+                        unit: totalDoughWeightParts.unit,
+                        kind: .tableNumber,
+                        numericKind: .weight
+                    )
+                }
+
+                PopupTableDivider()
+
+                StepPopupActionTableRow(title: BakingTerms.stepsDoughPieceCount) {
+                    StepPopupCountInput(
+                        value: shapingPieceCountBinding,
+                        accessibilityLabel: BakingTerms.stepsDoughPieceCount
+                    )
+                }
+
+                PopupTableDivider()
+
+                StepPopupActionTableRow(title: BakingTerms.stepsDoughEachWeight) {
+                    BakingNumericValue(
+                        value: doughPieceWeightParts.value,
+                        unit: doughPieceWeightParts.unit,
+                        kind: .tableNumber,
+                        numericKind: .weight
+                    )
+                }
+            }
+        }
     }
 
     private var starterPickerCard: some View {
@@ -1145,11 +1312,8 @@ private struct StepTextEditorSheetView: View {
 
     private var notesEditorCard: some View {
         BakingSectionCard(title: BakingTerms.stepsFieldNotes) {
-            TextEditor(text: stepNotesBinding)
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(Color.brandText)
-                .frame(minHeight: 236)
-                .scrollContentBackground(.hidden)
+            BakingMultilineTextEditor(text: stepNotesBinding)
+                .frame(minHeight: BakingComponentMetrics.popupNotesEditorMinHeight)
                 .background(Color.clear)
                 .padding(10)
                 .bakingInsetSurface()
@@ -1173,10 +1337,23 @@ private struct StepTextEditorSheetView: View {
 
     private func selectCategory(_ category: StepCategory) {
         selectedCategory = category
-        guard category == .makeStarter else { return }
+        showingMaterials = false
+        showingStarterPicker = false
         var next = currentStep
-        next.name = BakingTerms.stepsCategoryMakeStarter
+        next.type = category.stepType
+        if shouldSyncNameWithCategory {
+            next.name = category.label
+        }
         store.updateStep(next)
+    }
+
+    private var availableCategories: [StepCategory] {
+        StepCategory.available(for: store.currentRecipeKind)
+    }
+
+    private func normalizeSelectedCategoryIfNeeded() {
+        guard !availableCategories.contains(selectedCategory) else { return }
+        selectedCategory = StepCategory.defaultCategory(for: currentStep, recipeKind: store.currentRecipeKind)
     }
 
     private var currentStep: JournalStep {
@@ -1194,6 +1371,43 @@ private struct StepTextEditorSheetView: View {
     private var selectedStarter: RecipeItem? {
         guard let selectedStarterID else { return nil }
         return starterItems.first { $0.id == selectedStarterID }
+    }
+
+    private var shouldSyncNameWithCategory: Bool {
+        let trimmedName = currentStep.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return true }
+        if StepCategory.allCases.map(\.label).contains(trimmedName) { return true }
+        return trimmedName == generatedStepName
+    }
+
+    private var generatedStepName: String {
+        guard let index = store.steps.firstIndex(where: { $0.id == currentStep.id }) else {
+            return BakingTerms.stepDefaultName(store.steps.count + 1)
+        }
+        return BakingTerms.stepDefaultName(index + 1)
+    }
+
+    private var totalDoughWeightParts: BakingFormattedUnitValue {
+        BakingFormat.weightParts(store.summary.doughWeight)
+    }
+
+    private var doughPieceWeightParts: BakingFormattedUnitValue {
+        BakingFormat.weightParts(store.summary.doughWeight / shapingPieceCount)
+    }
+
+    private var shapingPieceCount: Double {
+        max(1, (currentStep.shapingPieceCount ?? 1).rounded())
+    }
+
+    private var shapingPieceCountBinding: Binding<Double> {
+        Binding(
+            get: { shapingPieceCount },
+            set: { value in
+                var next = currentStep
+                next.shapingPieceCount = max(1, value.rounded())
+                store.updateStep(next)
+            }
+        )
     }
 
     private var stepNotesBinding: Binding<String> {
@@ -1287,7 +1501,7 @@ private struct StepTextEditorSheetView: View {
 
     private func appendSelectedMaterials() {
         let lines = selectedMaterials.map { allocated in
-            "\(allocated.item.name)\(BakingFormat.weight(allocated.weight, gramPrecision: allocated.item.tag == .yeast ? 1 : 0))"
+            "\(allocated.item.name)\(BakingFormat.compactWeight(allocated.weight, gramPrecision: allocated.item.tag == .yeast ? 1 : 0))"
         }
         appendNoteLines(lines, clearsMaterialAllocations: true)
         showingMaterials = false
@@ -1334,10 +1548,13 @@ private enum StepCategory: CaseIterable, Identifiable {
     case makeStarter
     case prepWork
     case mixing
+    case batterMixing
     case fermentation
-    case baking
     case shaping
     case proofing
+    case baking
+    case cooling
+    case custom
 
     var id: Self { self }
 
@@ -1346,10 +1563,13 @@ private enum StepCategory: CaseIterable, Identifiable {
         case .makeStarter: BakingTerms.stepsCategoryMakeStarter
         case .prepWork: BakingTerms.stepsCategoryPrepWork
         case .mixing: BakingTerms.stepsCategoryMixing
+        case .batterMixing: BakingTerms.stepsCategoryBatterMixing
         case .fermentation: BakingTerms.stepsCategoryFermentation
         case .baking: BakingTerms.stepsCategoryBaking
         case .shaping: BakingTerms.stepsCategoryShaping
         case .proofing: BakingTerms.stepsCategoryProofing
+        case .cooling: BakingTerms.stepsCategoryCooling
+        case .custom: BakingTerms.stepsCategoryCustom
         }
     }
 
@@ -1357,24 +1577,77 @@ private enum StepCategory: CaseIterable, Identifiable {
         switch self {
         case .makeStarter: .starter
         case .prepWork: .other
-        case .mixing: .mixing
+        case .mixing, .batterMixing: .mixing
         case .fermentation: .fermentation
         case .baking: .baking
         case .shaping: .shaping
         case .proofing: .timer
+        case .cooling: .rest
+        case .custom: .other
         }
     }
 
-    static func defaultCategory(for step: JournalStep) -> StepCategory {
-        switch step.type {
-        case .prep: .prepWork
-        case .mixing: .mixing
-        case .fermentation: .fermentation
-        case .rest: .proofing
-        case .shaping: .shaping
-        case .baking: .baking
-        case .other: .prepWork
+    var stepType: StepType {
+        switch self {
+        case .makeStarter, .prepWork:
+            .prep
+        case .mixing, .batterMixing:
+            .mixing
+        case .fermentation:
+            .fermentation
+        case .baking:
+            .baking
+        case .shaping:
+            .shaping
+        case .proofing:
+            .rest
+        case .cooling:
+            .rest
+        case .custom:
+            .other
         }
+    }
+
+    static func available(for recipeKind: RecipeKind) -> [StepCategory] {
+        switch recipeKind {
+        case .chiffon:
+            [.prepWork, .batterMixing, .baking, .cooling, .custom]
+        case .toast, .countryBread, .custom:
+            [.makeStarter, .prepWork, .mixing, .fermentation, .shaping, .proofing, .baking, .custom]
+        }
+    }
+
+    static func defaultCategory(for step: JournalStep, recipeKind: RecipeKind) -> StepCategory {
+        let availableCategories = available(for: recipeKind)
+        let trimmedName = step.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let namedCategory = availableCategories.first(where: { $0.label == trimmedName }) {
+            return namedCategory
+        }
+
+        let preferredCategory: StepCategory = switch recipeKind {
+        case .chiffon:
+            switch step.type {
+            case .prep: .prepWork
+            case .mixing: .batterMixing
+            case .fermentation: .custom
+            case .rest: .cooling
+            case .shaping: .custom
+            case .baking: .baking
+            case .other: .custom
+            }
+        case .toast, .countryBread, .custom:
+            switch step.type {
+            case .prep: .prepWork
+            case .mixing: .mixing
+            case .fermentation: .fermentation
+            case .rest: .proofing
+            case .shaping: .shaping
+            case .baking: .baking
+            case .other: .custom
+            }
+        }
+
+        return availableCategories.contains(preferredCategory) ? preferredCategory : (availableCategories.first ?? .custom)
     }
 }
 
@@ -1526,6 +1799,28 @@ private struct StepPopupNameTableRow: View {
     }
 }
 
+private struct StepPopupCountInput: View {
+    @Binding var value: Double
+    let accessibilityLabel: String
+    @State private var isFocused = false
+
+    var body: some View {
+        BakingNumericTextField(
+            value: $value,
+            fractionDigits: 0...0,
+            minValue: 1,
+            isFocused: $isFocused,
+            color: UIColor(Color.brandText),
+            font: BakingTypography.popupNumericInputValueUIFont
+        )
+        .frame(width: 58)
+        .padding(.horizontal, BakingSpace.sm)
+        .frame(width: BakingComponentMetrics.popupNumericFieldWidth, height: BakingComponentMetrics.popupInputHeight)
+        .bakingSurface(isFocused ? .focused : .field)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
 private struct StepPopupActionTableRow<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
@@ -1542,6 +1837,94 @@ private struct StepPopupActionTableRow<Content: View>: View {
         .padding(.horizontal, BakingSpace.md)
         .padding(.vertical, BakingSpace.xs)
         .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
+    }
+}
+
+private struct StepFoldPlanCard: View {
+    @EnvironmentObject private var store: RecipeStore
+    let step: JournalStep
+    @State private var showingFrequencyPicker = false
+
+    var body: some View {
+        if let foldPlan = currentStep.foldPlan {
+            BakingSectionCard(title: BakingTerms.stepsFoldPlanSection, headerBottomPadding: 0) {
+                VStack(spacing: 0) {
+                    StepPopupActionTableRow(title: BakingTerms.stepsFoldCount) {
+                        StepPopupCountInput(
+                            value: foldCountBinding,
+                            accessibilityLabel: BakingTerms.stepsFoldCount
+                        )
+                    }
+
+                    PopupTableDivider()
+
+                    StepPopupActionTableRow(title: BakingTerms.stepsFoldFrequency) {
+                        Button {
+                            showingFrequencyPicker = true
+                        } label: {
+                            StepCompactValueButton(
+                                systemImage: "timer",
+                                text: StepFormatting.compactDuration(minutes: Double(foldPlan.normalizedIntervalMinutes)),
+                                tint: .brandPrimary
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(BakingTerms.stepsFoldFrequency)
+                        .popover(isPresented: $showingFrequencyPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                            DurationPopoverView(totalMinutes: foldIntervalMinutesBinding)
+                                .presentationCompactAdaptation(.popover)
+                        }
+                    }
+
+                    PopupTableDivider()
+
+                    StepPopupActionTableRow(title: BakingTerms.stepsFoldTotalDuration) {
+                        Text(BakingFormat.duration(minutes: Double(foldPlan.totalMinutes)))
+                            .font(BakingTypography.tableNumber)
+                            .foregroundStyle(Color.brandText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
+                }
+            }
+        }
+    }
+
+    private var currentStep: JournalStep {
+        store.steps.first { $0.id == step.id } ?? step
+    }
+
+    private var foldCountBinding: Binding<Double> {
+        Binding(
+            get: { Double(currentStep.foldPlan?.normalizedTargetCount ?? 1) },
+            set: { value in
+                updateFoldPlan { plan in
+                    plan.targetCount = max(1, Int(value.rounded()))
+                }
+            }
+        )
+    }
+
+    private var foldIntervalMinutesBinding: Binding<Int> {
+        Binding(
+            get: { currentStep.foldPlan?.normalizedIntervalMinutes ?? 30 },
+            set: { value in
+                updateFoldPlan { plan in
+                    plan.intervalMinutes = max(1, value)
+                }
+            }
+        )
+    }
+
+    private func updateFoldPlan(_ update: (inout StepFoldPlan) -> Void) {
+        var next = currentStep
+        var foldPlan = next.foldPlan ?? StepFoldPlan(targetCount: 4, intervalMinutes: 30)
+        update(&foldPlan)
+        next.foldPlan = StepFoldPlan(
+            targetCount: foldPlan.normalizedTargetCount,
+            intervalMinutes: foldPlan.normalizedIntervalMinutes
+        )
+        store.updateStep(next)
     }
 }
 
@@ -1566,6 +1949,9 @@ private struct StepEditorSheetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BakingLayout.cardStackSpacing) {
                     primaryControlsCard
+                    if currentStep.foldPlan != nil {
+                        StepFoldPlanCard(step: currentStep)
+                    }
                     materialsCard
                     notesCard
                 }
@@ -1607,16 +1993,18 @@ private struct StepEditorSheetView: View {
                 }
             }
 
-            Button {
-                showingDurationPicker = true
-            } label: {
-                StepCompactValueButton(systemImage: "timer", text: durationText, tint: .brandPrimary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(BakingTerms.stepsFieldDuration)
-            .popover(isPresented: $showingDurationPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-                DurationPopoverView(totalMinutes: durationMinutesBinding)
-                    .presentationCompactAdaptation(.popover)
+            if currentStep.foldPlan == nil {
+                Button {
+                    showingDurationPicker = true
+                } label: {
+                    StepCompactValueButton(systemImage: "timer", text: durationText, tint: .brandPrimary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.stepsFieldDuration)
+                .popover(isPresented: $showingDurationPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                    DurationPopoverView(totalMinutes: durationMinutesBinding)
+                        .presentationCompactAdaptation(.popover)
+                }
             }
         }
         .padding(.horizontal, BakingSpace.md)
@@ -1687,11 +2075,8 @@ private struct StepEditorSheetView: View {
             }
 
             if notesExpanded {
-                TextEditor(text: stepTextBinding(\.notes))
-                    .font(BakingTypography.appPrimaryText)
-                    .foregroundStyle(Color.brandText)
+                BakingMultilineTextEditor(text: stepTextBinding(\.notes))
                     .frame(minHeight: 112)
-                    .scrollContentBackground(.hidden)
                     .padding(8)
                     .bakingInsetSurface()
                     .accessibilityLabel(BakingTerms.stepsFieldNotes)
@@ -1835,10 +2220,12 @@ private struct ProductionMethodMenu: View {
                         selection = method
                         showingMenu = false
                     } label: {
-                        BakingDropdownRow(title: method.label, isSelected: selection == method) {
-                            Image(systemName: method == .steam ? "humidity" : "oven")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.brandPrimary)
+                        BakingDropdownRow(
+                            title: method.label,
+                            isSelected: selection == method,
+                            showsLeadingSlot: false
+                        ) {
+                            EmptyView()
                         }
                     }
                     .buttonStyle(.plain)
@@ -2277,7 +2664,7 @@ private struct StepRowReorderValue {
 }
 
 private struct StepRowInteractionSurface: UIViewRepresentable {
-    private static let log = Logger(subsystem: "com.hang.BakingJournal", category: "StepsReorder")
+    private static let log = Logger(subsystem: "com.openbakery.bready", category: "StepsReorder")
 
     let minimumPressDuration: TimeInterval
     var onTap: () -> Void

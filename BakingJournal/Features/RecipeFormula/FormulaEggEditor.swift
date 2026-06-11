@@ -15,11 +15,13 @@ struct EggMiniRecipeEditor: View {
                     BakingLabel(text: BakingTerms.egg, role: .inputLabel)
                         .lineLimit(1)
 
-                    PopupAttributeIcon(
-                        icon: .water,
-                        color: .waterText,
-                        background: Color.waterSurface.opacity(0.9)
-                    )
+                    if store.currentRecipeKind.usesHydrationSystem {
+                        PopupAttributeIcon(
+                            icon: .water,
+                            color: .waterText,
+                            background: Color.waterSurface.opacity(0.9)
+                        )
+                    }
                 }
             } trailing: {
                 EggTypePicker(
@@ -61,31 +63,35 @@ struct EggMiniRecipeEditor: View {
                 )
             }
 
-            EggTableDivider()
+            if store.currentRecipeKind.usesBakerPercentageSystem {
+                EggTableDivider()
 
-            EggTableRow(title: BakingTerms.formulaTablePercentage) {
-                BakingPercentageField(
-                    value: Binding(
-                        get: { percent },
-                        set: { store.updateItemPercent(currentItem, percent: $0) }
-                    ),
-                    maxValue: 100,
-                    precision: 1,
-                    font: BakingTypography.rowMeta,
-                    valueFont: BakingTypography.popupNumericInputValue,
-                    color: .brandText,
-                    fieldWidth: 46,
-                    totalWidth: BakingCompactInputFieldSize.short.width,
-                    height: BakingComponentMetrics.compactInputFieldHeight
-                )
+                EggTableRow(title: BakingTerms.formulaTablePercentage) {
+                    BakingPercentageField(
+                        value: Binding(
+                            get: { percent },
+                            set: { store.updateItemPercent(currentItem, percent: $0) }
+                        ),
+                        maxValue: 100,
+                        precision: 1,
+                        font: BakingTypography.rowMeta,
+                        valueFont: BakingTypography.popupNumericInputValue,
+                        color: .brandText,
+                        fieldWidth: 46,
+                        totalWidth: BakingCompactInputFieldSize.short.width,
+                        height: BakingComponentMetrics.compactInputFieldHeight
+                    )
+                }
             }
 
-            EggTableDivider()
+            if store.currentRecipeKind.usesHydrationSystem {
+                EggTableDivider()
 
-            EggWaterSummaryRow(
-                waterPercent: displayWaterPercent,
-                waterWeight: store.waterContribution(currentItem)
-            )
+                EggWaterSummaryRow(
+                    waterPercent: displayWaterPercent,
+                    waterWeight: store.waterContribution(currentItem)
+                )
+            }
         }
         .bakingCard()
         .onAppear {
@@ -125,7 +131,6 @@ private struct EggTypePicker: View {
                     frame: triggerFrame,
                     width: BakingComponentMetrics.popupTypeDropdownMenuWidth,
                     alignment: .leading,
-                    reservesLeadingIconSlot: false,
                     items: RecipeStore.eggOptions.map { option in
                         DropdownMenuItem(title: BakingTerms.eggDisplayName(option), isSelected: option == selection) {
                             selection = option

@@ -19,7 +19,7 @@ enum StepType: String, Codable, CaseIterable, Identifiable {
         case .rest: L10n.tr("step_type.rest", default: "松弛")
         case .shaping: L10n.tr("step_type.shaping", default: "整形")
         case .baking: L10n.tr("step_type.baking", default: "制作")
-        case .other: L10n.tr("step_type.other", default: "其他")
+        case .other: L10n.tr("step_type.other", default: "自定义")
         }
     }
 
@@ -61,6 +61,7 @@ enum ItemTag: String, Codable, CaseIterable, Identifiable {
     case salt
     case sugar
     case butter
+    case cream
     case yeast
     case egg
     case other
@@ -75,6 +76,7 @@ enum ItemTag: String, Codable, CaseIterable, Identifiable {
         case .salt: L10n.tr("item_tag.salt", default: "盐")
         case .sugar: L10n.tr("item_tag.sugar", default: "糖")
         case .butter: L10n.tr("item_tag.butter", default: "黄油")
+        case .cream: L10n.tr("item_tag.cream", default: "奶油")
         case .yeast: L10n.tr("item_tag.yeast", default: "酵母")
         case .egg: L10n.tr("item_tag.egg", default: "鸡蛋")
         case .other: L10n.tr("item_tag.other", default: "其他")
@@ -118,6 +120,22 @@ enum ProductionMethod: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum RecipeStepsMode: String, Codable, CaseIterable, Identifiable {
+    case simple
+    case custom
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .simple:
+            return BakingTerms.stepsModeSimple
+        case .custom:
+            return BakingTerms.stepsModeCustom
+        }
+    }
+}
+
 struct RecipeItem: Identifiable, Codable, Equatable {
     var id: UUID
     var category: ItemCategory
@@ -146,6 +164,23 @@ struct StepMaterialAllocation: Identifiable, Codable, Equatable {
     var percentage: Double
 }
 
+struct StepFoldPlan: Codable, Equatable {
+    var targetCount: Int
+    var intervalMinutes: Int
+
+    var normalizedTargetCount: Int {
+        max(1, targetCount)
+    }
+
+    var normalizedIntervalMinutes: Int {
+        max(1, intervalMinutes)
+    }
+
+    var totalMinutes: Int {
+        normalizedTargetCount * normalizedIntervalMinutes
+    }
+}
+
 struct AllocatedRecipeItem: Identifiable, Equatable {
     var id: UUID { item.id }
     var item: RecipeItem
@@ -164,6 +199,8 @@ struct JournalStep: Identifiable, Codable, Equatable {
     var temperature: Double?
     var temperatureUnit: TemperatureUnit?
     var productionMethod: ProductionMethod? = nil
+    var shapingPieceCount: Double? = nil
+    var foldPlan: StepFoldPlan? = nil
 }
 
 struct RecipeSummary: Equatable {
@@ -171,6 +208,31 @@ struct RecipeSummary: Equatable {
     var flourWeight: Double
     var waterWeight: Double
     var hydration: Double
+}
+
+enum FormulaIngredientLockMode: String, Codable, CaseIterable, Identifiable {
+    case weight
+    case percentage
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .weight:
+            return BakingTerms.formulaIngredientLockWeight
+        case .percentage:
+            return BakingTerms.formulaIngredientLockPercentage
+        }
+    }
+
+    var toggled: FormulaIngredientLockMode {
+        switch self {
+        case .weight:
+            return .percentage
+        case .percentage:
+            return .weight
+        }
+    }
 }
 
 enum RecipeWorkflowState: String, Codable, CaseIterable, Identifiable {
@@ -205,6 +267,37 @@ enum RecipeKind: String, Codable, CaseIterable, Identifiable {
             return BakingTerms.recipeKindCountryBread
         case .custom:
             return BakingTerms.recipeKindCustom
+        }
+    }
+
+    var usesBakerPercentageSystem: Bool {
+        switch self {
+        case .chiffon:
+            return false
+        case .toast, .countryBread, .custom:
+            return true
+        }
+    }
+
+    var usesHydrationSystem: Bool {
+        usesBakerPercentageSystem
+    }
+
+    var usesUnifiedIngredientList: Bool {
+        switch self {
+        case .chiffon:
+            return true
+        case .toast, .countryBread, .custom:
+            return false
+        }
+    }
+
+    var showsPreviewSummaryMetrics: Bool {
+        switch self {
+        case .chiffon:
+            return false
+        case .toast, .countryBread, .custom:
+            return true
         }
     }
 
@@ -247,6 +340,10 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
     var stepText: String
     var items: [RecipeItem]
     var steps: [JournalStep]
+    var stepsMode: RecipeStepsMode
+    var simpleStep: JournalStep?
+    var customSteps: [JournalStep]
+    var formulaIngredientLockMode: FormulaIngredientLockMode
     var workflowState: RecipeWorkflowState
     var createdAt: Date
     var updatedAt: Date
@@ -259,6 +356,10 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
         stepText: String = "",
         items: [RecipeItem],
         steps: [JournalStep],
+        stepsMode: RecipeStepsMode = .simple,
+        simpleStep: JournalStep? = nil,
+        customSteps: [JournalStep] = [],
+        formulaIngredientLockMode: FormulaIngredientLockMode = .weight,
         workflowState: RecipeWorkflowState,
         createdAt: Date,
         updatedAt: Date
@@ -270,6 +371,10 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
         self.stepText = stepText
         self.items = items
         self.steps = steps
+        self.stepsMode = stepsMode
+        self.simpleStep = simpleStep
+        self.customSteps = customSteps
+        self.formulaIngredientLockMode = formulaIngredientLockMode
         self.workflowState = workflowState
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -283,6 +388,10 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
         case stepText
         case items
         case steps
+        case stepsMode
+        case simpleStep
+        case customSteps
+        case formulaIngredientLockMode
         case workflowState
         case createdAt
         case updatedAt
@@ -297,6 +406,12 @@ struct SavedRecipe: Identifiable, Codable, Equatable {
         overallNotes = try container.decodeIfPresent(String.self, forKey: .overallNotes) ?? ""
         stepText = try container.decodeIfPresent(String.self, forKey: .stepText) ?? ""
         steps = try container.decode([JournalStep].self, forKey: .steps)
+        stepsMode = try container.decodeIfPresent(RecipeStepsMode.self, forKey: .stepsMode)
+            ?? (steps.count > 1 ? .custom : .simple)
+        simpleStep = try container.decodeIfPresent(JournalStep.self, forKey: .simpleStep)
+        customSteps = try container.decodeIfPresent([JournalStep].self, forKey: .customSteps)
+            ?? (stepsMode == .custom ? steps : [])
+        formulaIngredientLockMode = try container.decodeIfPresent(FormulaIngredientLockMode.self, forKey: .formulaIngredientLockMode) ?? .weight
         workflowState = try container.decodeIfPresent(RecipeWorkflowState.self, forKey: .workflowState) ?? .draft
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
@@ -311,6 +426,14 @@ struct BakeStepTiming: Identifiable, Codable, Equatable {
     var completedAt: Date?
 }
 
+struct BakeFoldRecord: Identifiable, Codable, Equatable {
+    var id: UUID
+    var stepID: UUID
+    var stepName: String
+    var sequence: Int
+    var foldedAt: Date
+}
+
 struct BakeRecord: Identifiable, Codable, Equatable {
     var id: UUID
     var recipeID: UUID?
@@ -321,6 +444,7 @@ struct BakeRecord: Identifiable, Codable, Equatable {
     var notes: String
     var stepCount: Int
     var stepTimings: [BakeStepTiming]
+    var foldRecords: [BakeFoldRecord]
 
     init(
         id: UUID,
@@ -331,7 +455,8 @@ struct BakeRecord: Identifiable, Codable, Equatable {
         completedAt: Date?,
         notes: String,
         stepCount: Int,
-        stepTimings: [BakeStepTiming] = []
+        stepTimings: [BakeStepTiming] = [],
+        foldRecords: [BakeFoldRecord] = []
     ) {
         self.id = id
         self.recipeID = recipeID
@@ -342,6 +467,7 @@ struct BakeRecord: Identifiable, Codable, Equatable {
         self.notes = notes
         self.stepCount = stepCount
         self.stepTimings = stepTimings
+        self.foldRecords = foldRecords
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -354,6 +480,7 @@ struct BakeRecord: Identifiable, Codable, Equatable {
         case notes
         case stepCount
         case stepTimings
+        case foldRecords
     }
 
     init(from decoder: Decoder) throws {
@@ -367,7 +494,13 @@ struct BakeRecord: Identifiable, Codable, Equatable {
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
         stepCount = try container.decodeIfPresent(Int.self, forKey: .stepCount) ?? 0
         stepTimings = try container.decodeIfPresent([BakeStepTiming].self, forKey: .stepTimings) ?? []
+        foldRecords = try container.decodeIfPresent([BakeFoldRecord].self, forKey: .foldRecords) ?? []
     }
+}
+
+enum CookTimerPurpose: String, Codable, Equatable {
+    case stepCompletion
+    case foldReminder
 }
 
 struct CookState: Codable, Equatable {
@@ -378,6 +511,7 @@ struct CookState: Codable, Equatable {
     var stepStartedAt: Date?
     var timerEndsAt: Date?
     var timerStepId: UUID?
+    var timerPurpose: CookTimerPurpose?
     var totalStartedAt: Date?
 
     private enum CodingKeys: String, CodingKey {
@@ -388,6 +522,7 @@ struct CookState: Codable, Equatable {
         case stepStartedAt
         case timerEndsAt
         case timerStepId
+        case timerPurpose
         case totalStartedAt
     }
 
@@ -402,6 +537,7 @@ struct CookState: Codable, Equatable {
         stepStartedAt = try container.decodeIfPresent(Date.self, forKey: .stepStartedAt)
         timerEndsAt = try container.decodeIfPresent(Date.self, forKey: .timerEndsAt)
         timerStepId = try container.decodeIfPresent(UUID.self, forKey: .timerStepId)
+        timerPurpose = try container.decodeIfPresent(CookTimerPurpose.self, forKey: .timerPurpose)
         totalStartedAt = try container.decodeIfPresent(Date.self, forKey: .totalStartedAt)
     }
 
@@ -414,6 +550,7 @@ struct CookState: Codable, Equatable {
         try container.encodeIfPresent(stepStartedAt, forKey: .stepStartedAt)
         try container.encodeIfPresent(timerEndsAt, forKey: .timerEndsAt)
         try container.encodeIfPresent(timerStepId, forKey: .timerStepId)
+        try container.encodeIfPresent(timerPurpose, forKey: .timerPurpose)
         try container.encodeIfPresent(totalStartedAt, forKey: .totalStartedAt)
     }
 }
@@ -438,6 +575,8 @@ enum StarterFeedingRatio: String, Codable, CaseIterable, Identifiable {
 }
 
 struct StarterProfile: Identifiable, Codable, Equatable {
+    static let defaultFeedingFrequencyDays = 1
+
     var id: UUID
     var name: String
     var isContainerWeightEnabled: Bool
@@ -448,6 +587,7 @@ struct StarterProfile: Identifiable, Codable, Equatable {
     var feedFlourWeight: Double
     var feedWaterWeight: Double
     var isReminderEnabled: Bool
+    var feedingFrequencyDays: Int
     var nextFeedingDate: Date
 
     init(
@@ -461,10 +601,12 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         feedFlourWeight: Double? = nil,
         feedWaterWeight: Double? = nil,
         isReminderEnabled: Bool = false,
-        nextFeedingDate: Date = Date()
+        feedingFrequencyDays: Int = 1,
+        nextFeedingDate: Date? = nil
     ) {
         let starterWeight = max(0, measuredWeight - containerWeight)
         let defaultFeedWeight = starterWeight * feedingRatio.feedMultiplier
+        let normalizedFrequency = Self.normalizedFeedingFrequencyDays(feedingFrequencyDays)
         self.id = id
         self.name = name
         self.isContainerWeightEnabled = isContainerWeightEnabled
@@ -475,7 +617,9 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         self.feedFlourWeight = max(0, feedFlourWeight ?? defaultFeedWeight)
         self.feedWaterWeight = max(0, feedWaterWeight ?? defaultFeedWeight)
         self.isReminderEnabled = isReminderEnabled
+        self.feedingFrequencyDays = normalizedFrequency
         self.nextFeedingDate = nextFeedingDate
+            ?? Self.scheduledNextFeedingDate(after: lastFedAt, frequencyDays: normalizedFrequency)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -489,6 +633,7 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         case feedFlourWeight
         case feedWaterWeight
         case isReminderEnabled
+        case feedingFrequencyDays
         case nextFeedingDate
     }
 
@@ -505,6 +650,51 @@ struct StarterProfile: Identifiable, Codable, Equatable {
         feedFlourWeight = try container.decodeIfPresent(Double.self, forKey: .feedFlourWeight) ?? defaultFeedWeight
         feedWaterWeight = try container.decodeIfPresent(Double.self, forKey: .feedWaterWeight) ?? defaultFeedWeight
         isReminderEnabled = try container.decode(Bool.self, forKey: .isReminderEnabled)
-        nextFeedingDate = try container.decode(Date.self, forKey: .nextFeedingDate)
+        let fallbackNextFeedingDate = Self.scheduledNextFeedingDate(
+            after: lastFedAt,
+            frequencyDays: Self.defaultFeedingFrequencyDays
+        )
+        let decodedNextFeedingDate = try container.decodeIfPresent(Date.self, forKey: .nextFeedingDate)
+            ?? fallbackNextFeedingDate
+        let decodedFrequency = try container.decodeIfPresent(Int.self, forKey: .feedingFrequencyDays)
+            ?? Self.inferredFeedingFrequencyDays(lastFedAt: lastFedAt, nextFeedingDate: decodedNextFeedingDate)
+        feedingFrequencyDays = Self.normalizedFeedingFrequencyDays(decodedFrequency)
+        nextFeedingDate = Self.scheduledNextFeedingDate(after: lastFedAt, frequencyDays: feedingFrequencyDays)
+    }
+
+    mutating func normalizeFeedingSchedule(calendar: Calendar = .current) {
+        feedingFrequencyDays = Self.normalizedFeedingFrequencyDays(feedingFrequencyDays)
+        nextFeedingDate = Self.scheduledNextFeedingDate(
+            after: lastFedAt,
+            frequencyDays: feedingFrequencyDays,
+            calendar: calendar
+        )
+    }
+
+    static func normalizedFeedingFrequencyDays(_ days: Int) -> Int {
+        max(defaultFeedingFrequencyDays, days)
+    }
+
+    static func scheduledNextFeedingDate(
+        after date: Date,
+        frequencyDays: Int,
+        calendar: Calendar = .current
+    ) -> Date {
+        let normalizedFrequency = normalizedFeedingFrequencyDays(frequencyDays)
+        let startOfFedDay = calendar.startOfDay(for: date)
+        return calendar.date(byAdding: .day, value: normalizedFrequency, to: startOfFedDay)
+            ?? startOfFedDay
+    }
+
+    private static func inferredFeedingFrequencyDays(
+        lastFedAt: Date,
+        nextFeedingDate: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        let lastFedStart = calendar.startOfDay(for: lastFedAt)
+        let nextFeedingStart = calendar.startOfDay(for: nextFeedingDate)
+        let days = calendar.dateComponents([.day], from: lastFedStart, to: nextFeedingStart).day
+            ?? defaultFeedingFrequencyDays
+        return normalizedFeedingFrequencyDays(days)
     }
 }

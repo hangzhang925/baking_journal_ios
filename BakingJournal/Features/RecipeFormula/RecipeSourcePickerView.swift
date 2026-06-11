@@ -17,21 +17,28 @@ struct RecipeSourcePickerView: View {
                 }
             })
 
-            List {
+            BakingLibraryList {
                 Section {
                     recipeSourceButton(
-                        icon: .start,
-                        title: BakingTerms.recipeSourceStartBlank,
-                        detail: BakingTerms.recipeSourceStartBlankDetail
+                        icon: .recipeCustom,
+                        title: BakingTerms.aiRecipeImportEntry
                     ) {
-                        store.createDraftRecipe()
-                        navigationController.push(.recipeWorkspace(.formula))
+                        navigationController.push(.aiRecipeImport)
                     }
                 } header: {
                     RecipeSourceSectionHeader(title: BakingTerms.recipeSourceNewSection)
                 }
 
                 Section {
+                    recipeSourceButton(
+                        icon: .recipeCustom,
+                        title: BakingTerms.recipeSourceCustom,
+                        detail: BakingTerms.recipeSourceStartBlankDetail
+                    ) {
+                        store.createDraftRecipe()
+                        navigationController.push(.recipeWorkspace(.formula))
+                    }
+
                     ForEach(RecipeStore.RecipeTemplate.allCases) { template in
                         recipeSourceButton(
                             icon: presetIcon(for: template),
@@ -55,8 +62,7 @@ struct RecipeSourcePickerView: View {
                         ForEach(sortedRecipes) { recipe in
                             recipeSourceButton(
                                 icon: BakingIcon.recipeKind(recipe.kind),
-                                title: recipe.name,
-                                detail: recipe.updatedAt.formatted(date: .abbreviated, time: .shortened)
+                                title: recipe.name
                             ) {
                                 store.createRecipeCopy(from: recipe)
                                 store.saveCurrentRecipe()
@@ -68,10 +74,7 @@ struct RecipeSourcePickerView: View {
                     RecipeSourceSectionHeader(title: BakingTerms.recipeSourceExistingSection)
                 }
             }
-            .listStyle(.plain)
-            .contentMargins(.top, BakingLayout.contentTopInset, for: .scrollContent)
-            .scrollContentBackground(.hidden)
-            .background(Color.brandBackground)
+            .listSectionSpacing(BakingSpace.sm)
         }
         .background(Color.brandBackground)
     }
@@ -105,7 +108,7 @@ struct RecipeSourcePickerView: View {
     private func recipeSourceButton(
         icon: BakingIcon,
         title: String,
-        detail: String,
+        detail: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -122,35 +125,35 @@ private struct RecipeSourceSectionHeader: View {
 
     var body: some View {
         BakingLabel(text: title, role: .sectionHeader)
-            .padding(.horizontal, BakingLayout.screenHorizontalInset)
-            .padding(.top, BakingSpace.xl)
-            .padding(.bottom, BakingSpace.xs)
             .frame(maxWidth: .infinity, alignment: .leading)
             .textCase(nil)
-            .background(Color.brandBackground)
     }
 }
 
 private struct RecipeSourceRow: View {
     let icon: BakingIcon
     let title: String
-    let detail: String
+    let detail: String?
 
     var body: some View {
         HStack(spacing: BakingSpace.lg) {
             BakingMaterialIconBadge(icon: icon)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: BakingSpace.xs) {
                 Text(title)
-                    .bakingLabelStyle(.inputLabel)
+                    .font(BakingTypography.rowTitle)
+                    .foregroundStyle(Color.brandText)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
-                Text(detail)
-                    .bakingLabelStyle(.helperText)
-                    .lineLimit(1)
+                if let detail {
+                    Text(detail)
+                        .bakingLabelStyle(.helperText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
@@ -160,5 +163,6 @@ private struct RecipeSourceRow: View {
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.vertical, BakingSpace.sm)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }

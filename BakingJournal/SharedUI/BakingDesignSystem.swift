@@ -132,6 +132,29 @@ enum BakingComponentState {
     case empty
 }
 
+enum BakingFilterMatchState: Equatable {
+    case matching
+    case filteredOut
+
+    var opacity: Double {
+        switch self {
+        case .matching:
+            return 1
+        case .filteredOut:
+            return 0.46
+        }
+    }
+
+    var saturation: Double {
+        switch self {
+        case .matching:
+            return 1
+        case .filteredOut:
+            return 0.12
+        }
+    }
+}
+
 enum BakingControlSize {
     case primary
     case secondary
@@ -197,12 +220,15 @@ enum BakingTypography {
     static let popupNumericInputValue: Font = tableNumber
     static let popupInputValueUIFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
     static let popupNumericInputValueUIFont = UIFont.monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
+    static let dropdownRowUIFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
+    static let dropdownSelectedRowUIFont = UIFont.systemFont(ofSize: 15, weight: .bold)
     static let readOnlyLabel: Font = appSecondaryText.weight(.semibold)
     static let readOnlyValue: Font = appPrimaryText.monospacedDigit().weight(.bold)
     static let helperText: Font = appSecondaryText
     static let iconCaption: Font = .caption2.weight(.medium)
     static let tabCaption: Font = .caption2.weight(.semibold)
     static let stageTabLabel: Font = appPrimaryText
+    static let stageTabLabelUIFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
     static let tableHeader: Font = appSecondaryText.weight(.semibold)
     static let tableCell: Font = appPrimaryText
     static let tableNumber: Font = appPrimaryText.monospacedDigit().weight(.bold)
@@ -238,6 +264,8 @@ enum BakingSurfaceKind {
     case warning
     case success
     case primaryAction
+    case secondaryAction
+    case secondaryActionDisabled
 }
 
 enum BakingComponentMetrics {
@@ -245,6 +273,9 @@ enum BakingComponentMetrics {
     static let libraryRowStatusColumnWidth: CGFloat = 86
     static let libraryRowMetadataColumnWidth: CGFloat = 112
     static let tabItemHeight: CGFloat = 56
+    static let tabBarVerticalPadding: CGFloat = BakingSpace.xxs
+    static let tabBarVisualHeight: CGFloat = tabItemHeight + tabBarVerticalPadding * 2
+    static let tabBarScrollContentClearance: CGFloat = tabBarVisualHeight + BakingSpace.xxl
     static let tabSelectedSurfaceWidth: CGFloat = 58
     static let tabSelectedSurfaceHeight: CGFloat = 40
     static let stageItemHeight: CGFloat = 36
@@ -257,6 +288,10 @@ enum BakingComponentMetrics {
     static let statusCapsuleIconGlyph: CGFloat = 20
     static let statusCapsuleTextSlot: CGFloat = 58
     static let statusCapsuleChevronSlot: CGFloat = 14
+    static let singleLineRowHeight: CGFloat = 52
+    static let twoLineRowHeight: CGFloat = 68
+    static let metricStripHorizontalPadding: CGFloat = 12
+    static let metricStripVerticalPadding: CGFloat = 6
     static let metricStripCellMinHeight: CGFloat = 44
     static let metricStripDividerWidth: CGFloat = 0.6
     static let metricStripDividerHeight: CGFloat = 38
@@ -267,6 +302,14 @@ enum BakingComponentMetrics {
     static let dropdownTriggerWidth: CGFloat = 104
     static let popupTypeDropdownWidth: CGFloat = dropdownTriggerWidth
     static let popupTypeDropdownMenuWidth: CGFloat = 132
+    static let dropdownPopoverPadding: CGFloat = BakingSpace.sm
+    static let dropdownRowHorizontalPadding: CGFloat = BakingSpace.sm
+    static let dropdownRowTextSpacing: CGFloat = BakingSpace.md
+    static let dropdownRowLeadingSlotWidth: CGFloat = 20
+    static let dropdownRowSelectionSlotWidth: CGFloat = BakingTouchTarget.dropdownIconGlyph
+    static let dropdownMenuHorizontalScreenInset: CGFloat = BakingSpace.sm
+    static let dropdownMenuDefaultMinWidth: CGFloat = popupTypeDropdownMenuWidth
+    static let dropdownMenuMaxWidth: CGFloat = 320
     static let compactOptionWidth: CGFloat = 58
     static let materialChipWidth: CGFloat = 72
     static let materialChipIcon: CGFloat = 18
@@ -300,7 +343,9 @@ enum BakingComponentMetrics {
     static let temperaturePopoverWidth: CGFloat = 116
     static let temperatureScrollerHeight: CGFloat = 196
     static let temperatureOptionHeight: CGFloat = 38
+    static let popupNotesEditorMinHeight: CGFloat = 236
     static let notesEditorMinHeight: CGFloat = 260
+    static let notesDisplayMinHeight: CGFloat = 112
 }
 
 enum BakingPopupSheetSize {
@@ -343,9 +388,8 @@ enum BakingPopupSheetMetrics {
     }
 
     private static func capped(_ height: CGFloat, screenHeight: CGFloat?) -> CGFloat {
-        guard let screenHeight else { return height }
-        let maximumHeight = screenHeight * maximumScreenRatio
-        return min(height, maximumHeight)
+        let screenMaximumHeight = screenHeight.map { $0 * maximumScreenRatio } ?? height
+        return min(height, screenMaximumHeight)
     }
 }
 
@@ -638,6 +682,20 @@ struct BakingSurfaceTheme {
                 radius: BakingRadius.card,
                 lineWidth: 0.7
             )
+        case .secondaryAction:
+            BakingSurfaceTheme(
+                background: Color.brandSurface,
+                stroke: Color.brandPrimary,
+                radius: BakingRadius.card,
+                lineWidth: 1.0
+            )
+        case .secondaryActionDisabled:
+            BakingSurfaceTheme(
+                background: Color.brandSurface,
+                stroke: Color.brandDivider,
+                radius: BakingRadius.card,
+                lineWidth: 0.7
+            )
         }
     }
 
@@ -695,9 +753,9 @@ struct BakingComponentTheme {
             )
         case .secondary:
             BakingComponentTheme(
-                foreground: .brandText,
+                foreground: .brandPrimary,
                 selectedForeground: .brandPrimary,
-                disabledForeground: .brandSecondaryText.opacity(0.45),
+                disabledForeground: .brandSecondaryText,
                 background: .clear,
                 selectedBackground: BakingSurface.selectedRowBackground,
                 stroke: .clear,
@@ -978,6 +1036,13 @@ extension View {
     func bakingLiftedShadow() -> some View {
         shadow(color: BakingShadow.liftedColor, radius: BakingShadow.liftedRadius, x: 0, y: BakingShadow.liftedY)
     }
+
+    func bakingFilterMatchState(_ state: BakingFilterMatchState) -> some View {
+        self
+            .saturation(state.saturation)
+            .opacity(state.opacity)
+            .animation(BakingMotion.quick, value: state)
+    }
 }
 
 struct BakingSystemIconButtonLabel: View {
@@ -1109,6 +1174,70 @@ struct BakingIconButton: View {
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
         .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+struct BakingIconDropdownOption<ID: Hashable>: Identifiable {
+    let id: ID
+    let title: String
+    let icon: BakingIcon
+    var tint: Color? = nil
+}
+
+struct BakingIconDropdownMenu<ID: Hashable>: View {
+    @Binding var selection: ID
+    let options: [BakingIconDropdownOption<ID>]
+    let accessibilityLabel: String
+    var role: BakingComponentRole = .primary
+    var width: CGFloat = 168
+
+    @State private var showingOptions = false
+
+    var body: some View {
+        Button {
+            showingOptions = true
+        } label: {
+            BakingIconButtonLabel(
+                icon: selectedOption?.icon ?? options.first?.icon ?? .filterAll,
+                role: role,
+                size: .primary,
+                isSelected: selection != options.first?.id,
+                tintOverride: selectedOption?.tint
+            )
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .popover(isPresented: $showingOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            BakingDropdownPopover(width: width) {
+                ForEach(options) { option in
+                    Button {
+                        showingOptions = false
+                        guard option.id != selection else { return }
+                        withAnimation(BakingMotion.quick) {
+                            selection = option.id
+                        }
+                    } label: {
+                        BakingDropdownRow(
+                            title: option.title,
+                            isSelected: option.id == selection,
+                            selectionTint: option.tint ?? BakingComponentTheme.action(role: role).selectedForeground
+                        ) {
+                            BakingIconView(
+                                icon: option.icon,
+                                size: BakingTouchTarget.dropdownIconGlyph,
+                                color: option.tint ?? BakingComponentTheme.action(role: role).selectedForeground
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(selectedOption?.title ?? "")
+    }
+
+    private var selectedOption: BakingIconDropdownOption<ID>? {
+        options.first { $0.id == selection }
     }
 }
 
@@ -1352,7 +1481,7 @@ struct BakingSegmentedStageControl: View {
                 .buttonStyle(BakingPressFeedbackButtonStyle())
                 .accessibilityLabel(option.title)
                 .accessibilityAddTraits(option.id == selectedID ? .isSelected : [])
-                .frame(maxWidth: .infinity)
+                .frame(minWidth: itemMinimumWidth(for: option), maxWidth: .infinity)
             }
         }
         .accessibilityElement(children: .contain)
@@ -1362,6 +1491,13 @@ struct BakingSegmentedStageControl: View {
 
     private var selectedOption: BakingSegmentedStageOption? {
         options.first { $0.id == selectedID }
+    }
+
+    private func itemMinimumWidth(for option: BakingSegmentedStageOption) -> CGFloat {
+        let textWidth = (option.title as NSString).size(withAttributes: [
+            .font: BakingTypography.stageTabLabelUIFont
+        ]).width
+        return ceil(iconSize + BakingSpace.xs + textWidth + BakingSpace.xs)
     }
 }
 
@@ -1388,7 +1524,6 @@ private struct BakingSegmentedStageButtonLabel: View {
                     .font(labelFont)
                     .foregroundStyle(labelColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity, minHeight: minHeight - BakingComponentMetrics.stageIndicatorHeight)
             .contentShape(Rectangle())
@@ -1887,7 +2022,7 @@ struct BakingSearchField: View {
         }
         .padding(.leading, BakingSpace.xxl)
         .padding(.trailing, text.isEmpty ? BakingSpace.xxl : BakingSpace.xs)
-        .frame(minHeight: BakingTouchTarget.primaryAction)
+        .frame(height: BakingTouchTarget.primaryAction)
         .background(Color.brandSurfaceStrong)
         .clipShape(RoundedRectangle(cornerRadius: BakingRadius.field, style: .continuous))
         .overlay {
@@ -1938,7 +2073,7 @@ struct BakingActionButton: View {
     private var surfaceKind: BakingSurfaceKind {
         switch state {
         case .disabled:
-            .readOnly
+            role == .secondary ? .secondaryActionDisabled : .readOnly
         case .selected, .focused, .editing:
             .focused
         case .warning:
@@ -1948,8 +2083,76 @@ struct BakingActionButton: View {
         case .destructive:
             .destructive
         default:
-            role == .primary ? .primaryAction : .readOnly
+            role == .primary ? .primaryAction : secondarySurfaceKind
         }
+    }
+
+    private var secondarySurfaceKind: BakingSurfaceKind {
+        role == .secondary ? .secondaryAction : .readOnly
+    }
+
+    private func foregroundColor(theme: BakingComponentTheme, isDisabled: Bool) -> Color {
+        guard !isDisabled else { return theme.disabledForeground }
+        switch state {
+        case .warning:
+            return .semanticWarningDeep
+        case .success:
+            return .semanticSuccessDeep
+        case .destructive:
+            return .semanticErrorDeep
+        default:
+            break
+        }
+        return role == .primary ? .brandOnPrimary : theme.foreground
+    }
+}
+
+struct BakingInlineActionButton: View {
+    let title: String
+    let accessibilityLabel: String
+    var role: BakingComponentRole = .primary
+    var state: BakingComponentState = .normal
+    var action: () -> Void
+
+    var body: some View {
+        let theme = BakingComponentTheme.action(role: role)
+        let isDisabled = state == .disabled
+
+        Button(action: action) {
+            Text(title)
+                .font(BakingTypography.actionLabel)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .foregroundStyle(foregroundColor(theme: theme, isDisabled: isDisabled))
+                .padding(.horizontal, BakingSpace.xxl)
+                .frame(minHeight: BakingTouchTarget.primaryAction)
+                .contentShape(RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous))
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .bakingSurface(surfaceKind)
+        .disabled(isDisabled)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var surfaceKind: BakingSurfaceKind {
+        switch state {
+        case .disabled:
+            role == .secondary ? .secondaryActionDisabled : .readOnly
+        case .selected, .focused, .editing:
+            .focused
+        case .warning:
+            .warning
+        case .success:
+            .success
+        case .destructive:
+            .destructive
+        default:
+            role == .primary ? .primaryAction : secondarySurfaceKind
+        }
+    }
+
+    private var secondarySurfaceKind: BakingSurfaceKind {
+        role == .secondary ? .secondaryAction : .readOnly
     }
 
     private func foregroundColor(theme: BakingComponentTheme, isDisabled: Bool) -> Color {
@@ -2054,7 +2257,8 @@ struct BakingSectionCardHeader<Accessory: View>: View {
 
             if let detail {
                 Text(detail)
-                    .bakingLabelStyle(.helperText)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
                     .lineLimit(1)
             }
 
@@ -2119,13 +2323,7 @@ struct BakingFormRow<Value: View>: View {
 
     var body: some View {
         HStack(alignment: alignment, spacing: BakingSpace.md) {
-            VStack(alignment: .leading, spacing: BakingSpace.xs) {
-                BakingLabel(text: title, role: .fieldLabel)
-
-                if let subtitle {
-                    BakingLabel(text: subtitle, role: .helperText)
-                }
-            }
+            BakingRowTextStack(title: title, subtitle: subtitle)
 
             Spacer(minLength: BakingSpace.md)
 
@@ -2134,9 +2332,194 @@ struct BakingFormRow<Value: View>: View {
                 .foregroundStyle(BakingFormTheme.valueColor)
         }
         .padding(.horizontal, BakingFormTheme.rowHorizontalPadding)
-        .padding(.vertical, BakingFormTheme.rowVerticalPadding)
-        .frame(minHeight: BakingTouchTarget.primaryAction)
+        .padding(.vertical, BakingSpace.xs)
+        .frame(minHeight: rowHeight)
         .opacity(state == .disabled ? 0.45 : 1)
+    }
+
+    private var rowHeight: CGFloat {
+        BakingRowMetrics.height(hasSubtitle: subtitle != nil)
+    }
+}
+
+struct BakingInfoRow: View {
+    let title: String
+    let value: String
+    var subtitle: String? = nil
+    var valueFont: Font = BakingTypography.appPrimaryText
+    var valueColor: Color = .brandText
+
+    var body: some View {
+        HStack(alignment: .center, spacing: BakingSpace.md) {
+            BakingRowTextStack(title: title, subtitle: subtitle)
+
+            Spacer(minLength: BakingSpace.md)
+
+            Text(value)
+                .font(valueFont)
+                .foregroundStyle(valueColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.horizontal, BakingFormTheme.rowHorizontalPadding)
+        .padding(.vertical, BakingSpace.xs)
+        .frame(minHeight: BakingRowMetrics.height(hasSubtitle: subtitle != nil))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct BakingDisclosureRow: View {
+    let title: String
+    let value: String
+    var subtitle: String? = nil
+    var isExpanded: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: BakingSpace.md) {
+                BakingRowTextStack(title: title, subtitle: subtitle)
+
+                Spacer(minLength: BakingSpace.md)
+
+                Text(value)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Image(systemName: "chevron.down")
+                    .font(BakingTypography.appPrimaryText.weight(.bold))
+                    .foregroundStyle(Color.brandPrimary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .frame(width: 18, height: 18)
+            }
+            .padding(.horizontal, BakingFormTheme.rowHorizontalPadding)
+            .padding(.vertical, BakingSpace.xs)
+            .frame(minHeight: BakingRowMetrics.height(hasSubtitle: subtitle != nil))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+    }
+}
+
+private struct BakingRowTextStack: View {
+    let title: String
+    var subtitle: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BakingSpace.xs) {
+            Text(title)
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(Color.brandText)
+                .lineLimit(1)
+
+            if let subtitle {
+                Text(subtitle)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(Color.brandSecondaryText)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+private enum BakingRowMetrics {
+    static func height(hasSubtitle: Bool) -> CGFloat {
+        hasSubtitle ? BakingComponentMetrics.twoLineRowHeight : BakingComponentMetrics.singleLineRowHeight
+    }
+}
+
+struct BakingEditableNotesCard: View {
+    let title: String
+    let text: String
+    let emptyText: String
+    let accessibilityLabel: String
+    let onEdit: () -> Void
+
+    var body: some View {
+        Button(action: onEdit) {
+            BakingSectionCard(
+                title: title,
+                accessory: {
+                    BakingIconButtonLabel(
+                        icon: .edit,
+                        role: .primary,
+                        size: .inline
+                    )
+                }
+            ) {
+                Text(displayText)
+                    .font(BakingTypography.appPrimaryText)
+                    .foregroundStyle(trimmedText.isEmpty ? Color.brandSecondaryText : Color.brandText)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.notesDisplayMinHeight, alignment: .topLeading)
+                    .padding(BakingSpace.md)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: BakingRadius.card, style: .continuous))
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(displayText)
+    }
+
+    private var trimmedText: String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var displayText: String {
+        trimmedText.isEmpty ? emptyText : text
+    }
+}
+
+struct BakingNotesEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    @Binding var text: String
+    let accessibilityLabel: String
+    var editorMinHeight: CGFloat = BakingComponentMetrics.notesEditorMinHeight
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                BakingTopActionRow(trailing: {
+                    BakingSystemIconButton(
+                        systemImage: "xmark",
+                        accessibilityLabel: BakingTerms.done,
+                        role: .secondary,
+                        size: .secondary,
+                        font: .caption.weight(.bold)
+                    ) {
+                        dismiss()
+                    }
+                })
+
+                BakingSectionCard(title: title) {
+                    BakingMultilineTextEditor(text: $text)
+                        .frame(minHeight: editorMinHeight)
+                        .background(Color.clear)
+                        .padding(10)
+                        .bakingInsetSurface()
+                        .accessibilityLabel(accessibilityLabel)
+                        .padding(.horizontal, BakingSpace.md)
+                        .padding(.bottom, BakingSpace.md)
+                }
+                .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                .padding(.top, BakingSpace.sm)
+
+                Spacer(minLength: 0)
+            }
+            .background(Color.brandBackground)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .presentationDetents([.height(BakingPopupSheetMetrics.notesEditorDefaultHeight), .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.brandBackground)
     }
 }
 
@@ -2261,14 +2644,39 @@ struct BakingToggleRow: View {
     @Binding var isOn: Bool
     var subtitle: String? = nil
     var state: BakingComponentState = .normal
+    var tint: Color = .brandPrimary
+    var accessibilityValueOn: String? = nil
+    var accessibilityValueOff: String? = nil
 
     var body: some View {
-        BakingFormRow(title: title, subtitle: subtitle, state: state) {
-            Toggle(title, isOn: $isOn)
-                .labelsHidden()
-                .tint(.brandPrimary)
-                .disabled(state == .disabled)
+        Toggle(isOn: animatedBinding) {
+            BakingRowTextStack(title: title, subtitle: subtitle)
         }
+        .toggleStyle(.switch)
+        .tint(tint)
+        .padding(.horizontal, BakingFormTheme.rowHorizontalPadding)
+        .padding(.vertical, BakingSpace.xs)
+        .frame(minHeight: BakingRowMetrics.height(hasSubtitle: subtitle != nil))
+        .disabled(state == .disabled)
+        .opacity(state == .disabled ? 0.45 : 1)
+        .accessibilityLabel(title)
+        .accessibilityValue(accessibilityValueText)
+    }
+
+    private var animatedBinding: Binding<Bool> {
+        Binding(
+            get: { isOn },
+            set: { nextValue in
+                guard nextValue != isOn else { return }
+                withAnimation(BakingMotion.quick) {
+                    isOn = nextValue
+                }
+            }
+        )
+    }
+
+    private var accessibilityValueText: String {
+        isOn ? (accessibilityValueOn ?? "") : (accessibilityValueOff ?? "")
     }
 }
 
@@ -2506,18 +2914,35 @@ struct BakingPercentColumn: View {
     }
 }
 
-struct BakingTopActionRow<Leading: View, Trailing: View>: View {
+struct BakingTopActionRow<Leading: View, Center: View, Trailing: View>: View {
     @ViewBuilder let leading: () -> Leading
+    @ViewBuilder let center: () -> Center
     @ViewBuilder let trailing: () -> Trailing
 
+    init(
+        @ViewBuilder leading: @escaping () -> Leading,
+        @ViewBuilder center: @escaping () -> Center,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) {
+        self.leading = leading
+        self.center = center
+        self.trailing = trailing
+    }
+
     var body: some View {
-        HStack(spacing: BakingSpace.sm) {
-            leading()
-                .frame(minWidth: BakingTouchTarget.iconButton, alignment: .leading)
+        ZStack {
+            center()
+                .frame(maxWidth: .infinity)
+                .allowsHitTesting(false)
 
-            Spacer(minLength: BakingSpace.sm)
+            HStack(spacing: BakingSpace.sm) {
+                leading()
+                    .frame(minWidth: BakingTouchTarget.iconButton, alignment: .leading)
 
-            trailing()
+                Spacer(minLength: BakingSpace.sm)
+
+                trailing()
+            }
         }
         .frame(minHeight: BakingTouchTarget.iconButton)
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
@@ -2527,16 +2952,37 @@ struct BakingTopActionRow<Leading: View, Trailing: View>: View {
     }
 }
 
-extension BakingTopActionRow where Leading == EmptyView {
-    init(@ViewBuilder trailing: @escaping () -> Trailing) {
-        self.leading = { EmptyView() }
+extension BakingTopActionRow where Center == EmptyView {
+    init(
+        @ViewBuilder leading: @escaping () -> Leading,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) {
+        self.leading = leading
+        self.center = { EmptyView() }
         self.trailing = trailing
     }
 }
 
-extension BakingTopActionRow where Trailing == EmptyView {
+extension BakingTopActionRow where Leading == EmptyView, Center == EmptyView {
+    init(@ViewBuilder trailing: @escaping () -> Trailing) {
+        self.leading = { EmptyView() }
+        self.center = { EmptyView() }
+        self.trailing = trailing
+    }
+}
+
+extension BakingTopActionRow where Center == EmptyView, Trailing == EmptyView {
     init(@ViewBuilder leading: @escaping () -> Leading) {
         self.leading = leading
+        self.center = { EmptyView() }
+        self.trailing = { EmptyView() }
+    }
+}
+
+extension BakingTopActionRow where Leading == EmptyView, Trailing == EmptyView {
+    init(@ViewBuilder center: @escaping () -> Center) {
+        self.leading = { EmptyView() }
+        self.center = center
         self.trailing = { EmptyView() }
     }
 }
@@ -2547,6 +2993,173 @@ struct BakingPressFeedbackButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .opacity(configuration.isPressed ? 0.72 : 1)
             .animation(BakingMotion.quick, value: configuration.isPressed)
+    }
+}
+
+struct BakingRecencyBadge: View {
+    let text: String
+    let elapsedDays: Int
+    let targetDays: Int
+
+    var body: some View {
+        let theme = BakingRecencyBadgeTheme.theme(
+            elapsedDays: elapsedDays,
+            targetDays: targetDays
+        )
+
+        Text(text)
+            .font(.caption.weight(.semibold).monospacedDigit())
+            .foregroundStyle(theme.foreground)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(theme.background)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(theme.stroke, lineWidth: 0.6)
+            }
+    }
+}
+
+struct BakingStatusBadge: View {
+    let text: String
+    var role: BakingComponentRole = .success
+
+    var body: some View {
+        let theme = BakingStatusBadgeTheme.theme(for: role)
+
+        Text(text)
+            .font(BakingTypography.tableHeader)
+            .foregroundStyle(theme.foreground)
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(theme.background)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(theme.stroke, lineWidth: 0.6)
+            }
+    }
+}
+
+struct BakingTransientStatusToast: View {
+    let title: String
+    var icon: BakingIcon = .complete
+    var role: BakingComponentRole = .success
+
+    var body: some View {
+        HStack(spacing: BakingSpace.sm) {
+            BakingIconView(
+                icon: icon,
+                size: 16,
+                color: iconColor
+            )
+            .accessibilityHidden(true)
+
+            Text(title)
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(Color.brandText)
+        }
+        .padding(.horizontal, BakingSpace.xl)
+        .padding(.vertical, BakingSpace.md)
+        .bakingSurface(surfaceKind)
+        .bakingLiftedShadow()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .allowsHitTesting(false)
+    }
+
+    private var surfaceKind: BakingSurfaceKind {
+        switch role {
+        case .success:
+            return .success
+        case .destructive:
+            return .destructive
+        default:
+            return .readOnly
+        }
+    }
+
+    private var iconColor: Color {
+        switch role {
+        case .success:
+            return .brandSage
+        case .destructive:
+            return .semanticErrorDeep
+        default:
+            return .brandSecondaryText
+        }
+    }
+}
+
+private struct BakingStatusBadgeTheme {
+    let foreground: Color
+    let background: Color
+    let stroke: Color
+
+    static func theme(for role: BakingComponentRole) -> BakingStatusBadgeTheme {
+        switch role {
+        case .success:
+            return BakingStatusBadgeTheme(
+                foreground: .brandSage,
+                background: .semanticSuccessSoft,
+                stroke: Color.brandSage.opacity(0.22)
+            )
+        case .secondary:
+            return BakingStatusBadgeTheme(
+                foreground: .brandPrimary,
+                background: BakingSurface.selectedRowBackground,
+                stroke: Color.brandPrimary.opacity(0.22)
+            )
+        case .destructive:
+            return BakingStatusBadgeTheme(
+                foreground: .semanticErrorDeep,
+                background: .semanticErrorSoft,
+                stroke: Color.semanticError.opacity(0.24)
+            )
+        default:
+            return BakingStatusBadgeTheme(
+                foreground: .brandSecondaryText,
+                background: .brandSurface,
+                stroke: BakingSurface.warmHairline
+            )
+        }
+    }
+}
+
+private struct BakingRecencyBadgeTheme {
+    let foreground: Color
+    let background: Color
+    let stroke: Color
+
+    static func theme(elapsedDays: Int, targetDays: Int) -> BakingRecencyBadgeTheme {
+        let progress = Double(max(0, elapsedDays)) / Double(max(1, targetDays))
+
+        if progress < 0.5 {
+            return BakingRecencyBadgeTheme(
+                foreground: .brandSage,
+                background: .semanticSuccessSoft,
+                stroke: Color.brandSage.opacity(0.22)
+            )
+        }
+
+        if progress < 1 {
+            return BakingRecencyBadgeTheme(
+                foreground: .brandPrimaryLight,
+                background: BakingSurface.selectedRowBackground,
+                stroke: Color.brandPrimary.opacity(0.22)
+            )
+        }
+
+        return BakingRecencyBadgeTheme(
+            foreground: .semanticWarningDeep,
+            background: .semanticWarningSoft,
+            stroke: Color.semanticWarning.opacity(0.28)
+        )
     }
 }
 
@@ -2619,6 +3232,18 @@ struct BakingConfirmationDialog: View {
 }
 
 final class BakingScrollFriendlyTextField: UITextField {
+    var movesCaretToEndOnEditing = true
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        addTarget(self, action: #selector(editingInteractionDidRequestCaretUpdate), for: [.editingDidBegin, .touchUpInside])
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        addTarget(self, action: #selector(editingInteractionDidRequestCaretUpdate), for: [.editingDidBegin, .touchUpInside])
+    }
+
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if let panGesture = gestureRecognizer as? UIPanGestureRecognizer {
             let velocity = panGesture.velocity(in: self)
@@ -2627,6 +3252,36 @@ final class BakingScrollFriendlyTextField: UITextField {
             }
         }
         return super.gestureRecognizerShouldBegin(gestureRecognizer)
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let didBecomeFirstResponder = super.becomeFirstResponder()
+        if didBecomeFirstResponder {
+            scheduleCaretMovementToEnd()
+        }
+        return didBecomeFirstResponder
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        scheduleCaretMovementToEnd()
+    }
+
+    func scheduleCaretMovementToEnd() {
+        guard movesCaretToEndOnEditing else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.moveCaretToEndIfNeeded()
+        }
+    }
+
+    private func moveCaretToEndIfNeeded() {
+        guard movesCaretToEndOnEditing, isFirstResponder, markedTextRange == nil else { return }
+        let end = endOfDocument
+        selectedTextRange = textRange(from: end, to: end)
+    }
+
+    @objc private func editingInteractionDidRequestCaretUpdate() {
+        scheduleCaretMovementToEnd()
     }
 }
 
@@ -2640,6 +3295,11 @@ struct BakingInlineTextField: UIViewRepresentable {
     var returnKeyType: UIReturnKeyType = .done
     var minimumScaleFactor: CGFloat = 0.72
     var maxLength: Int? = 32
+    var keyboardType: UIKeyboardType = .default
+    var textContentType: UITextContentType? = nil
+    var autocapitalizationType: UITextAutocapitalizationType = .sentences
+    var autocorrectionType: UITextAutocorrectionType = .default
+    var movesCaretToEndOnFocus = true
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -2654,6 +3314,11 @@ struct BakingInlineTextField: UIViewRepresentable {
         textField.textAlignment = textAlignment
         textField.borderStyle = .none
         textField.returnKeyType = returnKeyType
+        textField.keyboardType = keyboardType
+        textField.textContentType = textContentType
+        textField.autocapitalizationType = autocapitalizationType
+        textField.autocorrectionType = autocorrectionType
+        textField.movesCaretToEndOnEditing = movesCaretToEndOnFocus
         textField.delegate = context.coordinator
         textField.tintColor = UIColor(Color.brandPrimary)
         textField.clearButtonMode = .never
@@ -2671,6 +3336,13 @@ struct BakingInlineTextField: UIViewRepresentable {
         uiView.font = font
         uiView.textAlignment = textAlignment
         uiView.returnKeyType = returnKeyType
+        uiView.keyboardType = keyboardType
+        uiView.textContentType = textContentType
+        uiView.autocapitalizationType = autocapitalizationType
+        uiView.autocorrectionType = autocorrectionType
+        if let bakingTextField = uiView as? BakingScrollFriendlyTextField {
+            bakingTextField.movesCaretToEndOnEditing = movesCaretToEndOnFocus
+        }
         uiView.adjustsFontSizeToFitWidth = true
         uiView.minimumFontSize = font.pointSize * minimumScaleFactor
         if !uiView.isFirstResponder, uiView.text != text {
@@ -2705,6 +3377,7 @@ struct BakingInlineTextField: UIViewRepresentable {
 
         func textFieldDidBeginEditing(_ textField: UITextField) {
             parent.isFocused?.wrappedValue = true
+            (textField as? BakingScrollFriendlyTextField)?.scheduleCaretMovementToEnd()
         }
 
         func textFieldDidEndEditing(_ textField: UITextField) {
@@ -2728,6 +3401,96 @@ struct BakingInlineTextField: UIViewRepresentable {
     private func limited(_ value: String) -> String {
         guard let maxLength, value.count > maxLength else { return value }
         return String(value.prefix(maxLength))
+    }
+}
+
+final class BakingEndCaretTextView: UITextView {
+    var movesCaretToEndOnEditing = true
+
+    override func becomeFirstResponder() -> Bool {
+        let didBecomeFirstResponder = super.becomeFirstResponder()
+        if didBecomeFirstResponder {
+            scheduleCaretMovementToEnd()
+        }
+        return didBecomeFirstResponder
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        scheduleCaretMovementToEnd()
+    }
+
+    func scheduleCaretMovementToEnd() {
+        guard movesCaretToEndOnEditing else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.moveCaretToEndIfNeeded()
+        }
+    }
+
+    private func moveCaretToEndIfNeeded() {
+        guard movesCaretToEndOnEditing, isFirstResponder, markedTextRange == nil else { return }
+        selectedRange = NSRange(location: textStorage.length, length: 0)
+    }
+}
+
+struct BakingMultilineTextEditor: UIViewRepresentable {
+    @Binding var text: String
+    var font: UIFont = .systemFont(ofSize: 15, weight: .semibold)
+    var textColor: UIColor = UIColor(Color.brandText)
+    var textContainerInset: UIEdgeInsets = .zero
+    var isScrollEnabled = true
+    var movesCaretToEndOnFocus = true
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIView(context: Context) -> UITextView {
+        let textView = BakingEndCaretTextView()
+        textView.text = text
+        textView.font = font
+        textView.textColor = textColor
+        textView.backgroundColor = .clear
+        textView.tintColor = UIColor(Color.brandPrimary)
+        textView.delegate = context.coordinator
+        textView.isScrollEnabled = isScrollEnabled
+        textView.textContainerInset = textContainerInset
+        textView.textContainer.lineFragmentPadding = 0
+        textView.movesCaretToEndOnEditing = movesCaretToEndOnFocus
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return textView
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        context.coordinator.parent = self
+        uiView.font = font
+        uiView.textColor = textColor
+        uiView.backgroundColor = .clear
+        uiView.isScrollEnabled = isScrollEnabled
+        uiView.textContainerInset = textContainerInset
+        uiView.textContainer.lineFragmentPadding = 0
+        if let bakingTextView = uiView as? BakingEndCaretTextView {
+            bakingTextView.movesCaretToEndOnEditing = movesCaretToEndOnFocus
+        }
+        if !uiView.isFirstResponder, uiView.text != text {
+            uiView.text = text
+        }
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: BakingMultilineTextEditor
+
+        init(parent: BakingMultilineTextEditor) {
+            self.parent = parent
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            (textView as? BakingEndCaretTextView)?.scheduleCaretMovementToEnd()
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            parent.text = textView.text
+        }
     }
 }
 
@@ -3241,7 +4004,7 @@ struct BakingPercentagePickerControl: View {
                 }
 
                 VStack(spacing: 6) {
-                    Slider(value: sliderBinding, in: 0...max(1, effectiveMaxValue), step: step)
+                    Slider(value: sliderBinding, in: 0...max(1, effectiveMaxValue), step: 1)
                         .tint(tint)
                         .accessibilityLabel(BakingTerms.percentagePickerAccessibility)
                         .accessibilityValue("\(formattedPercent)%")
@@ -3272,7 +4035,7 @@ struct BakingPercentagePickerControl: View {
     private var numericInputField: some View {
         HStack(alignment: .center, spacing: 4) {
             BakingNumericTextField(
-                value: sliderBinding,
+                value: numericInputBinding,
                 fractionDigits: 0...1,
                 maxValue: effectiveMaxValue,
                 isFocused: $inputFocused,
@@ -3303,21 +4066,28 @@ struct BakingPercentagePickerControl: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(tint)
-                .frame(width: BakingTouchTarget.iconButton, height: BakingTouchTarget.iconButton)
-                .contentShape(Rectangle())
-                .accessibilityHidden(true)
+            BakingSystemIconButtonLabel(
+                systemImage: systemImage,
+                tint: .brandPrimary,
+                visualSize: BakingTouchTarget.secondaryActionVisual,
+                font: .caption.weight(.bold)
+            )
         }
         .buttonStyle(BakingPressFeedbackButtonStyle())
         .accessibilityLabel(accessibilityLabel)
     }
 
-    private var sliderBinding: Binding<Double> {
+    private var numericInputBinding: Binding<Double> {
         Binding(
             get: { clampedValue },
             set: { value = clamped($0) }
+        )
+    }
+
+    private var sliderBinding: Binding<Double> {
+        Binding(
+            get: { clampedValue },
+            set: { value = clamped($0.rounded()) }
         )
     }
 
@@ -3331,10 +4101,6 @@ struct BakingPercentagePickerControl: View {
 
     private var effectiveMaxValue: Double {
         max(0, maxValue)
-    }
-
-    private var step: Double {
-        precision <= 0 ? 1 : 0.1
     }
 
     private func clamped(_ nextValue: Double) -> Double {
@@ -3381,10 +4147,14 @@ struct BakingSlideActionBar: View {
             ZStack {
                 Capsule(style: .continuous)
                     .fill(trackBackground)
+                    .overlay {
+                        Capsule(style: .continuous)
+                            .stroke(tint.opacity(0.10), lineWidth: 0.6)
+                    }
 
                 Capsule(style: .continuous)
                     .fill(trackAccent)
-                    .frame(width: max(thumbSize, thumbSize + currentProgress * travel))
+                    .frame(width: max(thumbSize + horizontalInset * 2, thumbSize + horizontalInset * 2 + currentProgress * travel))
                     .frame(maxWidth: .infinity, alignment: fillAlignment)
 
                 HStack(spacing: BakingSpace.xs) {
@@ -3404,12 +4174,7 @@ struct BakingSlideActionBar: View {
                     .gesture(slideGesture(travel: travel))
                     .allowsHitTesting(!isCompleting)
             }
-            .padding(horizontalInset)
-            .bakingCard(
-                background: trackBackground,
-                radius: trackHeight / 2,
-                stroke: tint.opacity(0.10)
-            )
+            .clipShape(Capsule(style: .continuous))
         }
         .frame(height: trackHeight)
         .accessibilityElement(children: .ignore)

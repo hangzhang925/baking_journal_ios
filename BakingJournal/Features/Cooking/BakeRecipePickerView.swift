@@ -75,6 +75,8 @@ struct BakeRecipePickerView: View {
 
     private func startBake(with recipe: SavedRecipe) {
         store.loadRecipe(recipe)
+        guard store.startNewBake() else { return }
+        navigationController.selectTab(.history)
         navigationController.push(.cook)
     }
 }

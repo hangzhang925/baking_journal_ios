@@ -5,13 +5,15 @@ struct MetricStrip: View {
     var items: [RecipeItem] = []
     var flourContribution: ((RecipeItem) -> Double)?
     var waterContribution: ((RecipeItem) -> Double)?
+    var showsHydration = true
 
     var body: some View {
         RecipeMetricsOverviewCard(
             summary: summary,
             items: items,
             flourContribution: flourContribution,
-            waterContribution: waterContribution
+            waterContribution: waterContribution,
+            showsHydration: showsHydration
         )
     }
 }
@@ -21,16 +23,18 @@ struct RecipeMetricsOverviewCard: View {
     var items: [RecipeItem] = []
     var flourContribution: ((RecipeItem) -> Double)?
     var waterContribution: ((RecipeItem) -> Double)?
+    var showsHydration = true
 
     var body: some View {
         RecipeMetricsOverview(
             summary: summary,
             items: items,
             flourContribution: flourContribution,
-            waterContribution: waterContribution
+            waterContribution: waterContribution,
+            showsHydration: showsHydration
         )
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, BakingComponentMetrics.metricStripHorizontalPadding)
+            .padding(.vertical, BakingComponentMetrics.metricStripVerticalPadding)
             .bakingCard()
     }
 }
@@ -40,18 +44,21 @@ private struct RecipeMetricsOverview: View {
     var items: [RecipeItem] = []
     var flourContribution: ((RecipeItem) -> Double)?
     var waterContribution: ((RecipeItem) -> Double)?
+    var showsHydration = true
 
     var body: some View {
         HStack(spacing: 0) {
             MetricCell(title: BakingTerms.formulaMetricDough, value: BakingFormat.weight(summary.doughWeight))
             metricDivider
             MetricCell(title: BakingTerms.formulaMetricFlour, value: BakingFormat.weight(summary.flourWeight))
-            metricDivider
-            MetricCell(
-                title: BakingTerms.formulaMetricHydration,
-                value: "\(BakingFormat.number(summary.hydration, precision: 1))%",
-                hydrationReceipt: hydrationReceipt
-            )
+            if showsHydration {
+                metricDivider
+                MetricCell(
+                    title: BakingTerms.formulaMetricHydration,
+                    value: "\(BakingFormat.number(summary.hydration, precision: 1))%",
+                    hydrationReceipt: hydrationReceipt
+                )
+            }
         }
     }
 

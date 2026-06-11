@@ -111,7 +111,7 @@ Likely simulator/system noise:
 
 App-owned issues to investigate:
 
-- Custom UTType warnings, such as missing `com.hang.bakingjournal.step-material`.
+- Custom UTType warnings, such as missing `com.openbakery.bready.step-material`.
 - `Invalid frame dimension`
 - Scroll locking after gestures/popovers.
 - App freezes or crashes during repeatable user flows.

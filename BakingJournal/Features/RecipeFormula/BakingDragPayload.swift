@@ -15,5 +15,5 @@ struct StepMaterialDragPayload: Codable, Transferable {
 }
 
 extension UTType {
-    static let stepMaterialPayload = UTType(exportedAs: "com.hang.bakingjournal.step-material")
+    static let stepMaterialPayload = UTType(exportedAs: "com.openbakery.bready.step-material")
 }

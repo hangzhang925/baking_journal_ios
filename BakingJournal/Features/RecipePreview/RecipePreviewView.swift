@@ -17,19 +17,20 @@ private enum RecipePreviewTypography {
     static let tableUnit: Font = BakingTypography.appSecondaryText.weight(.bold)
 }
 
+enum RecipePreviewToolbarMode {
+    case standard
+    case embedded
+    case referenceSheet
+}
+
 struct RecipePreviewView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
 
-    var showsDoneButton: Bool = false
-    var showsToolbar: Bool = true
+    var toolbarMode: RecipePreviewToolbarMode = .standard
     @State private var exportError: String?
     @State private var exportSuccessMessage: String?
     @State private var showingTextTutorial = false
-    @State private var showingCookView = false
-    @State private var showingWorkspace = false
-    @State private var localWorkspaceStage: RecipeWorkspaceStage = .formula
     @State private var plannedStartTime = Date()
 
     var body: some View {
@@ -48,12 +49,6 @@ struct RecipePreviewView: View {
         }
         .background(Color.brandBackground)
         .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(isPresented: $showingCookView) {
-            CookView()
-        }
-        .navigationDestination(isPresented: $showingWorkspace) {
-            RecipeWorkspaceView(initialStage: localWorkspaceStage)
-        }
         .sheet(isPresented: $showingTextTutorial) {
             RecipePreviewTextTutorialSheet(text: textTutorial)
         }
@@ -82,16 +77,12 @@ struct RecipePreviewView: View {
     private var previewTopActionRow: some View {
         BakingTopActionRow(
             leading: {
-                if showsDoneButton || navigationController.canGoBack {
+                if navigationController.canGoBack {
                     BakingIconButton(
                         icon: .back,
                         accessibilityLabel: BakingTerms.back
                     ) {
-                        if showsDoneButton {
-                            dismiss()
-                        } else {
-                            navigationController.goBack()
-                        }
+                        navigationController.goBack()
                     }
                 }
             },
@@ -118,23 +109,25 @@ struct RecipePreviewView: View {
                     .buttonStyle(BakingPressFeedbackButtonStyle())
                     .accessibilityLabel(BakingTerms.share)
 
-                    BakingIconButton(
-                        icon: .start,
-                        accessibilityLabel: store.isReadyToBake ? BakingTerms.startBake : BakingTerms.viewIncompleteSteps,
-                        role: .primary
-                    ) {
-                        if store.isReadyToBake {
-                            presentCook()
-                        } else {
-                            presentWorkspace(.steps)
+                    if toolbarMode != .referenceSheet {
+                        BakingIconButton(
+                            icon: .start,
+                            accessibilityLabel: store.isReadyToBake ? BakingTerms.startBake : BakingTerms.viewIncompleteSteps,
+                            role: .primary
+                        ) {
+                            if store.isReadyToBake {
+                                presentCook()
+                            } else {
+                                presentWorkspace(.steps)
+                            }
                         }
-                    }
 
-                    BakingIconButton(
-                        icon: .edit,
-                        accessibilityLabel: BakingTerms.editRecipe
-                    ) {
-                        presentWorkspace(.formula)
+                        BakingIconButton(
+                            icon: .edit,
+                            accessibilityLabel: BakingTerms.editRecipe
+                        ) {
+                            presentWorkspace(.formula)
+                        }
                     }
                 }
             }
@@ -142,34 +135,38 @@ struct RecipePreviewView: View {
     }
 
     private func presentCook() {
-        if showsDoneButton {
-            showingCookView = true
-        } else {
-            navigationController.push(.cook)
-        }
+        guard store.startNewBake() else { return }
+        navigationController.selectTab(.history)
+        navigationController.push(.cook)
     }
 
     private func presentWorkspace(_ stage: RecipeWorkspaceStage) {
-        if showsDoneButton {
-            localWorkspaceStage = stage
-            showingWorkspace = true
-        } else {
-            navigationController.push(.recipeWorkspace(stage))
-        }
+        navigationController.push(.recipeWorkspace(stage))
+    }
+
+    private var showsToolbar: Bool {
+        toolbarMode == .standard
     }
 
     private var previewStack: some View {
         LazyVStack(spacing: BakingSpace.lg) {
-            summaryCard
+            if toolbarMode != .referenceSheet {
+                summaryCard
+            }
             timePlanCard
-            metricsCard
-            overallNotesCard
+            if store.currentRecipeKind.showsPreviewSummaryMetrics {
+                metricsCard
+            }
             ingredientsCard
             stepsCard
         }
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.top, BakingLayout.contentTopInset)
-        .padding(.bottom, 24)
+        .padding(.bottom, previewBottomClearance)
+    }
+
+    private var previewBottomClearance: CGFloat {
+        toolbarMode == .referenceSheet ? BakingSpace.xxl : BakingComponentMetrics.tabBarScrollContentClearance
     }
 
     private var summaryCard: some View {
@@ -193,8 +190,8 @@ struct RecipePreviewView: View {
             totalDuration: store.totalStepMinutes(),
             startTime: $plannedStartTime
         )
-        .padding(.horizontal, BakingSpace.md)
-        .padding(.vertical, BakingSpace.xs)
+        .padding(.horizontal, BakingComponentMetrics.metricStripHorizontalPadding)
+        .padding(.vertical, BakingComponentMetrics.metricStripVerticalPadding)
         .bakingCard()
         .previewDismissesKeyboardOnTap()
     }
@@ -204,24 +201,13 @@ struct RecipePreviewView: View {
             summary: store.summary,
             items: store.items,
             flourContribution: store.flourContribution,
-            waterContribution: store.waterContribution
+            waterContribution: store.waterContribution,
+            showsHydration: store.currentRecipeKind.usesHydrationSystem
         )
-            .padding(.horizontal, BakingSpace.md)
-            .padding(.vertical, BakingSpace.xs)
+            .padding(.horizontal, BakingComponentMetrics.metricStripHorizontalPadding)
+            .padding(.vertical, BakingComponentMetrics.metricStripVerticalPadding)
             .bakingCard()
             .previewDismissesKeyboardOnTap()
-    }
-
-    @ViewBuilder
-    private var overallNotesCard: some View {
-        if !trimmedOverallNotes.isEmpty {
-            PreviewOverallNotesDisplay(notesText: trimmedOverallNotes)
-                .previewDismissesKeyboardOnTap()
-        }
-    }
-
-    private var trimmedOverallNotes: String {
-        store.recipeOverallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var previewShareContent: RecipePreviewShareContent {
@@ -231,6 +217,7 @@ struct RecipePreviewView: View {
     private var ingredientsCard: some View {
         BakingSectionCard(title: BakingTerms.recipePreviewIngredients) {
             PreviewIngredientList(ingredients: previewIngredientSnapshots)
+                .environment(\.showsPreviewIngredientPercentages, store.currentRecipeKind.usesBakerPercentageSystem)
                 .padding(.horizontal, BakingSpace.md)
                 .padding(.bottom, BakingSpace.sm)
         }
@@ -274,12 +261,13 @@ struct RecipePreviewView: View {
             case .salt: return 3
             case .egg: return 4
             case .butter: return 5
-            case .yeast: return 6
-            case .sugar: return 7
-            default: return 8
+            case .cream: return 6
+            case .yeast: return 7
+            case .sugar: return 8
+            default: return 9
             }
         case .other:
-            return 9
+            return 10
         }
     }
 
@@ -420,18 +408,21 @@ private struct PreviewMetricsOverview: View {
     var items: [RecipeItem] = []
     var flourContribution: ((RecipeItem) -> Double)?
     var waterContribution: ((RecipeItem) -> Double)?
+    var showsHydration = true
 
     var body: some View {
         HStack(spacing: 0) {
             PreviewMetricColumn(title: BakingTerms.formulaMetricDough, value: BakingFormat.weight(summary.doughWeight))
             previewColumnDivider
             PreviewMetricColumn(title: BakingTerms.formulaMetricFlour, value: BakingFormat.weight(summary.flourWeight))
-            previewColumnDivider
-            PreviewMetricColumn(
-                title: BakingTerms.formulaMetricHydration,
-                value: "\(BakingFormat.number(summary.hydration, precision: 1))%",
-                hydrationReceipt: hydrationReceipt
-            )
+            if showsHydration {
+                previewColumnDivider
+                PreviewMetricColumn(
+                    title: BakingTerms.formulaMetricHydration,
+                    value: "\(BakingFormat.number(summary.hydration, precision: 1))%",
+                    hydrationReceipt: hydrationReceipt
+                )
+            }
         }
     }
 
@@ -447,7 +438,10 @@ private struct PreviewMetricsOverview: View {
     private var previewColumnDivider: some View {
         Rectangle()
             .fill(BakingSurfaceTheme.separator)
-            .frame(width: 0.6, height: 34)
+            .frame(
+                width: BakingComponentMetrics.metricStripDividerWidth,
+                height: BakingComponentMetrics.metricStripDividerHeight
+            )
             .padding(.horizontal, 6)
     }
 }
@@ -479,7 +473,7 @@ private struct PreviewMetricColumn: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.metricStripCellMinHeight, alignment: .leading)
     }
 }
 
@@ -586,14 +580,17 @@ private struct PreviewTimePlanner: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: BakingComponentMetrics.metricStripCellMinHeight, alignment: .leading)
         .contentShape(Rectangle())
     }
 
     private var previewColumnDivider: some View {
         Rectangle()
             .fill(BakingSurfaceTheme.separator)
-            .frame(width: 0.6, height: 34)
+            .frame(
+                width: BakingComponentMetrics.metricStripDividerWidth,
+                height: BakingComponentMetrics.metricStripDividerHeight
+            )
             .padding(.horizontal, 6)
     }
 }
@@ -603,6 +600,7 @@ private struct CompactIngredientRow: View {
     let weightParts: BakingFormattedUnitValue
     let percentValue: String?
     let hasWater: Bool
+    let showsPercentage: Bool
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
@@ -622,18 +620,20 @@ private struct CompactIngredientRow: View {
             .layoutPriority(1)
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                if let percentValue {
-                    BakingPercentColumn(
-                        value: percentValue,
-                        valueFont: RecipePreviewTypography.tableNumber,
-                        unitFont: RecipePreviewTypography.tableUnit,
-                        color: Color.brandText,
-                        unitColor: Color.brandSecondaryText,
-                        width: 48
-                    )
-                } else {
-                    Color.clear
-                        .frame(width: 48, height: 1)
+                if showsPercentage {
+                    if let percentValue {
+                        BakingPercentColumn(
+                            value: percentValue,
+                            valueFont: RecipePreviewTypography.tableNumber,
+                            unitFont: RecipePreviewTypography.tableUnit,
+                            color: Color.brandText,
+                            unitColor: Color.brandSecondaryText,
+                            width: 48
+                        )
+                    } else {
+                        Color.clear
+                            .frame(width: 48, height: 1)
+                    }
                 }
 
                 BakingQuantityColumn(
@@ -647,7 +647,7 @@ private struct CompactIngredientRow: View {
                     unitWidth: 14
                 )
             }
-            .frame(width: 124, alignment: .trailing)
+            .frame(width: showsPercentage ? 124 : 64, alignment: .trailing)
             .layoutPriority(0)
         }
         .frame(minHeight: 58)
@@ -658,6 +658,7 @@ private struct CompactIngredientRow: View {
 }
 
 private struct PreviewIngredientList: View {
+    @Environment(\.showsPreviewIngredientPercentages) private var showsPercentages
     let ingredients: [PreviewIngredientSnapshot]
 
     var body: some View {
@@ -670,7 +671,8 @@ private struct PreviewIngredientList: View {
                         item: snapshot.item,
                         weightParts: snapshot.weightParts,
                         percentValue: snapshot.percentValue,
-                        hasWater: snapshot.hasWater
+                        hasWater: snapshot.hasWater,
+                        showsPercentage: showsPercentages
                     )
 
                     if index < ingredients.count - 1 {
@@ -680,6 +682,17 @@ private struct PreviewIngredientList: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct ShowsPreviewIngredientPercentagesKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+private extension EnvironmentValues {
+    var showsPreviewIngredientPercentages: Bool {
+        get { self[ShowsPreviewIngredientPercentagesKey.self] }
+        set { self[ShowsPreviewIngredientPercentagesKey.self] = newValue }
     }
 }
 
@@ -776,22 +789,6 @@ private struct PreviewEmptyOrTextContent: View {
     }
 }
 
-private struct PreviewOverallNotesDisplay: View {
-    let notesText: String
-
-    var body: some View {
-        BakingSectionCard(title: BakingTerms.recipePreviewOverallNotes) {
-            Text(notesText)
-                .font(RecipePreviewTypography.tablePrimary)
-                .foregroundStyle(Color.brandText)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, BakingSpace.md)
-                .padding(.bottom, BakingSpace.md)
-        }
-    }
-}
-
 struct PreviewIngredientSnapshot: Identifiable {
     let item: RecipeItem
     let weightParts: BakingFormattedUnitValue
@@ -818,26 +815,34 @@ struct RecipePreviewShareContent {
     let currentRecipeDisplayName: String
     let summary: RecipeSummary
     let totalDuration: Double
-    let overallNotes: String
+    let usesBakerPercentageSystem: Bool
+    let usesHydrationSystem: Bool
+    let showsSummaryMetrics: Bool
     let ingredients: [PreviewIngredientSnapshot]
     let steps: [PreviewStepSnapshot]
 
     init(store: RecipeStore) {
+        let showsPercentages = store.currentRecipeKind.usesBakerPercentageSystem
+        let showsHydration = store.currentRecipeKind.usesHydrationSystem
+        let usesUnifiedIngredientList = store.currentRecipeKind.usesUnifiedIngredientList
         currentRecipeDisplayName = store.currentRecipeDisplayName
         summary = store.summary
         totalDuration = store.totalStepMinutes()
-        overallNotes = store.recipeOverallNotes
+        usesBakerPercentageSystem = showsPercentages
+        usesHydrationSystem = showsHydration
+        showsSummaryMetrics = store.currentRecipeKind.showsPreviewSummaryMetrics
 
-        let sortedItems = store.items.sorted { lhs, rhs in
+        let visibleItems = usesUnifiedIngredientList ? store.items.filter { $0.category != .starter } : store.items
+        let sortedItems = visibleItems.sorted { lhs, rhs in
             Self.previewSortRank(for: lhs) < Self.previewSortRank(for: rhs)
         }
         ingredients = sortedItems.map { item in
             PreviewIngredientSnapshot(
                 item: item,
                 weightParts: BakingFormat.weightParts(item.weight, gramPrecision: item.tag == .yeast ? 1 : 0),
-                percentValue: item.category == .flour ? nil : BakingFormat.number(Self.percentForPreview(item, summary: store.summary), precision: 1),
-                detailText: Self.secondaryDetail(for: item, store: store),
-                hasWater: store.hasWaterContent(item)
+                percentValue: showsPercentages && item.category != .flour ? BakingFormat.number(Self.percentForPreview(item, summary: store.summary), precision: 1) : nil,
+                detailText: showsHydration ? Self.secondaryDetail(for: item, store: store) : nil,
+                hasWater: showsHydration && store.hasWaterContent(item)
             )
         }
 
@@ -857,17 +862,17 @@ struct RecipePreviewShareContent {
         var sections: [String] = []
 
         sections.append(currentRecipeDisplayName)
-        sections.append([
-            "\(BakingTerms.recipePreviewEstimatedDuration): \(BakingFormat.duration(minutes: totalDuration))",
-            "\(BakingTerms.formulaMetricDough): \(BakingFormat.weight(summary.doughWeight))",
-            "\(BakingTerms.formulaMetricFlour): \(BakingFormat.weight(summary.flourWeight))",
-            "\(BakingTerms.formulaMetricHydration): \(BakingFormat.number(summary.hydration, precision: 1))%"
-        ].joined(separator: "\n"))
-
-        let trimmedOverallNotes = overallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedOverallNotes.isEmpty {
-            sections.append("\(BakingTerms.recipePreviewOverallNotes)\n\(trimmedOverallNotes)")
+        var metricLines = [
+            "\(BakingTerms.recipePreviewEstimatedDuration): \(BakingFormat.duration(minutes: totalDuration))"
+        ]
+        if showsSummaryMetrics {
+            metricLines.append("\(BakingTerms.formulaMetricDough): \(BakingFormat.weight(summary.doughWeight))")
+            metricLines.append("\(BakingTerms.formulaMetricFlour): \(BakingFormat.weight(summary.flourWeight))")
+            if usesHydrationSystem {
+                metricLines.append("\(BakingTerms.formulaMetricHydration): \(BakingFormat.number(summary.hydration, precision: 1))%")
+            }
         }
+        sections.append(metricLines.joined(separator: "\n"))
 
         let ingredientLines = ingredients.map { snapshot in
             var line = "- \(snapshot.item.name): \(snapshot.weightParts.value) \(snapshot.weightParts.unit)"
@@ -906,7 +911,9 @@ struct RecipePreviewShareContent {
             currentRecipeDisplayName: currentRecipeDisplayName,
             summary: summary,
             totalDuration: totalDuration,
-            overallNotes: overallNotes,
+            showsSummaryMetrics: showsSummaryMetrics,
+            showsHydration: usesHydrationSystem,
+            showsIngredientPercentages: usesBakerPercentageSystem,
             ingredients: ingredients,
             steps: steps
         )
@@ -930,12 +937,13 @@ struct RecipePreviewShareContent {
             case .salt: return 3
             case .egg: return 4
             case .butter: return 5
-            case .yeast: return 6
-            case .sugar: return 7
-            default: return 8
+            case .cream: return 6
+            case .yeast: return 7
+            case .sugar: return 8
+            default: return 9
             }
         case .other:
-            return 9
+            return 10
         }
     }
 
@@ -987,13 +995,13 @@ private struct RecipePreviewExportContent: View {
     let currentRecipeDisplayName: String
     let summary: RecipeSummary
     let totalDuration: Double
-    let overallNotes: String
+    let showsSummaryMetrics: Bool
+    let showsHydration: Bool
+    let showsIngredientPercentages: Bool
     let ingredients: [PreviewIngredientSnapshot]
     let steps: [PreviewStepSnapshot]
 
     var body: some View {
-        let trimmedOverallNotes = overallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
-
         ZStack {
             Color.brandBackground
                 .ignoresSafeArea()
@@ -1014,17 +1022,16 @@ private struct RecipePreviewExportContent: View {
                 .padding(12)
                 .bakingCard()
 
-                PreviewMetricsOverview(summary: summary)
-                    .padding(.horizontal, BakingSpace.md)
-                    .padding(.vertical, BakingSpace.xs)
-                    .bakingCard()
-
-                if !trimmedOverallNotes.isEmpty {
-                    PreviewOverallNotesDisplay(notesText: trimmedOverallNotes)
+                if showsSummaryMetrics {
+                    PreviewMetricsOverview(summary: summary, showsHydration: showsHydration)
+                        .padding(.horizontal, BakingComponentMetrics.metricStripHorizontalPadding)
+                        .padding(.vertical, BakingComponentMetrics.metricStripVerticalPadding)
+                        .bakingCard()
                 }
 
                 BakingSectionCard(title: BakingTerms.recipePreviewIngredients) {
                     PreviewIngredientList(ingredients: ingredients)
+                        .environment(\.showsPreviewIngredientPercentages, showsIngredientPercentages)
                         .padding(.horizontal, BakingSpace.md)
                         .padding(.bottom, BakingSpace.sm)
                 }

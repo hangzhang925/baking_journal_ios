@@ -1,12 +1,95 @@
+import Combine
 import Foundation
 
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case english = "en"
+    case simplifiedChinese = "zh-Hans"
+
+    private static let storageKey = "baking-journal-ios:app-language"
+
+    var id: String { rawValue }
+
+    var localizationIdentifier: String {
+        rawValue
+    }
+
+    var locale: Locale {
+        return Locale(identifier: localizationIdentifier)
+    }
+
+    var displayName: String {
+        switch self {
+        case .english:
+            return BakingTerms.settingsLanguageEnglishOption
+        case .simplifiedChinese:
+            return BakingTerms.settingsLanguageSimplifiedChineseOption
+        }
+    }
+
+    static func saved(in defaults: UserDefaults = .standard) -> AppLanguage {
+        guard let rawValue = defaults.string(forKey: storageKey),
+              let language = AppLanguage(rawValue: rawValue) else {
+            return defaultLanguage()
+        }
+        return language
+    }
+
+    static func defaultLanguage(preferredLanguages: [String] = Locale.preferredLanguages) -> AppLanguage {
+        guard let preferredLanguage = preferredLanguages.first else {
+            return .english
+        }
+
+        let normalizedLanguage = preferredLanguage
+            .replacingOccurrences(of: "_", with: "-")
+            .lowercased()
+        return normalizedLanguage == "zh" || normalizedLanguage.hasPrefix("zh-")
+            ? .simplifiedChinese
+            : .english
+    }
+
+    func save(in defaults: UserDefaults = .standard) {
+        defaults.set(rawValue, forKey: Self.storageKey)
+    }
+}
+
+final class AppLanguageSettings: ObservableObject {
+    @Published private(set) var selectedLanguage: AppLanguage
+
+    init() {
+        selectedLanguage = AppLanguage.saved()
+    }
+
+    var locale: Locale {
+        selectedLanguage.locale
+    }
+
+    func select(_ language: AppLanguage) {
+        language.save()
+        guard language != selectedLanguage else { return }
+        selectedLanguage = language
+    }
+}
+
 enum L10n {
+    private static var localizedBundle: Bundle {
+        let identifier = AppLanguage.saved().localizationIdentifier
+        guard let path = Bundle.main.path(forResource: identifier, ofType: "lproj"),
+              let bundle = Bundle(path: path) else {
+            return .main
+        }
+        return bundle
+    }
+
+    static var locale: Locale {
+        AppLanguage.saved().locale
+    }
+
     static func tr(_ key: String, default defaultValue: String) -> String {
-        NSLocalizedString(key, bundle: .main, value: defaultValue, comment: "")
+        localizedBundle.localizedString(forKey: key, value: defaultValue, table: nil)
     }
 
     static func format(_ key: String, default defaultValue: String, _ arguments: CVarArg...) -> String {
-        String(format: tr(key, default: defaultValue), locale: Locale.current, arguments: arguments)
+        String(format: tr(key, default: defaultValue), locale: locale, arguments: arguments)
     }
 }
 
@@ -76,6 +159,7 @@ enum BakingTerms {
     static var salt: String { L10n.tr("ingredient.salt", default: "盐") }
     static var sugar: String { L10n.tr("ingredient.sugar", default: "糖") }
     static var butter: String { L10n.tr("ingredient.butter", default: "黄油") }
+    static var cream: String { L10n.tr("ingredient.cream", default: "奶油") }
     static var yeast: String { L10n.tr("ingredient.yeast", default: "酵母") }
     static var egg: String { L10n.tr("ingredient.egg", default: wholeEgg) }
     static var custom: String { L10n.tr("ingredient.custom", default: "其他") }
@@ -95,13 +179,16 @@ enum BakingTerms {
     static var toastRecipeName: String { L10n.tr("recipe.toast.name", default: "吐司配方") }
     static var chiffonRecipeName: String { L10n.tr("recipe.chiffon.name", default: "蛋糕") }
     static var countryBreadRecipeName: String { L10n.tr("recipe.country_bread.name", default: "欧包配方") }
-    static var toastTemplateLabel: String { L10n.tr("recipe.toast.template", default: "吐司") }
+    static var toastTemplateLabel: String { L10n.tr("recipe.toast.template", default: "日式吐司") }
     static var chiffonTemplateLabel: String { L10n.tr("recipe.chiffon.template", default: "蛋糕") }
     static var countryBreadTemplateLabel: String { L10n.tr("recipe.country_bread.template", default: "欧包") }
     static var recipeKindToast: String { L10n.tr("recipe.kind.toast", default: "吐司") }
     static var recipeKindChiffon: String { L10n.tr("recipe.kind.chiffon", default: "蛋糕") }
     static var recipeKindCountryBread: String { L10n.tr("recipe.kind.country_bread", default: "欧包") }
     static var recipeKindCustom: String { L10n.tr("recipe.kind.custom", default: "配方") }
+    static func recipeKindPinnedAccessibility(_ kind: String) -> String {
+        L10n.format("recipe.kind.pinned_accessibility", default: "配方类型：%@", kind)
+    }
     static var done: String { L10n.tr("common.done", default: "完成") }
     static var save: String { L10n.tr("common.save", default: "保存") }
     static var saved: String { L10n.tr("common.saved", default: "已保存") }
@@ -118,6 +205,7 @@ enum BakingTerms {
     static var time: String { L10n.tr("common.time", default: "时间") }
     static var percentage: String { L10n.tr("common.percentage", default: "百分比") }
     static var unitGram: String { L10n.tr("common.unit.gram", default: "g") }
+    static var unitDay: String { L10n.tr("common.unit.day", default: "天") }
     static var unitPiece: String { L10n.tr("common.unit.piece", default: "个") }
     static var moreActions: String { L10n.tr("common.more_actions", default: "更多操作") }
     static var continueAction: String { L10n.tr("common.continue", default: "继续") }
@@ -176,17 +264,52 @@ enum BakingTerms {
     static var bakeSortStartedOldest: String { L10n.tr("bake_library.filter.started_sort.oldest", default: "最早开始优先") }
     static var noMatchingBakeRecords: String { L10n.tr("bake_library.empty.no_matching_records", default: "没有匹配的烘焙记录") }
     static var settingsSectionTools: String { L10n.tr("settings.section.tools", default: "工具") }
-    static var settingsToolboxDetail: String { L10n.tr("settings.toolbox.detail", default: "计时器和之后的烘焙小工具") }
-    static var toolboxTitle: String { L10n.tr("toolbox.title", default: "工具箱") }
-    static var toolboxSectionTools: String { L10n.tr("toolbox.section.tools", default: "可用工具") }
-    static var toolboxKitchenTimerDetail: String { L10n.tr("toolbox.kitchen_timer.detail", default: "独立计时器，适合烘烤、发酵和醒发提醒") }
+    static var settingsLanguageTitle: String { L10n.tr("settings.language.title", default: "语言") }
+    static var settingsLanguageOpenAccessibility: String {
+        L10n.tr("settings.language.action.open", default: "选择语言")
+    }
+    static var settingsLanguagePickerTitle: String {
+        L10n.tr("settings.language.picker.title", default: "选择语言")
+    }
+    static var settingsLanguageSystemOption: String {
+        L10n.tr("settings.language.option.system", default: "跟随系统")
+    }
+    static var settingsLanguageEnglishOption: String {
+        L10n.tr("settings.language.option.english", default: "英语")
+    }
+    static var settingsLanguageSimplifiedChineseOption: String {
+        L10n.tr("settings.language.option.zh_hans", default: "简体中文")
+    }
+    static var settingsTimerDetail: String { L10n.tr("settings.timer.detail", default: "独立计时器，适合烘烤、发酵和醒发提醒") }
+    static var settingsTutorialTitle: String { L10n.tr("settings.tutorial.title", default: "新手教程") }
+    static var settingsTutorialOpenAccessibility: String {
+        L10n.tr("settings.tutorial.action.open", default: "打开新手教程")
+    }
+    static var settingsAboutTitle: String { L10n.tr("settings.about.title", default: "关于 Bready") }
+    static var settingsAboutOpenAccessibility: String { L10n.tr("settings.about.action.open", default: "打开关于 Bready") }
+    static var settingsAboutFeedbackMessage: String {
+        L10n.tr("settings.about.feedback_message", default: "欢迎提交 feedback，帮助我们把 Bready 做得更好。")
+    }
+    static var settingsAboutLocalDataMessage: String {
+        L10n.tr("settings.about.local_data_message", default: "目前，你在 Bready 中记录的配方、烘焙记录和酵种等数据都保存在本地，不会上传到我们的服务器。")
+    }
+    static var settingsAboutVersion: String { L10n.tr("settings.about.version", default: "版本") }
+    static var settingsAboutVersionUnavailable: String {
+        L10n.tr("settings.about.version.unavailable", default: "未知")
+    }
+    static var settingsAboutContactEmail: String { L10n.tr("settings.about.channel.contact_email", default: "联系邮箱") }
+    static var settingsAboutXiaohongshu: String { L10n.tr("settings.about.channel.xiaohongshu", default: "小红书") }
+    static var settingsAboutInstagram: String { L10n.tr("settings.about.channel.instagram", default: "Instagram") }
+    static var settingsAboutContactEmailValue: String { L10n.tr("settings.about.channel.contact_email.value", default: "待填写") }
+    static var settingsAboutXiaohongshuValue: String { L10n.tr("settings.about.channel.xiaohongshu.value", default: "待填写") }
+    static var settingsAboutInstagramValue: String { L10n.tr("settings.about.channel.instagram.value", default: "待填写") }
     static var noRecords: String { L10n.tr("home.empty.no_records", default: "暂无记录") }
     static var notFinished: String { L10n.tr("home.status.not_finished", default: "未结束") }
     static var stepCount: String { L10n.tr("home.label.step_count", default: "步骤数") }
     static var reviewNotes: String { L10n.tr("home.section.review_notes", default: "复盘备注") }
     static var workspaceStagePreview: String { L10n.tr("workspace.stage.preview", default: "预览") }
-    static var workspaceStageFormula: String { L10n.tr("workspace.stage.formula", default: "配方") }
-    static var workspaceStageSteps: String { L10n.tr("workspace.stage.steps", default: "步骤") }
+    static var workspaceStageFormula: String { L10n.tr("workspace.stage.formula", default: "材料") }
+    static var workspaceStageSteps: String { L10n.tr("workspace.stage.steps", default: "制作") }
     static var workspaceStageHistory: String { L10n.tr("workspace.stage.history", default: "记录") }
     static var workspaceStagePicker: String { L10n.tr("workspace.stage.picker", default: "编辑阶段") }
     static var formulaItemMissing: String { L10n.tr("formula.item.missing", default: "这个材料已经不存在了") }
@@ -200,13 +323,108 @@ enum BakingTerms {
     static var formulaTablePercentage: String { L10n.tr("formula.table.percentage", default: "比例") }
     static var formulaTableWeight: String { L10n.tr("formula.table.weight", default: "重量") }
     static var recipeSourceNewSection: String { L10n.tr("recipe_source.section.new", default: "新建") }
-    static var recipeSourceTemplatesSection: String { L10n.tr("recipe_source.section.templates", default: "系统预设") }
+    static var recipeSourceTemplatesSection: String { L10n.tr("recipe_source.section.templates", default: "模板") }
     static var recipeSourceExistingSection: String { L10n.tr("recipe_source.section.existing", default: "从已有配方开始") }
+    static var recipeSourceCustom: String { L10n.tr("recipe_source.action.custom", default: "自定义") }
+    static var aiRecipeImportEntry: String { L10n.tr("recipe_import_ai.entry", default: "从 AI 导入") }
+    static var aiRecipeImportTutorialTitle: String { L10n.tr("recipe_import_ai.tutorial.title", default: "导入流程") }
+    static var aiRecipeImportTutorialCopyPrompt: String {
+        L10n.tr("recipe_import_ai.tutorial.copy_prompt", default: "复制下面的提示词。")
+    }
+    static var aiRecipeImportTutorialUseAI: String {
+        L10n.tr("recipe_import_ai.tutorial.use_ai", default: "打开你常用的 AI，把配方图片和提示词一起发给它。")
+    }
+    static var aiRecipeImportTutorialPasteJSON: String {
+        L10n.tr("recipe_import_ai.tutorial.paste_json", default: "复制 AI 返回的 JSON，粘贴到这里导入。")
+    }
+    static var aiRecipeImportPromptTitle: String { L10n.tr("recipe_import_ai.prompt.title", default: "AI 提示词") }
+    static var aiRecipeImportPromptPreview: String {
+        L10n.tr("recipe_import_ai.prompt.preview", default: "让 AI 只返回 Bready 可识别的配方 JSON。")
+    }
+    static var aiRecipeImportCopyPrompt: String { L10n.tr("recipe_import_ai.action.copy_prompt", default: "复制提示词") }
+    static var aiRecipeImportPromptCopied: String {
+        L10n.tr("recipe_import_ai.prompt.copied", default: "提示词已经复制。")
+    }
+    static var aiRecipeImportJSONTitle: String { L10n.tr("recipe_import_ai.json.title", default: "粘贴 JSON") }
+    static var aiRecipeImportJSONAccessibility: String {
+        L10n.tr("recipe_import_ai.json.accessibility", default: "AI 返回的配方 JSON")
+    }
+    static var aiRecipeImportAction: String { L10n.tr("recipe_import_ai.action.import", default: "导入配方") }
+    static var aiRecipeImportFailedTitle: String { L10n.tr("recipe_import_ai.alert.failed", default: "导入失败") }
+    static var aiRecipeImportPrompt: String {
+        L10n.tr("recipe_import_ai.prompt.full", default: """
+        请把我提供的烘焙配方图片或文字整理成 Bready 可导入的 JSON。
+
+        只输出 JSON，不要输出 Markdown、代码块或解释。
+        使用 schema: "bready.recipe"，schemaVersion: 1。
+        所有重量使用 grams 数字。时间拆成 duration.value 和 duration.unit，unit 只能是 "min" 或 "hr"。温度拆成 temperature.value 和 temperature.unit，unit 只能是 "F" 或 "C"。
+        每个 ingredient 必须有唯一 ingredientId；steps.materialAllocations 只能引用这些 ingredientId。
+        不确定的信息写进 notes，不要编造精确重量。
+
+        可用枚举：
+        kind: "toast", "chiffon", "countryBread", "custom"
+        category: "flour", "starter", "basic", "other"
+        tag: "flour", "starter", "water", "salt", "sugar", "butter", "cream", "yeast", "egg", "other"
+        step type: "prep", "mixing", "fermentation", "rest", "shaping", "baking", "other"
+        productionMethod: "bake", "steam"
+
+        JSON 结构：
+        {
+          "schema": "bready.recipe",
+          "schemaVersion": 1,
+          "recipe": {
+            "name": "配方名称",
+            "kind": "custom",
+            "overallNotes": "可选备注",
+            "ingredients": [
+              {
+                "ingredientId": "flour-1",
+                "name": "高筋面粉",
+                "category": "flour",
+                "tag": "flour",
+                "weightGrams": 500
+              }
+            ],
+            "steps": [
+              {
+                "name": "混合",
+                "type": "mixing",
+                "notes": "步骤说明",
+                "duration": { "value": 20, "unit": "min" },
+                "temperature": { "value": 350, "unit": "F" },
+                "productionMethod": "bake",
+                "materialAllocations": [
+                  { "ingredientId": "flour-1", "percentage": 100 }
+                ]
+              }
+            ]
+          }
+        }
+        """)
+    }
+    static var recipeImportErrorInvalidJSON: String {
+        L10n.tr("recipe_import.error.invalid_json", default: "没有识别到有效 JSON。")
+    }
+    static var recipeImportErrorInvalidSchema: String {
+        L10n.tr("recipe_import.error.invalid_schema", default: "这个文件不是 Bready 配方 JSON。")
+    }
+    static func recipeImportErrorUnsupportedVersion(_ version: Int) -> String {
+        L10n.format("recipe_import.error.unsupported_version", default: "暂不支持 schemaVersion %d。", version)
+    }
+    static var recipeImportErrorEmptyRecipe: String {
+        L10n.tr("recipe_import.error.empty_recipe", default: "JSON 里需要至少一个材料和一个步骤。")
+    }
+    static func recipeImportErrorInvalidNumber(_ field: String) -> String {
+        L10n.format("recipe_import.error.invalid_number", default: "%@ 需要是非负数字。", field)
+    }
+    static func recipeImportErrorMissingIngredientReference(_ ingredientId: String) -> String {
+        L10n.format("recipe_import.error.missing_ingredient_reference", default: "步骤引用了不存在的材料：%@。", ingredientId)
+    }
     static var recipeSourceStartBlank: String { L10n.tr("recipe_source.action.start_blank", default: "从空白开始") }
     static var recipeSourceStartBlankDetail: String { L10n.tr("recipe_source.detail.start_blank", default: "手动搭建一个全新的配方") }
-    static var recipeSourceToastTemplateDetail: String { L10n.tr("recipe_source.detail.toast_template", default: "吐司基础配方") }
-    static var recipeSourceChiffonTemplateDetail: String { L10n.tr("recipe_source.detail.chiffon_template", default: "蛋糕基础配方") }
-    static var recipeSourceCountryBreadTemplateDetail: String { L10n.tr("recipe_source.detail.country_bread_template", default: "欧包基础配方") }
+    static var recipeSourceToastTemplateDetail: String { L10n.tr("recipe_source.detail.toast_template", default: "吐司、日式牛奶面包、模具面包") }
+    static var recipeSourceChiffonTemplateDetail: String { L10n.tr("recipe_source.detail.chiffon_template", default: "奶油蛋糕、戚风、巴斯克、香蕉蛋糕") }
+    static var recipeSourceCountryBreadTemplateDetail: String { L10n.tr("recipe_source.detail.country_bread_template", default: "酸面包、法棍、披萨面团") }
     static var recipeSourceEmptySaved: String { L10n.tr("recipe_source.empty.saved", default: "还没有已保存配方") }
     static var bakePickerChooseRecipe: String { L10n.tr("bake_picker.section.choose_recipe", default: "选择一个配方") }
     static var bakePickerEmptyReadyRecipes: String { L10n.tr("bake_picker.empty.ready_recipes", default: "还没有可烘焙的配方") }
@@ -298,13 +516,29 @@ enum BakingTerms {
     static var cookTitle: String { L10n.tr("cook.title", default: "开始开炉") }
     static var cookHomeAccessibility: String { L10n.tr("cook.action.home", default: "回到首页") }
     static var cookResetAccessibility: String { L10n.tr("cook.action.reset", default: "重置") }
+    static var cookOpenRecipePreview: String { L10n.tr("cook.action.open_recipe_preview", default: "查看原配方") }
     static var cookEmptyNeedsSteps: String { L10n.tr("cook.empty.needs_steps", default: "先添加制作步骤，再开始。") }
     static var cookEmptyNotReady: String { L10n.tr("cook.empty.not_ready", default: "配方还没准备好，先把材料分配到步骤。") }
     static var cookCurrentStage: String { L10n.tr("cook.label.current_stage", default: "当前阶段") }
     static var cookIngredients: String { L10n.tr("cook.section.ingredients", default: "本步材料") }
     static var cookTips: String { L10n.tr("cook.section.tips", default: "操作提示") }
     static var cookNow: String { L10n.tr("cook.label.now", default: "当前") }
+    static var cookStartAt: String { L10n.tr("cook.label.start_at", default: "开始") }
     static var cookFinishAt: String { L10n.tr("cook.label.finish_at", default: "预计完成") }
+    static var cookReminderSection: String { L10n.tr("cook.section.reminder", default: "计时提醒") }
+    static var cookReminderTime: String { L10n.tr("cook.label.reminder_time", default: "提醒时间") }
+    static var cookSetReminder: String { L10n.tr("cook.action.set_reminder", default: "设置提醒") }
+    static var cookUpdateReminder: String { L10n.tr("cook.action.update_reminder", default: "更新提醒") }
+    static var cookFoldReminderSection: String { L10n.tr("cook.fold.section.reminder", default: "抱叠提醒") }
+    static var cookFoldReminderToggle: String { L10n.tr("cook.fold.reminder.toggle", default: "抱叠提醒") }
+    static var cookFoldFrequency: String { L10n.tr("cook.fold.frequency", default: "抱叠频率") }
+    static var cookFoldNextTime: String { L10n.tr("cook.fold.next_time", default: "下次抱叠时间") }
+    static var cookFoldRecordsSection: String { L10n.tr("cook.fold.section.records", default: "抱叠记录") }
+    static var cookFoldAction: String { L10n.tr("cook.fold.action.record", default: "抱叠") }
+    static var cookFoldCompleted: String { L10n.tr("cook.fold.status.completed", default: "抱叠已完成，步骤仍需手动完成。") }
+    static var cookFoldRecordIndex: String { L10n.tr("cook.fold.record.index", default: "次数") }
+    static var cookFoldRecordTime: String { L10n.tr("cook.fold.record.time", default: "记录时间") }
+    static var cookFoldRecordsEmpty: String { L10n.tr("cook.fold.records.empty", default: "还没有抱叠记录") }
     static var cookNoStepIngredients: String { L10n.tr("cook.empty.no_step_ingredients", default: "这个步骤还没有分配材料。") }
     static var cookDefaultStepNote: String { L10n.tr("cook.note.default", default: "按你的记录完成这个步骤。") }
     static var cookChecked: String { L10n.tr("cook.status.checked", default: "已确认") }
@@ -315,7 +549,8 @@ enum BakingTerms {
     static var cookReturnToCurrentStep: String { L10n.tr("cook.action.return_to_current_step", default: "回到当前步骤") }
     static var cookCompleteStep: String { L10n.tr("cook.action.complete_step", default: "完成步骤") }
     static var cookFinish: String { L10n.tr("cook.action.finish", default: "完成") }
-    static var cookFinishBake: String { L10n.tr("cook.action.finish_bake", default: "完成制作") }
+    static var cookFinishBake: String { L10n.tr("cook.action.finish_bake", default: "完成烘焙") }
+    static var cookCompletedStatus: String { L10n.tr("cook.status.completed", default: "已完成") }
     static var cookStepCompleted: String { L10n.tr("cook.status.step_completed", default: "已完成") }
     static var cookCompletedTitle: String { L10n.tr("cook.completed.title", default: "制作完成") }
     static var cookCompletedBody: String { L10n.tr("cook.completed.body", default: "这次流程已经完整跑完，可以顺手记一点复盘。") }
@@ -331,6 +566,18 @@ enum BakingTerms {
 
     static func cookCurrentStepProgress(stepIndex: Int, totalSteps: Int) -> String {
         L10n.format("cook.label.current_step_progress", default: "当前 · 步骤 %d/%d", stepIndex, totalSteps)
+    }
+
+    static func cookReminderDefaultDetail(_ time: String) -> String {
+        L10n.format("cook.reminder.default_detail", default: "默认 %@", time)
+    }
+
+    static func cookReminderScheduledAt(_ time: String) -> String {
+        L10n.format("cook.reminder.scheduled_at", default: "已设置 %@", time)
+    }
+
+    static func cookFoldProgress(completed: Int, target: Int) -> String {
+        L10n.format("cook.fold.progress", default: "%d/%d", completed, target)
     }
 
     static func cookIngredientProgress(checked: Int, total: Int) -> String {
@@ -357,6 +604,14 @@ enum BakingTerms {
         L10n.format("notification.cook_timer.finished.body", default: "「%@」时间到了。", stepName)
     }
 
+    static var cookFoldReminderNotificationTitle: String {
+        L10n.tr("notification.cook_fold_reminder.title", default: "该抱叠了")
+    }
+
+    static func cookFoldReminderNotificationBody(stepName: String, foldIndex: Int) -> String {
+        L10n.format("notification.cook_fold_reminder.body", default: "「%@」第 %d 次抱叠时间到了。", stepName, foldIndex)
+    }
+
     static var starterFeedingReminderNotificationTitle: String {
         L10n.tr("notification.starter_feeding.title", default: "酵种喂养提醒")
     }
@@ -369,21 +624,21 @@ enum BakingTerms {
         L10n.format("notification.starter_feeding.past_due.body", default: "「%@」已经超过喂养日期，今天早上记得处理。", starterName)
     }
 
-    static var kitchenTimerTitle: String { L10n.tr("kitchen_timer.title", default: "厨房计时器") }
+    static var kitchenTimerTitle: String { L10n.tr("kitchen_timer.title", default: "计时器") }
     static var kitchenTimerOpenAccessibility: String {
-        L10n.tr("kitchen_timer.action.open", default: "打开厨房计时器")
+        L10n.tr("kitchen_timer.action.open", default: "打开计时器")
     }
     static var kitchenTimerStartAccessibility: String {
-        L10n.tr("kitchen_timer.action.start", default: "开始厨房计时")
+        L10n.tr("kitchen_timer.action.start", default: "开始计时")
     }
     static var kitchenTimerPauseAccessibility: String {
-        L10n.tr("kitchen_timer.action.pause", default: "暂停厨房计时")
+        L10n.tr("kitchen_timer.action.pause", default: "暂停计时")
     }
     static var kitchenTimerResumeAccessibility: String {
-        L10n.tr("kitchen_timer.action.resume", default: "继续厨房计时")
+        L10n.tr("kitchen_timer.action.resume", default: "继续计时")
     }
     static var kitchenTimerStopAccessibility: String {
-        L10n.tr("kitchen_timer.action.stop", default: "停止厨房计时")
+        L10n.tr("kitchen_timer.action.stop", default: "停止计时")
     }
     static var kitchenTimerHours: String { L10n.tr("kitchen_timer.unit.hours", default: "小时") }
     static var kitchenTimerMinutes: String { L10n.tr("kitchen_timer.unit.minutes", default: "分钟") }
@@ -421,7 +676,51 @@ enum BakingTerms {
 
     static var bakingStepName: String { L10n.tr("step.default.baking_name", default: "烘烤") }
     static var productionStepName: String { L10n.tr("step.default.production_name", default: "制作") }
-    static var customStepName: String { L10n.tr("step.default.custom_name", default: "其他") }
+    static var customStepName: String { L10n.tr("step.default.custom_name", default: "自定义") }
+
+    static var templateToastSimpleNote: String { L10n.tr("template.toast.simple.note", default: "称量材料，黄油提前软化。混合成团后加入盐和黄油，揉到光滑；发酵、整形入模，醒发后烘烤。") }
+    static var templateToastPrepName: String { L10n.tr("template.toast.step.prep.name", default: "准备材料") }
+    static var templateToastPrepNote: String { L10n.tr("template.toast.step.prep.note", default: "称量材料，黄油提前软化，模具抹油或铺纸。") }
+    static var templateToastMixName: String { L10n.tr("template.toast.step.mix.name", default: "混合成团") }
+    static var templateToastMixNote: String { L10n.tr("template.toast.step.mix.note", default: "混合到无干粉并开始成团。") }
+    static var templateToastButterName: String { L10n.tr("template.toast.step.butter.name", default: "加入黄油") }
+    static var templateToastButterNote: String { L10n.tr("template.toast.step.butter.note", default: "加入盐和黄油，揉到光滑有延展性。") }
+    static var templateToastBulkName: String { L10n.tr("template.toast.step.bulk.name", default: "基础发酵") }
+    static var templateToastBulkNote: String { L10n.tr("template.toast.step.bulk.note", default: "盖好发酵到明显膨胀。") }
+    static var templateToastShapeName: String { L10n.tr("template.toast.step.shape.name", default: "整形入模") }
+    static var templateToastShapeNote: String { L10n.tr("template.toast.step.shape.note", default: "排气分割，擀卷入模。") }
+    static var templateToastProofName: String { L10n.tr("template.toast.step.proof.name", default: "最后醒发") }
+    static var templateToastProofNote: String { L10n.tr("template.toast.step.proof.note", default: "醒发到八九分满，轻按有弹性。") }
+    static var templateToastBakeName: String { L10n.tr("template.toast.step.bake.name", default: "烘烤") }
+    static var templateToastBakeNote: String { L10n.tr("template.toast.step.bake.note", default: "烤到表面金黄，出炉脱模放凉。") }
+
+    static var templateChiffonSimpleNote: String { L10n.tr("template.chiffon.simple.note", default: "分蛋，蛋黄糊乳化后拌入低粉；蛋白加糖打发，翻拌入模，烘烤后倒扣冷却。") }
+    static var templateChiffonPrepName: String { L10n.tr("template.chiffon.step.prep.name", default: "准备与分蛋") }
+    static var templateChiffonPrepNote: String { L10n.tr("template.chiffon.step.prep.note", default: "预热烤箱，分蛋，蛋白盆保持无油无水。") }
+    static var templateChiffonYolkName: String { L10n.tr("template.chiffon.step.yolk.name", default: "蛋黄糊") }
+    static var templateChiffonYolkNote: String { L10n.tr("template.chiffon.step.yolk.note", default: "乳化蛋黄糊，筛入低粉拌顺滑。") }
+    static var templateChiffonMeringueName: String { L10n.tr("template.chiffon.step.meringue.name", default: "蛋白霜") }
+    static var templateChiffonMeringueNote: String { L10n.tr("template.chiffon.step.meringue.note", default: "加糖打发到稳定小弯钩。") }
+    static var templateChiffonFoldName: String { L10n.tr("template.chiffon.step.fold.name", default: "混合入模") }
+    static var templateChiffonFoldNote: String { L10n.tr("template.chiffon.step.fold.note", default: "蛋白霜分次和蛋黄糊翻拌，入模震气泡。") }
+    static var templateChiffonBakeName: String { L10n.tr("template.chiffon.step.bake.name", default: "烘烤") }
+    static var templateChiffonBakeNote: String { L10n.tr("template.chiffon.step.bake.note", default: "烤到表面回弹，竹签无湿面糊。") }
+    static var templateChiffonCoolName: String { L10n.tr("template.chiffon.step.cool.name", default: "倒扣冷却") }
+    static var templateChiffonCoolNote: String { L10n.tr("template.chiffon.step.cool.note", default: "出炉立刻倒扣，冷透后脱模。") }
+
+    static var templateCountryBreadSimpleNote: String { L10n.tr("template.country_bread.simple.note", default: "混合材料到无干粉，室温折叠发酵；冷藏后整形、醒发，割包烘烤。") }
+    static var templateCountryBreadMixName: String { L10n.tr("template.country_bread.step.mix.name", default: "混合面团") }
+    static var templateCountryBreadMixNote: String { L10n.tr("template.country_bread.step.mix.note", default: "混合到无干粉。") }
+    static var templateCountryBreadBulkName: String { L10n.tr("template.country_bread.step.bulk.name", default: "折叠发酵") }
+    static var templateCountryBreadBulkNote: String { L10n.tr("template.country_bread.step.bulk.note", default: "室温发酵，中途拉伸折叠。") }
+    static var templateCountryBreadColdName: String { L10n.tr("template.country_bread.step.cold.name", default: "冷藏发酵") }
+    static var templateCountryBreadColdNote: String { L10n.tr("template.country_bread.step.cold.note", default: "盖好冷藏过夜。") }
+    static var templateCountryBreadPreshapeName: String { L10n.tr("template.country_bread.step.preshape.name", default: "预整形") }
+    static var templateCountryBreadPreshapeNote: String { L10n.tr("template.country_bread.step.preshape.note", default: "回温后轻轻收圆，松弛再整形。") }
+    static var templateCountryBreadProofName: String { L10n.tr("template.country_bread.step.proof.name", default: "最后醒发") }
+    static var templateCountryBreadProofNote: String { L10n.tr("template.country_bread.step.proof.note", default: "放入撒粉发酵篮或碗中，醒发到按压后缓慢回弹。") }
+    static var templateCountryBreadBakeName: String { L10n.tr("template.country_bread.step.bake.name", default: "割包烘烤") }
+    static var templateCountryBreadBakeNote: String { L10n.tr("template.country_bread.step.bake.note", default: "割包入炉，前段加盖或蒸汽，烤到深金色。") }
 
     static func stepDefaultName(_ number: Int) -> String {
         L10n.format("step.default.numbered_name", default: "步骤%d", number)
@@ -440,11 +739,13 @@ enum BakingTerms {
     static var starterMeasuredWeight: String { L10n.tr("starter_profile.measured_weight", default: "称重") }
     static var starterFinalWeight: String { L10n.tr("starter_profile.final_weight", default: "酵种重量") }
     static var starterTotalWeight: String { L10n.tr("starter_profile.total_weight", default: "总重量") }
+    static var starterPostFeedWeight: String { L10n.tr("starter_profile.post_feed_weight", default: "喂养后重量") }
     static var starterTime: String { L10n.tr("starter_profile.time", default: "时间") }
     static var starterRatio: String { L10n.tr("starter_profile.ratio", default: "比例") }
     static var starterFeedFlour: String { L10n.tr("starter_profile.feed_flour", default: "面粉") }
     static var starterFeedWater: String { L10n.tr("starter_profile.feed_water", default: "水") }
     static var starterReminderToggle: String { L10n.tr("starter_profile.reminder.toggle", default: "喂养提醒") }
+    static var starterFeedingFrequencyDays: String { L10n.tr("starter_profile.feeding_frequency_days", default: "喂养频率（天）") }
     static var starterNextFeedingDate: String { L10n.tr("starter_profile.next_feeding_date", default: "下次喂养日期") }
     static var starterReminderTimes: String { L10n.tr("starter_profile.reminder_times", default: "提醒时间") }
     static var starterFedDone: String { L10n.tr("starter_profile.action.done", default: "已完成喂养") }
@@ -462,13 +763,21 @@ enum BakingTerms {
     static var addStarter: String { L10n.tr("starter_library.action.add", default: "添加酵种") }
     static var noStarters: String { L10n.tr("starter_library.empty.no_starters", default: "暂无酵种") }
     static var noMatchingStarters: String { L10n.tr("starter_library.empty.no_matching_starters", default: "没有匹配的酵种") }
-    static var starterLastFed: String { L10n.tr("starter_library.row.last_fed", default: "喂养") }
+    static var starterLastFed: String { L10n.tr("starter_library.row.last_fed", default: "上次喂养") }
+    static var relativeToday: String { L10n.tr("starter_library.row.last_fed.today", default: "今天") }
+    static var relativeYesterday: String { L10n.tr("starter_library.row.last_fed.yesterday", default: "昨天") }
+    static func relativeDaysAgo(_ days: Int) -> String {
+        L10n.format("starter_library.row.last_fed.days_ago", default: "%d 天前", days)
+    }
+    static func starterLastFedAccessibilityValue(date: String, relative: String) -> String {
+        L10n.format("starter_library.row.last_fed.accessibility_value", default: "%@，%@", date, relative)
+    }
     static var starterDeleteConfirmationTitle: String { L10n.tr("starter_library.confirm.delete.title", default: "删除这个酵种？") }
     static var starterDeleteConfirmationButton: String { L10n.tr("starter_library.confirm.delete.button", default: "删除酵种") }
     static func starterDeleteConfirmationMessage(_ name: String) -> String {
         L10n.format("starter_library.confirm.delete.message", default: "“%@” 会从酵种列表中移除。", name)
     }
-    static var starterSlideToMarkFed: String { L10n.tr("starter_profile.action.slide_to_mark_fed", default: "向左滑动完成喂养") }
+    static var starterSlideToMarkFed: String { L10n.tr("starter_profile.action.slide_to_mark_fed", default: "向右滑动完成喂养") }
     static var starterWeightAdjustHint: String { L10n.tr("starter_profile.weight.adjust_hint", default: "向左滑动减少克数，也可以直接输入") }
     static var formulaFieldName: String { L10n.tr("formula.field.name", default: "名称") }
     static var formulaPopupNameLabel: String { L10n.tr("formula.popup.name_label", default: "名称") }
@@ -507,6 +816,16 @@ enum BakingTerms {
     static var formulaExportJSON: String { L10n.tr("formula.action.export_json", default: "导出 JSON") }
     static var formulaImportJSON: String { L10n.tr("formula.action.import_json", default: "导入 JSON") }
     static var formulaEmptyMaterials: String { L10n.tr("formula.empty.materials", default: "还没有材料") }
+    static var formulaFlourPercentageInfoAccessibility: String { L10n.tr("formula.flour_percentage.accessibility", default: "面粉百分比说明") }
+    static var formulaFlourPercentageInfoTitle: String { L10n.tr("formula.flour_percentage.title", default: "仅限面粉表") }
+    static var formulaFlourPercentageInfoBody: String {
+        L10n.tr("formula.flour_percentage.body", default: "只统计这个面粉表里的面粉。普通面粉按重量算；种面只算其中的面粉。")
+    }
+    static var formulaIngredientLockToggleAccessibility: String {
+        L10n.tr("formula.ingredient_lock.toggle.accessibility", default: "切换材料表锁定方式")
+    }
+    static var formulaIngredientLockWeight: String { L10n.tr("formula.ingredient_lock.weight", default: "锁定重量") }
+    static var formulaIngredientLockPercentage: String { L10n.tr("formula.ingredient_lock.percentage", default: "锁定比例") }
     static var formulaBakerPercentageInfoAccessibility: String { L10n.tr("formula.baker_percentage.accessibility", default: "百分比说明") }
     static var formulaBakerPercentageInfoTitle: String { L10n.tr("formula.baker_percentage.title", default: "基于总面粉") }
     static var formulaBakerPercentageInfoBody: String {
@@ -515,10 +834,24 @@ enum BakingTerms {
 
     static var stepsOverviewTitle: String { L10n.tr("steps.overview.title", default: "制作安排") }
     static var stepsSectionTitle: String { L10n.tr("steps.section.title", default: "制作步骤") }
+    static var stepsModeSection: String { L10n.tr("steps.mode.section", default: "步骤版本") }
+    static var stepsModeField: String { L10n.tr("steps.mode.field", default: "版本") }
+    static var stepsModeSimple: String { L10n.tr("steps.mode.simple", default: "精简版") }
+    static var stepsModeCustom: String { L10n.tr("steps.mode.custom", default: "定制版") }
+    static var stepsModeCustomToggle: String { L10n.tr("steps.mode.custom_toggle", default: "定制步骤") }
+    static var stepsSimpleStepName: String { L10n.tr("steps.simple.step_name", default: "制作步骤") }
+    static var stepsSimpleEditAccessibility: String {
+        L10n.tr("steps.simple.edit.accessibility", default: "编辑精简制作步骤")
+    }
     static var stepsEditorTitle: String { L10n.tr("steps.editor.title", default: "编辑步骤") }
     static var stepsTimingSection: String { L10n.tr("steps.section.timing", default: "时间与温度") }
     static var stepsMaterialsSection: String { L10n.tr("steps.section.materials", default: "材料") }
     static var stepsPageNotes: String { L10n.tr("steps.section.notes", default: "笔记") }
+    static var stepsPageNotesEmpty: String { L10n.tr("steps.empty.notes", default: "还没有笔记") }
+    static var stepsDoughSplitSection: String { L10n.tr("steps.dough_split.section", default: "面团分割") }
+    static var stepsDoughTotalWeight: String { L10n.tr("steps.dough_split.total_weight", default: "面团总重量") }
+    static var stepsDoughPieceCount: String { L10n.tr("steps.dough_split.piece_count", default: "分成份数") }
+    static var stepsDoughEachWeight: String { L10n.tr("steps.dough_split.each_weight", default: "每份重量") }
     static var stepsMaterialsEmpty: String { L10n.tr("steps.empty.materials", default: "配方里还没有材料。") }
     static var stepsEmptyMessage: String { L10n.tr("steps.empty.message", default: "添加步骤后，就可以把材料分配到每一步。") }
     static var stepsMissingStep: String { L10n.tr("steps.empty.missing_step", default: "这个步骤已经不存在了") }
@@ -544,10 +877,13 @@ enum BakingTerms {
     static var stepsCategoryMakeStarter: String { L10n.tr("steps.category.make_starter", default: "制作种面") }
     static var stepsCategoryPrepWork: String { L10n.tr("steps.category.prep_work", default: "准备工作") }
     static var stepsCategoryMixing: String { L10n.tr("steps.category.mixing", default: "打面") }
+    static var stepsCategoryBatterMixing: String { L10n.tr("steps.category.batter_mixing", default: "混合") }
     static var stepsCategoryFermentation: String { L10n.tr("steps.category.fermentation", default: "发酵") }
     static var stepsCategoryBaking: String { L10n.tr("steps.category.baking", default: "烘焙") }
     static var stepsCategoryShaping: String { L10n.tr("steps.category.shaping", default: "整形") }
     static var stepsCategoryProofing: String { L10n.tr("steps.category.proofing", default: "醒发") }
+    static var stepsCategoryCooling: String { L10n.tr("steps.category.cooling", default: "冷却") }
+    static var stepsCategoryCustom: String { L10n.tr("steps.category.custom", default: "自定义") }
     static var stepsStarterPickerSection: String { L10n.tr("steps.starter_picker.section", default: "种面") }
     static var stepsStarterPickerEmpty: String { L10n.tr("steps.starter_picker.empty", default: "配方里还没有种面。") }
     static var stepsStarterPickerAccessibility: String { L10n.tr("steps.starter_picker.accessibility", default: "选择种面") }
@@ -559,6 +895,10 @@ enum BakingTerms {
     static var stepsSwitchTemperatureUnit: String { L10n.tr("steps.action.switch_temperature_unit", default: "切换温标") }
     static var stepsFieldProductionMethod: String { L10n.tr("steps.field.production_method", default: "方式") }
     static var stepsFieldNotes: String { L10n.tr("steps.field.notes", default: "备注") }
+    static var stepsFoldPlanSection: String { L10n.tr("steps.fold.section.plan", default: "抱叠计划") }
+    static var stepsFoldCount: String { L10n.tr("steps.fold.count", default: "抱叠次数") }
+    static var stepsFoldFrequency: String { L10n.tr("steps.fold.frequency", default: "抱叠频率") }
+    static var stepsFoldTotalDuration: String { L10n.tr("steps.fold.total_duration", default: "预计耗时") }
     static var stepsTextBlockAccessibility: String { L10n.tr("steps.text_block.accessibility", default: "制作步骤文字") }
     static var stepsInsertSelectedMaterials: String { L10n.tr("steps.action.insert_selected_materials", default: "加入笔记") }
     static var stepsMinuteUnit: String { L10n.tr("steps.unit.minute", default: "分钟") }
@@ -656,5 +996,128 @@ enum BakingTerms {
     }
     static func recipePreviewEggDetail(count: String, water: String) -> String {
         L10n.format("recipe_preview.detail.egg", default: "%@ 个 / 水 %@", count, water)
+    }
+
+    static var onboardingRecipeListTitle: String {
+        L10n.tr("onboarding.recipe_list.title", default: "先把配方整理起来")
+    }
+    static var onboardingRecipeListMessage: String {
+        L10n.tr("onboarding.recipe_list.message", default: "把常做配方放进列表，按状态和最近更新快速找到下一次要做的那一个。")
+    }
+    static var onboardingRecipeViewTitle: String {
+        L10n.tr("onboarding.recipe_view.title", default: "看清每个配方的比例")
+    }
+    static var onboardingRecipeViewMessage: String {
+        L10n.tr("onboarding.recipe_view.message", default: "配方页会把材料、烘焙百分比、总重量和含水量放在一起，调整起来更直观。")
+    }
+    static var onboardingOngoingBakeTitle: String {
+        L10n.tr("onboarding.ongoing_bake.title", default: "制作时跟着步骤走")
+    }
+    static var onboardingOngoingBakeMessage: String {
+        L10n.tr("onboarding.ongoing_bake.message", default: "开始烘焙后，当前步骤、计时和材料确认会集中在正在制作页面里。")
+    }
+    static var onboardingStarterFeedingTitle: String {
+        L10n.tr("onboarding.starter_feeding.title", default: "记录种面的喂养")
+    }
+    static var onboardingStarterFeedingMessage: String {
+        L10n.tr("onboarding.starter_feeding.message", default: "为鲁邦种、液种和其他种面记录喂养比例、成熟时间和下一次提醒。")
+    }
+    static var onboardingNext: String {
+        L10n.tr("onboarding.action.next", default: "下一页")
+    }
+    static var onboardingFinish: String {
+        L10n.tr("onboarding.action.finish", default: "开始使用")
+    }
+    static var onboardingRecipeListPreviewTitle: String {
+        L10n.tr("onboarding.preview.recipe_list.title", default: "配方列表")
+    }
+    static var onboardingRecipeViewPreviewTitle: String {
+        L10n.tr("onboarding.preview.recipe_view.title", default: "配方视图")
+    }
+    static var onboardingRecipeViewPreviewDetail: String {
+        L10n.tr("onboarding.preview.recipe_view.detail", default: "450g 面粉基准")
+    }
+    static var onboardingOngoingPreviewTitle: String {
+        L10n.tr("onboarding.preview.ongoing.title", default: "正在制作")
+    }
+    static var onboardingStarterPreviewTitle: String {
+        L10n.tr("onboarding.preview.starter.title", default: "种面喂养")
+    }
+    static var onboardingMetricDoughWeight: String {
+        L10n.tr("onboarding.metric.dough_weight", default: "总面团")
+    }
+    static var onboardingMetricHydration: String {
+        L10n.tr("onboarding.metric.hydration", default: "含水量")
+    }
+    static var onboardingMetricRemaining: String {
+        L10n.tr("onboarding.metric.remaining", default: "剩余")
+    }
+    static var onboardingCurrentStep: String {
+        L10n.tr("onboarding.metric.current_step", default: "当前步骤")
+    }
+    static var onboardingStarterRatio: String {
+        L10n.tr("onboarding.starter.ratio", default: "喂养比例")
+    }
+    static var onboardingStarterMaturity: String {
+        L10n.tr("onboarding.starter.maturity", default: "成熟时间")
+    }
+    static var onboardingStarterTemperature: String {
+        L10n.tr("onboarding.starter.temperature", default: "保存温度")
+    }
+    static var onboardingStarterSeed: String {
+        L10n.tr("onboarding.starter.seed", default: "原种")
+    }
+    static var onboardingStarterNextFeeding: String {
+        L10n.tr("onboarding.starter.next_feeding", default: "下次喂养")
+    }
+    static var onboardingCelsiusUnit: String {
+        L10n.tr("onboarding.unit.celsius", default: "°C")
+    }
+    static var onboardingSampleRecipeMilkToast: String {
+        L10n.tr("onboarding.sample.recipe.milk_toast", default: "牛奶吐司")
+    }
+    static var onboardingSampleRecipeCountryBread: String {
+        L10n.tr("onboarding.sample.recipe.country_bread", default: "高水量欧包")
+    }
+    static var onboardingSampleRecipeChiffon: String {
+        L10n.tr("onboarding.sample.recipe.chiffon", default: "戚风蛋糕")
+    }
+    static var onboardingSampleUpdatedToday: String {
+        L10n.tr("onboarding.sample.updated.today", default: "今天更新")
+    }
+    static var onboardingSampleUpdatedYesterday: String {
+        L10n.tr("onboarding.sample.updated.yesterday", default: "昨天更新")
+    }
+    static var onboardingSampleUpdatedLastWeek: String {
+        L10n.tr("onboarding.sample.updated.last_week", default: "上周更新")
+    }
+    static var onboardingSampleStepMixing: String {
+        L10n.tr("onboarding.sample.step.mixing", default: "基础打面")
+    }
+    static var onboardingSampleStepFermentation: String {
+        L10n.tr("onboarding.sample.step.fermentation", default: "一发")
+    }
+    static var onboardingSampleStepBake: String {
+        L10n.tr("onboarding.sample.step.bake", default: "入炉烘烤")
+    }
+    static var onboardingSampleStepCompleted: String {
+        L10n.tr("onboarding.sample.step.completed", default: "已完成")
+    }
+    static var onboardingSampleStepCurrent: String {
+        L10n.tr("onboarding.sample.step.current", default: "正在计时")
+    }
+    static var onboardingSampleStepUpcoming: String {
+        L10n.tr("onboarding.sample.step.upcoming", default: "待开始")
+    }
+    static var onboardingSampleTomorrowMorning: String {
+        L10n.tr("onboarding.sample.tomorrow_morning", default: "明早")
+    }
+
+    static func onboardingSampleBakeCount(_ count: Int) -> String {
+        L10n.format("onboarding.sample.bake_count", default: "%d 次制作", count)
+    }
+
+    static func onboardingStepProgress(_ current: Int, _ total: Int) -> String {
+        L10n.format("onboarding.step.progress", default: "步骤 %d/%d", current, total)
     }
 }

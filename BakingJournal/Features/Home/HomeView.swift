@@ -38,6 +38,8 @@ struct HomeView: View {
         switch route {
         case .recipeSourcePicker:
             RecipeSourcePickerView()
+        case .aiRecipeImport:
+            AIRecipeImportView()
         case .bakeRecipePicker:
             BakeRecipePickerView()
         case .recipeWorkspace(let initialStage):
@@ -48,8 +50,6 @@ struct HomeView: View {
             StarterDetailRouteView(starterID: starterID)
         case .cook:
             CookView()
-        case .toolbox:
-            ToolboxView()
         case .kitchenTimer:
             KitchenTimerView()
         case .bakeRecordDetail(let recordID):
@@ -78,7 +78,8 @@ struct HomeView: View {
                     icon: recipeStatusFilter.icon,
                     role: .primary,
                     size: .primary,
-                    isSelected: recipeStatusFilter != .all
+                    isSelected: recipeStatusFilter != .all,
+                    tintOverride: recipeStatusFilter.iconTint
                 )
             }
             .buttonStyle(BakingPressFeedbackButtonStyle())
@@ -121,18 +122,19 @@ struct HomeView: View {
                 } else if recipeLibraryCandidates.isEmpty {
                     BakingEmptyState(title: BakingTerms.noRecipes, systemImage: "book.closed")
                         .listRowBackground(Color.clear)
-                } else if displayedRecipes.isEmpty {
+                } else if displayedRecipeRows.isEmpty {
                     BakingEmptyState(title: BakingTerms.noMatchingRecipes, systemImage: "line.3.horizontal.decrease.circle")
                         .listRowBackground(Color.clear)
                 } else {
-                    ForEach(displayedRecipes) { recipe in
+                    ForEach(displayedRecipeRows) { row in
                         Button {
-                            store.loadRecipe(recipe)
+                            store.loadRecipe(row.recipe)
                             navigationController.push(.recipeWorkspace(.preview))
                         } label: {
                             RecipeLibraryRow(
-                                recipe: recipe,
-                                bakeCount: bakeCount(for: recipe)
+                                recipe: row.recipe,
+                                bakeCount: bakeCount(for: row.recipe),
+                                filterMatchState: row.filterMatchState
                             )
                         }
                         .buttonStyle(.plain)
@@ -140,7 +142,7 @@ struct HomeView: View {
                         .listRowBackground(BakingSurface.rowBackground)
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
-                                recipePendingDeletion = recipe
+                                recipePendingDeletion = row.recipe
                                 showingDeleteRecipeConfirmation = true
                             } label: {
                                 Label(BakingTerms.delete, systemImage: "trash")
@@ -174,15 +176,46 @@ struct HomeView: View {
         }
     }
 
-    private var displayedRecipes: [SavedRecipe] {
-        let filteredByStatus = recipeLibraryCandidates.filter { recipe in
-            recipeStatusFilter.includes(recipe)
-        }
+    private var displayedRecipeRows: [RecipeLibraryDisplayRow] {
         let trimmedSearch = recipeSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let filteredByName = trimmedSearch.isEmpty ? filteredByStatus : filteredByStatus.filter { recipe in
-            recipe.name.localizedStandardContains(trimmedSearch)
+
+        if !trimmedSearch.isEmpty {
+            return sortedByModified(
+                recipeLibraryCandidates.filter { recipe in
+                    recipeStatusFilter.includes(recipe) &&
+                    recipe.name.localizedStandardContains(trimmedSearch)
+                }
+            ).map { recipe in
+                RecipeLibraryDisplayRow(
+                    recipe: recipe,
+                    filterMatchState: .matching
+                )
+            }
         }
-        return filteredByName.sorted { lhs, rhs in
+
+        let filteredInRows = sortedByModified(
+            recipeLibraryCandidates.filter { recipeStatusFilter.includes($0) }
+        ).map { recipe in
+            RecipeLibraryDisplayRow(
+                recipe: recipe,
+                filterMatchState: .matching
+            )
+        }
+
+        let filteredOutRows = sortedByModified(
+            recipeLibraryCandidates.filter { !recipeStatusFilter.includes($0) }
+        ).map { recipe in
+            RecipeLibraryDisplayRow(
+                recipe: recipe,
+                filterMatchState: .filteredOut
+            )
+        }
+
+        return filteredInRows + filteredOutRows
+    }
+
+    private func sortedByModified(_ recipes: [SavedRecipe]) -> [SavedRecipe] {
+        recipes.sorted { lhs, rhs in
             switch recipeModifiedSort {
             case .newestFirst:
                 return lhs.updatedAt > rhs.updatedAt
@@ -201,10 +234,19 @@ struct HomeView: View {
     }
 }
 
-private enum RecipeLibraryStatusFilter {
+private struct RecipeLibraryDisplayRow: Identifiable {
+    let recipe: SavedRecipe
+    let filterMatchState: BakingFilterMatchState
+
+    var id: UUID { recipe.id }
+}
+
+private enum RecipeLibraryStatusFilter: CaseIterable, Hashable, Identifiable {
     case all
     case ready
     case draft
+
+    var id: Self { self }
 
     var next: RecipeLibraryStatusFilter {
         switch self {
@@ -225,6 +267,17 @@ private enum RecipeLibraryStatusFilter {
             return .complete
         case .draft:
             return .edit
+        }
+    }
+
+    var iconTint: Color? {
+        switch self {
+        case .all:
+            return nil
+        case .ready:
+            return RecipeWorkflowState.ready.badgeForegroundColor
+        case .draft:
+            return RecipeWorkflowState.draft.badgeForegroundColor
         }
     }
 
@@ -289,6 +342,15 @@ enum HomeTab {
     case starter
     case settings
 
+    var analyticsName: String {
+        switch self {
+        case .formula: "formula"
+        case .history: "history"
+        case .starter: "starter"
+        case .settings: "settings"
+        }
+    }
+
     var title: String {
         switch self {
         case .formula: BakingTerms.recipeTabTitle
@@ -310,7 +372,6 @@ enum HomeTab {
 
 struct BakingTabBar: View {
     @Binding var selection: HomeTab
-    let isStarterReminderDue: Bool
 
     private let tabs: [HomeTab] = [.formula, .history, .starter, .settings]
 
@@ -318,12 +379,12 @@ struct BakingTabBar: View {
         HStack(spacing: 0) {
             ForEach(tabs, id: \.self) { tab in
                 Button {
+                    BakingAnalytics.logNavTabClick(tabName: tab.analyticsName)
                     selection = tab
                 } label: {
                     BakingTabItem(
                         tab: tab,
-                        isSelected: selection == tab,
-                        showsBadge: tab == .starter && isStarterReminderDue
+                        isSelected: selection == tab
                     )
                 }
                 .buttonStyle(BakingPressFeedbackButtonStyle())
@@ -332,8 +393,8 @@ struct BakingTabBar: View {
             }
         }
         .padding(.horizontal, BakingSpace.lg)
-        .padding(.top, BakingSpace.xxs)
-        .padding(.bottom, BakingSpace.xxs)
+        .padding(.top, BakingComponentMetrics.tabBarVerticalPadding)
+        .padding(.bottom, BakingComponentMetrics.tabBarVerticalPadding)
         .frame(maxWidth: .infinity)
         .background(BakingSurface.bottomBarBackground)
         .overlay(alignment: .top) {
@@ -347,14 +408,12 @@ struct BakingTabBar: View {
 private struct BakingTabItem: View {
     let tab: HomeTab
     let isSelected: Bool
-    let showsBadge: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             BakingTabIconLabel(
                 icon: tab.icon,
-                isSelected: isSelected,
-                showsBadge: showsBadge
+                isSelected: isSelected
             )
 
             Text(tab.title)
@@ -376,91 +435,225 @@ private struct BakingTabItem: View {
 
 private struct SettingsTabView: View {
     @EnvironmentObject private var navigationController: AppNavigationController
+    @EnvironmentObject private var languageSettings: AppLanguageSettings
+    @State private var showingLanguageDropdown = false
+    @State private var showingOnboardingTutorial = false
+    @State private var showingAboutBready = false
 
     var body: some View {
-        List {
+        BakingLibraryList {
             Section {
                 Button {
-                    navigationController.push(.toolbox)
+                    showingLanguageDropdown = true
                 } label: {
                     SettingsNavigationRow(
-                        icon: .toolbox,
-                        title: BakingTerms.toolboxTitle,
-                        detail: BakingTerms.settingsToolboxDetail
+                        icon: .settings,
+                        title: BakingTerms.settingsLanguageTitle,
+                        detail: languageSettings.selectedLanguage.displayName,
+                        accessory: .dropdown
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(BakingTerms.toolboxTitle)
-            } header: {
-                Text(BakingTerms.settingsSectionTools)
-            }
-        }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(Color.brandBackground)
-    }
-}
+                .accessibilityLabel(BakingTerms.settingsLanguageOpenAccessibility)
+                .accessibilityValue(languageSettings.selectedLanguage.displayName)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .listRowBackground(BakingSurface.rowBackground)
+                .popover(isPresented: $showingLanguageDropdown, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                    languageDropdown
+                }
 
-private struct ToolboxView: View {
-    @EnvironmentObject private var navigationController: AppNavigationController
-
-    var body: some View {
-        List {
-            Section {
                 Button {
                     navigationController.push(.kitchenTimer)
                 } label: {
                     SettingsNavigationRow(
                         icon: .timer,
-                        title: BakingTerms.kitchenTimerTitle,
-                        detail: BakingTerms.toolboxKitchenTimerDetail
+                        title: BakingTerms.kitchenTimerTitle
                     )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(BakingTerms.kitchenTimerOpenAccessibility)
-            } header: {
-                Text(BakingTerms.toolboxSectionTools)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .listRowBackground(BakingSurface.rowBackground)
+
+                Button {
+                    showingOnboardingTutorial = true
+                } label: {
+                    SettingsNavigationRow(
+                        icon: .preview,
+                        title: BakingTerms.settingsTutorialTitle
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.settingsTutorialOpenAccessibility)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .listRowBackground(BakingSurface.rowBackground)
+            }
+            .listRowBackground(BakingSurface.rowBackground)
+
+            // Keep About Bready as the final settings entry.
+            Section {
+                Button {
+                    showingAboutBready = true
+                } label: {
+                    SettingsNavigationRow(
+                        icon: .settings,
+                        title: BakingTerms.settingsAboutTitle
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(BakingTerms.settingsAboutOpenAccessibility)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .listRowBackground(BakingSurface.rowBackground)
+            }
+            .listRowBackground(BakingSurface.rowBackground)
+        }
+        .background(Color.brandBackground)
+        .sheet(isPresented: $showingOnboardingTutorial) {
+            OnboardingView {
+                showingOnboardingTutorial = false
+            }
+            .presentationBackground(Color.brandBackground)
+        }
+        .sheet(isPresented: $showingAboutBready) {
+            SettingsAboutBreadyView()
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var languageDropdown: some View {
+        BakingDropdownPopover(width: 220) {
+            ForEach(AppLanguage.allCases) { language in
+                Button {
+                    showingLanguageDropdown = false
+                    languageSettings.select(language)
+                } label: {
+                    BakingDropdownRow(
+                        title: language.displayName,
+                        isSelected: language == languageSettings.selectedLanguage,
+                        showsLeadingSlot: false
+                    ) {
+                        EmptyView()
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(language.displayName)
             }
         }
-        .navigationTitle(BakingTerms.toolboxTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(Color.brandBackground)
+    }
+}
+
+private struct SettingsAboutBreadyView: View {
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(BakingTerms.settingsAboutFeedbackMessage)
+                        .bakingLabelStyle(.inputLabel)
+
+                    Text(BakingTerms.settingsAboutLocalDataMessage)
+                        .bakingLabelStyle(.helperText)
+                }
+                .listRowBackground(BakingSurface.rowBackground)
+
+                Section {
+                    SettingsContactRow(
+                        title: BakingTerms.settingsAboutVersion,
+                        value: AppInfo.current.displayVersion(
+                            fallback: BakingTerms.settingsAboutVersionUnavailable
+                        )
+                    )
+
+                    SettingsContactRow(
+                        title: BakingTerms.settingsAboutContactEmail,
+                        value: BakingTerms.settingsAboutContactEmailValue
+                    )
+
+                    SettingsContactRow(
+                        title: BakingTerms.settingsAboutXiaohongshu,
+                        value: BakingTerms.settingsAboutXiaohongshuValue
+                    )
+
+                    SettingsContactRow(
+                        title: BakingTerms.settingsAboutInstagram,
+                        value: BakingTerms.settingsAboutInstagramValue
+                    )
+                }
+                .listRowBackground(BakingSurface.rowBackground)
+            }
+            .navigationTitle(BakingTerms.settingsAboutTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.brandBackground)
+        }
+        .presentationBackground(Color.brandBackground)
+    }
+}
+
+private struct SettingsContactRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        LabeledContent {
+            Text(value)
+                .bakingLabelStyle(.helperText)
+                .multilineTextAlignment(.trailing)
+        } label: {
+            BakingLabel(text: title, role: .inputLabel)
+        }
     }
 }
 
 private struct SettingsNavigationRow: View {
     let icon: BakingIcon
     let title: String
-    let detail: String
+    var detail: String?
+    var accessory: SettingsRowAccessory = .navigation
 
     var body: some View {
-        HStack(spacing: 14) {
-            BakingMaterialIconBadge(
-                icon: icon,
-                color: .brandPrimary,
-                background: BakingSurfaceTheme.theme(for: .inputSurface).background
-            )
+        HStack(spacing: BakingSpace.lg) {
+            BakingMaterialIconBadge(icon: icon)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: BakingSpace.xs) {
                 Text(title)
-                    .font(BakingTypography.appPrimaryText)
+                    .font(BakingTypography.rowTitle)
                     .foregroundStyle(Color.brandText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
-                Text(detail)
-                    .font(BakingTypography.appSecondaryText)
-                    .foregroundStyle(Color.brandSecondaryText)
-                    .lineLimit(2)
+                if let detail {
+                    Text(detail)
+                        .font(BakingTypography.helperText)
+                        .foregroundStyle(Color.brandSecondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: BakingSpace.sm)
 
-            Image(systemName: "chevron.right")
+            Image(systemName: accessory.systemImage)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.brandTertiaryText)
         }
-        .frame(minHeight: 56)
+        .frame(minHeight: BakingComponentMetrics.listRowMinHeight)
+        .padding(.horizontal, BakingLayout.screenHorizontalInset)
+        .padding(.vertical, BakingSpace.sm)
         .contentShape(Rectangle())
+    }
+}
+
+private enum SettingsRowAccessory {
+    case navigation
+    case dropdown
+
+    var systemImage: String {
+        switch self {
+        case .navigation:
+            return "chevron.right"
+        case .dropdown:
+            return "chevron.down"
+        }
     }
 }

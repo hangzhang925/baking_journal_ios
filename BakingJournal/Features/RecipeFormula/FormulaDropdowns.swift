@@ -75,8 +75,16 @@ struct ActiveDropdownMenu: Identifiable {
     let frame: CGRect
     let width: CGFloat
     let alignment: DropdownMenuAlignment
-    var reservesLeadingIconSlot = true
     let items: [DropdownMenuItem]
+
+    func fittedWidth(in containerSize: CGSize) -> CGFloat {
+        BakingDropdownMenuWidth.fitting(
+            titles: items.map(\.title),
+            minimumWidth: width,
+            containerWidth: containerSize.width,
+            showsLeadingSlot: false
+        )
+    }
 }
 
 enum DropdownMenuAlignment {
@@ -87,7 +95,6 @@ enum DropdownMenuAlignment {
 struct DropdownMenuItem: Identifiable {
     let id = UUID()
     let title: String
-    var icon: BakingIcon? = nil
     var isSelected = false
     let action: () -> Void
 }
