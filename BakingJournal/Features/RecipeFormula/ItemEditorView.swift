@@ -94,22 +94,12 @@ struct ItemEditorSheetView: View {
                         dropdownPresenter.dismiss()
                         item.action()
                     } label: {
-                        if menu.reservesLeadingIconSlot {
-                            BakingDropdownRow(title: item.title, isSelected: item.isSelected) {
-                                if let icon = item.icon {
-                                    BakingIconView(icon: icon, size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
-                                } else {
-                                    Color.clear
-                                }
-                            }
-                        } else {
-                            BakingDropdownRow(
-                                title: item.title,
-                                isSelected: item.isSelected,
-                                showsLeadingSlot: false
-                            ) {
-                                EmptyView()
-                            }
+                        BakingDropdownRow(
+                            title: item.title,
+                            isSelected: item.isSelected,
+                            showsLeadingSlot: false
+                        ) {
+                            EmptyView()
                         }
                     }
                     .buttonStyle(.plain)
@@ -124,7 +114,7 @@ struct ItemEditorSheetView: View {
     }
 
     private func dropdownWidth(for menu: ActiveDropdownMenu, in containerSize: CGSize) -> CGFloat {
-        min(menu.width, max(0, containerSize.width - 16))
+        menu.fittedWidth(in: containerSize)
     }
 
     private func dropdownLayout(for menu: ActiveDropdownMenu, width: CGFloat, in containerSize: CGSize) -> (origin: CGPoint, height: CGFloat) {
@@ -261,7 +251,7 @@ private struct CompactItemEditorCard: View {
                 )
             )
 
-            if currentItem.category != .flour {
+            if store.currentRecipeKind.usesBakerPercentageSystem, currentItem.category != .flour {
                 PopupTableDivider()
 
                 PopupPercentMetricCell(
@@ -273,7 +263,7 @@ private struct CompactItemEditorCard: View {
                 )
             }
 
-            if showsWaterContentEditor {
+            if store.currentRecipeKind.usesHydrationSystem, showsWaterContentEditor {
                 PopupTableDivider()
 
                 PopupPercentMetricCell(
@@ -369,7 +359,7 @@ private struct CompactItemEditorCard: View {
                     )
                 }
 
-                if currentItem.category != .flour {
+                if store.currentRecipeKind.usesBakerPercentageSystem, currentItem.category != .flour {
                     Divider()
                         .overlay(BakingSurfaceTheme.separator)
                         .opacity(0)
@@ -449,7 +439,7 @@ private struct CompactItemEditorCard: View {
     }
 
     private var hasWaterContent: Bool {
-        store.hasWaterContent(currentItem)
+        store.currentRecipeKind.usesHydrationSystem && store.hasWaterContent(currentItem)
     }
 
     private var isPureWaterItem: Bool {

@@ -184,18 +184,15 @@ struct StarterDetailRouteView: View {
         .safeAreaInset(edge: .bottom) {
             feedBar
         }
-        .overlay {
-            if showingFeedingPopup {
-                feedingPopup
-            }
+        .sheet(isPresented: $showingFeedingPopup) {
+            feedingPopupSheet
         }
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: .center) {
             if showingFedToast {
-                StarterFedToast()
-                    .padding(.bottom, 96)
+                BakingTransientStatusToast(title: BakingTerms.starterFedDone)
                     .transition(
                         .asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            insertion: .scale(scale: 0.96).combined(with: .opacity),
                             removal: .opacity
                         )
                     )
@@ -249,7 +246,7 @@ struct StarterDetailRouteView: View {
 
     private var reminderSection: some View {
         starterSection(BakingTerms.starterSectionReminder) {
-            StarterToggleRow(
+            BakingToggleRow(
                 title: BakingTerms.starterReminderToggle,
                 isOn: profileBinding(\.isReminderEnabled)
             )
@@ -257,14 +254,18 @@ struct StarterDetailRouteView: View {
             if profile.isReminderEnabled {
                 PopupTableDivider()
 
+                StarterMetricRow(title: BakingTerms.starterFeedingFrequencyDays) {
+                    StarterDaysField(value: feedingFrequencyDaysBinding())
+                }
+
+                PopupTableDivider()
+
                 StarterMetricRow(title: BakingTerms.starterNextFeedingDate) {
-                    DatePicker(
-                        "",
-                        selection: profileBinding(\.nextFeedingDate),
-                        displayedComponents: .date
-                    )
-                    .labelsHidden()
-                    .tint(.brandPrimary)
+                    Text(BakingFormat.starterDate(store.starterNextFeedingDate(for: profile)))
+                        .font(BakingTypography.tableNumber)
+                        .foregroundStyle(Color.brandText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
                 }
             }
         }
@@ -297,35 +298,25 @@ struct StarterDetailRouteView: View {
         .padding(.top, BakingSpace.md)
         .padding(.bottom, BakingSpace.sm + tabBarClearance)
         .background(BakingSurface.bottomBarBackground)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(BakingSurfaceTheme.separator)
-                .frame(height: 0.6)
-            }
     }
 
-    private var feedingPopup: some View {
-        BakingCenteredPopupEditHost(
-            identity: profile.id,
-            defaultHeight: BakingCenteredPopupMetrics.defaultHeight(for: .compact)
-        ) {
-            showingFeedingPopup = false
-        } content: { isScrollEnabled, onContentHeightChange in
-            StarterFeedingPopupView(
-                profile: profile,
-                isScrollEnabled: isScrollEnabled,
-                onDismiss: {
-                    showingFeedingPopup = false
-                },
-                onFeed: {
-                    store.markStarterFed(profile)
-                    showingFeedingPopup = false
-                    showFedToast()
-                },
-                onContentHeightChange: onContentHeightChange
-            )
-            .environmentObject(store)
-        }
+    private var feedingPopupSheet: some View {
+        StarterFeedingPopupView(
+            profile: profile,
+            isScrollEnabled: true,
+            onDismiss: {
+                showingFeedingPopup = false
+            },
+            onFeed: {
+                store.markStarterFed(profile)
+                showingFeedingPopup = false
+                showFedToast()
+            }
+        )
+        .environmentObject(store)
+        .presentationDetents([BakingPopupSheetMetrics.editSheetTallDetent])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.brandBackground)
     }
 
     private var tabBarClearance: CGFloat {
@@ -335,15 +326,12 @@ struct StarterDetailRouteView: View {
     @ViewBuilder
     private func starterSection<Content: View>(
         _ title: String,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            BakingTableHeader(title: title)
-            PopupTableDivider()
+        BakingSectionCard(title: title, headerBottomPadding: 0) {
             VStack(spacing: 0) {
                 content()
             }
-            .bakingCard()
         }
     }
 
@@ -365,6 +353,15 @@ struct StarterDetailRouteView: View {
                 var next = profile
                 next[keyPath: keyPath] = max(0, value)
                 store.updateStarterProfile(next)
+            }
+        )
+    }
+
+    private func feedingFrequencyDaysBinding() -> Binding<Double> {
+        Binding(
+            get: { Double(profile.feedingFrequencyDays) },
+            set: { value in
+                store.updateStarterFeedingFrequencyDays(value, for: profile)
             }
         )
     }
@@ -392,7 +389,6 @@ private struct StarterFeedingPopupView: View {
     var isScrollEnabled = true
     var onDismiss: () -> Void
     var onFeed: () -> Void
-    var onContentHeightChange: (CGFloat) -> Void = { _ in }
     @State private var showingRatioPicker = false
 
     var body: some View {
@@ -415,11 +411,11 @@ private struct StarterFeedingPopupView: View {
                 VStack(spacing: BakingSpace.xxl) {
                     feedingTable
 
-                    BakingActionButton(
-                        title: BakingTerms.starterFeedTitle,
-                        accessibilityLabel: BakingTerms.starterMarkFed,
+                    BakingSlideActionBar(
                         icon: .complete,
-                        role: .primary
+                        accessibilityLabel: BakingTerms.starterSlideToMarkFed,
+                        direction: .leadingToTrailing,
+                        tint: .brandPrimary
                     ) {
                         onFeed()
                     }
@@ -427,21 +423,12 @@ private struct StarterFeedingPopupView: View {
                 .padding(.horizontal, BakingLayout.screenHorizontalInset)
                 .padding(.top, BakingSpace.xs)
                 .padding(.bottom, BakingSpace.xxl)
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear
-                            .preference(key: StarterFeedingPopupContentHeightPreferenceKey.self, value: proxy.size.height)
-                    }
-                )
             }
             .scrollDisabled(!isScrollEnabled)
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
         }
         .background(Color.brandBackground)
-        .onPreferenceChange(StarterFeedingPopupContentHeightPreferenceKey.self) { height in
-            onContentHeightChange(height)
-        }
     }
 
     private var currentProfile: StarterProfile {
@@ -449,11 +436,19 @@ private struct StarterFeedingPopupView: View {
     }
 
     private var feedingTable: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            BakingTableHeader(title: BakingTerms.starterSectionFeedingMethod)
-            PopupTableDivider()
-
+        BakingSectionCard(title: BakingTerms.starterSectionFeedingMethod, headerBottomPadding: 0) {
             VStack(spacing: 0) {
+                StarterMetricRow(title: BakingTerms.starterFinalWeight) {
+                    StarterWeightField(
+                        value: Binding(
+                            get: { store.starterFinalWeight(for: currentProfile) },
+                            set: { store.updateStarterFinalWeight($0, for: currentProfile) }
+                        )
+                    )
+                }
+
+                PopupTableDivider()
+
                 StarterMetricRow(title: BakingTerms.starterRatio) {
                     Button {
                         showingRatioPicker = true
@@ -475,9 +470,10 @@ private struct StarterFeedingPopupView: View {
                                 } label: {
                                     BakingDropdownRow(
                                         title: ratio.label,
-                                        isSelected: ratio == currentProfile.feedingRatio
+                                        isSelected: ratio == currentProfile.feedingRatio,
+                                        showsLeadingSlot: false
                                     ) {
-                                        Color.clear
+                                        EmptyView()
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -507,17 +503,20 @@ private struct StarterFeedingPopupView: View {
                         )
                     )
                 }
+
+                PopupTableDivider()
+
+                StarterMetricRow(title: BakingTerms.starterPostFeedWeight) {
+                    StarterReadOnlyField(value: postFeedWeight)
+                }
             }
-            .bakingCard()
         }
     }
-}
 
-private struct StarterFeedingPopupContentHeightPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
+    private var postFeedWeight: Double {
+        store.starterFinalWeight(for: currentProfile)
+            + store.starterFeedFlourWeight(for: currentProfile)
+            + store.starterFeedWaterWeight(for: currentProfile)
     }
 }
 
@@ -554,6 +553,21 @@ private struct StarterWeightField: View {
     }
 }
 
+private struct StarterDaysField: View {
+    @Binding var value: Double
+
+    var body: some View {
+        InlineNumberField(
+            value: $value,
+            unit: BakingTerms.unitDay,
+            color: .brandText,
+            fieldWidth: 42,
+            totalWidth: BakingCompactInputFieldSize.short.width,
+            height: BakingComponentMetrics.compactInputFieldHeight
+        )
+    }
+}
+
 private struct StarterReadOnlyField: View {
     let value: Double
     var color: Color = .brandText
@@ -566,51 +580,6 @@ private struct StarterReadOnlyField: View {
             totalWidth: BakingCompactInputFieldSize.short.width,
             height: BakingComponentMetrics.compactInputFieldHeight
         )
-    }
-}
-
-private struct StarterToggleRow: View {
-    let title: String
-    @Binding var isOn: Bool
-
-    var body: some View {
-        Button {
-            withAnimation(BakingMotion.quick) {
-                isOn.toggle()
-            }
-        } label: {
-            HStack(alignment: .center, spacing: BakingSpace.sm) {
-                BakingLabel(text: title, role: .popupRowLabel)
-                    .lineLimit(1)
-
-                Spacer(minLength: BakingSpace.sm)
-
-                Toggle(title, isOn: $isOn)
-                    .labelsHidden()
-                    .tint(.brandPrimary)
-                    .allowsHitTesting(false)
-            }
-            .padding(.horizontal, BakingSpace.md)
-            .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct StarterFedToast: View {
-    var body: some View {
-        HStack(spacing: BakingSpace.sm) {
-            BakingIconView(icon: .complete, size: 16, color: .brandSage)
-
-            Text(BakingTerms.starterFedDone)
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(Color.brandText)
-        }
-        .padding(.horizontal, BakingSpace.xl)
-        .padding(.vertical, BakingSpace.md)
-        .bakingSurface(.success)
-        .bakingLiftedShadow()
     }
 }
 
@@ -628,34 +597,34 @@ private struct StarterLibraryRow: View {
                     .foregroundStyle(Color.brandText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
-
-                HStack(spacing: BakingSpace.xs) {
-                    BakingIconView(icon: .water, size: BakingComponentMetrics.materialChipIcon, color: .waterText)
-
-                    Text(BakingFormat.weight(store.starterFinalWeight(for: profile)))
-                        .font(BakingTypography.rowMeta.monospacedDigit())
-                        .foregroundStyle(Color.waterText)
-                        .lineLimit(1)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(BakingTerms.starterFinalWeight)
-                .accessibilityValue(BakingFormat.weight(store.starterFinalWeight(for: profile)))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: BakingSpace.md)
 
             VStack(alignment: .trailing, spacing: BakingSpace.xs) {
                 RecipeLibraryMetadataLine(
                     title: BakingTerms.starterLastFed,
-                    value: profile.lastFedAt.formatted(date: .numeric, time: .omitted)
+                    value: BakingFormat.starterDate(profile.lastFedAt)
                 )
-                RecipeLibraryMetadataLine(
-                    title: BakingTerms.starterRatio,
-                    value: profile.feedingRatio.label
+
+                BakingRecencyBadge(
+                    text: BakingFormat.relativeDaysAgo(profile.lastFedAt),
+                    elapsedDays: BakingFormat.daysSince(profile.lastFedAt),
+                    targetDays: profile.feedingFrequencyDays
                 )
             }
+            .frame(width: BakingComponentMetrics.libraryRowMetadataColumnWidth, alignment: .trailing)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(BakingTerms.starterLastFed)
+            .accessibilityValue(
+                BakingTerms.starterLastFedAccessibilityValue(
+                    date: BakingFormat.starterDate(profile.lastFedAt),
+                    relative: BakingFormat.relativeDaysAgo(profile.lastFedAt)
+                )
+            )
         }
-        .frame(minHeight: 64)
+        .frame(minHeight: BakingComponentMetrics.listRowMinHeight)
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.vertical, BakingSpace.sm)
         .contentShape(Rectangle())

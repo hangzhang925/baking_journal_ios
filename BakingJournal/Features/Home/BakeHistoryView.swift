@@ -126,11 +126,15 @@ struct BakeHistoryView: View {
     }
 
     private func icon(for record: BakeRecord) -> BakingIcon {
-        if let recipeID = record.recipeID,
-           let recipe = store.savedRecipes.first(where: { $0.id == recipeID }) {
+        if let recipe = linkedRecipe(for: record) {
             return BakingIcon.recipeKind(recipe.kind)
         }
         return .recipe
+    }
+
+    private func linkedRecipe(for record: BakeRecord) -> SavedRecipe? {
+        guard let recipeID = record.recipeID else { return nil }
+        return store.savedRecipes.first { $0.id == recipeID }
     }
 }
 

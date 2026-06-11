@@ -22,7 +22,7 @@ struct StarterMiniRecipeEditor: View {
                     BakingLabel(text: currentItem.tag.label, role: .inputLabel)
                         .lineLimit(1)
 
-                    if store.hasWaterContent(currentItem) {
+                    if store.currentRecipeKind.usesHydrationSystem, store.hasWaterContent(currentItem) {
                         PopupAttributeIcon(
                             icon: .water,
                             color: .waterText,
@@ -95,24 +95,26 @@ struct StarterMiniRecipeEditor: View {
                 }
             }
 
-            StarterTableDivider()
+            if store.currentRecipeKind.usesBakerPercentageSystem {
+                StarterTableDivider()
 
-            StarterTableRow(title: BakingTerms.formulaTablePercentage) {
-                if starterEditMode == .ratio {
-                    StarterPercentInput(
-                        value: Binding(
-                            get: { percent },
-                            set: { store.updateItemPercent(currentItem, percent: $0) }
+                StarterTableRow(title: BakingTerms.formulaTablePercentage) {
+                    if starterEditMode == .ratio {
+                        StarterPercentInput(
+                            value: Binding(
+                                get: { percent },
+                                set: { store.updateItemPercent(currentItem, percent: $0) }
+                            )
                         )
-                    )
-                } else {
-                    ReadOnlyInlineMetric(
-                        value: BakingFormat.number(percent, precision: 0),
-                        unit: "%",
-                        color: .brandText,
-                        totalWidth: BakingCompactInputFieldSize.short.width,
-                        height: BakingComponentMetrics.compactInputFieldHeight
-                    )
+                    } else {
+                        ReadOnlyInlineMetric(
+                            value: BakingFormat.number(percent, precision: 0),
+                            unit: "%",
+                            color: .brandText,
+                            totalWidth: BakingCompactInputFieldSize.short.width,
+                            height: BakingComponentMetrics.compactInputFieldHeight
+                        )
+                    }
                 }
             }
 
@@ -197,8 +199,8 @@ struct StarterMiniRecipeEditor: View {
                     get: { store.starterEggWeight(currentItem) },
                     set: { store.updateStarterEgg(currentItem, count: $0 > 0 ? 1 : 0, unitWeight: $0) }
                 ),
-                isWaterBearing: currentItem.starterEggCount != nil,
-                waterText: BakingFormat.weight(store.starterEggWater(currentItem))
+                isWaterBearing: store.currentRecipeKind.usesHydrationSystem && currentItem.starterEggCount != nil,
+                waterText: store.currentRecipeKind.usesHydrationSystem ? BakingFormat.weight(store.starterEggWater(currentItem)) : nil
             )
             .padding(.horizontal, BakingSpace.md)
         }
@@ -407,7 +409,6 @@ private struct StarterTypePicker: View {
                     frame: triggerFrame,
                     width: BakingComponentMetrics.popupTypeDropdownMenuWidth,
                     alignment: .leading,
-                    reservesLeadingIconSlot: false,
                     items: RecipeStore.starterOptions.map { option in
                         DropdownMenuItem(title: BakingTerms.starterDisplayName(option), isSelected: option == selection) {
                             selection = option
@@ -451,7 +452,6 @@ private struct StarterRatioPicker: View {
                     frame: triggerFrame,
                     width: BakingCompactInputFieldSize.short.width,
                     alignment: .leading,
-                    reservesLeadingIconSlot: false,
                     items: RecipeStore.starterRatioOptions.map { option in
                         DropdownMenuItem(title: option, isSelected: option == selection) {
                             selection = option

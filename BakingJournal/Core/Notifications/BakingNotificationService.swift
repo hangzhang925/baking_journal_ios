@@ -33,6 +33,13 @@ enum BakingNotificationEvent {
         stepName: String,
         fireDate: Date
     )
+    case cookFoldReminder(
+        recipeName: String,
+        stepId: UUID,
+        stepName: String,
+        foldIndex: Int,
+        fireDate: Date
+    )
     case starterFeedingReminder(
         profileId: UUID,
         starterName: String,
@@ -44,6 +51,8 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished(_, let stepId, _, _):
             return BakingNotificationID(rawValue: "\(BakingNotificationScope.cookTimer.identifierPrefix)\(stepId.uuidString)")
+        case .cookFoldReminder(_, let stepId, _, _, _):
+            return BakingNotificationID(rawValue: "\(BakingNotificationScope.cookTimer.identifierPrefix)fold.\(stepId.uuidString)")
         case .starterFeedingReminder(let profileId, _, let fireDate, let repeatsDaily):
             let suffix = repeatsDaily ? "daily" : String(Int(fireDate.timeIntervalSince1970))
             return BakingNotificationID(rawValue: "\(BakingNotificationScope.starterReminder.identifierPrefix)\(profileId.uuidString).\(suffix)")
@@ -52,7 +61,7 @@ enum BakingNotificationEvent {
 
     var scope: BakingNotificationScope {
         switch self {
-        case .cookTimerFinished:
+        case .cookTimerFinished, .cookFoldReminder:
             return .cookTimer
         case .starterFeedingReminder:
             return .starterReminder
@@ -63,6 +72,8 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished:
             return BakingTerms.cookTimerFinishedNotificationTitle
+        case .cookFoldReminder:
+            return BakingTerms.cookFoldReminderNotificationTitle
         case .starterFeedingReminder:
             return BakingTerms.starterFeedingReminderNotificationTitle
         }
@@ -72,6 +83,8 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished(_, _, let stepName, _):
             return BakingTerms.cookTimerFinishedNotificationBody(stepName: stepName)
+        case .cookFoldReminder(_, _, let stepName, let foldIndex, _):
+            return BakingTerms.cookFoldReminderNotificationBody(stepName: stepName, foldIndex: foldIndex)
         case .starterFeedingReminder(_, let starterName, _, let repeatsDaily):
             return repeatsDaily
                 ? BakingTerms.starterFeedingPastDueNotificationBody(starterName: starterName)
@@ -83,6 +96,8 @@ enum BakingNotificationEvent {
         switch self {
         case .cookTimerFinished(_, _, _, let fireDate):
             return fireDate
+        case .cookFoldReminder(_, _, _, _, let fireDate):
+            return fireDate
         case .starterFeedingReminder(_, _, let fireDate, _):
             return fireDate
         }
@@ -90,7 +105,7 @@ enum BakingNotificationEvent {
 
     var repeatsDaily: Bool {
         switch self {
-        case .cookTimerFinished:
+        case .cookTimerFinished, .cookFoldReminder:
             return false
         case .starterFeedingReminder(_, _, _, let repeatsDaily):
             return repeatsDaily
@@ -105,6 +120,14 @@ enum BakingNotificationEvent {
                 "recipeName": recipeName,
                 "stepId": stepId.uuidString,
                 "stepName": stepName
+            ]
+        case .cookFoldReminder(let recipeName, let stepId, let stepName, let foldIndex, _):
+            return [
+                "event": "cookFoldReminder",
+                "recipeName": recipeName,
+                "stepId": stepId.uuidString,
+                "stepName": stepName,
+                "foldIndex": foldIndex
             ]
         case .starterFeedingReminder(let profileId, let starterName, _, let repeatsDaily):
             return [

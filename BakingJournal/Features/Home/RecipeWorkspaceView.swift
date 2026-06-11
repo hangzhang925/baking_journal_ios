@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Photos
+import UniformTypeIdentifiers
 
 enum RecipeWorkspaceStage: String, CaseIterable, Hashable, Identifiable {
     case preview
@@ -46,6 +47,9 @@ struct RecipeWorkspaceView: View {
     @State private var showingTextTutorial = false
     @State private var exportError: String?
     @State private var exportSuccessMessage: String?
+    @State private var jsonExportDocument = RecipeBackupDocument(data: Data())
+    @State private var showingJSONExporter = false
+    @State private var jsonExportError: String?
 
     init(initialStage: RecipeWorkspaceStage = .formula) {
         _stage = State(initialValue: initialStage)
@@ -85,6 +89,16 @@ struct RecipeWorkspaceView: View {
         .sheet(isPresented: $showingTextTutorial) {
             RecipePreviewTextTutorialSheet(text: previewShareContent.textTutorial)
         }
+        .fileExporter(
+            isPresented: $showingJSONExporter,
+            document: jsonExportDocument,
+            contentType: .json,
+            defaultFilename: jsonExportFilename
+        ) { result in
+            if case .failure(let error) = result {
+                jsonExportError = error.localizedDescription
+            }
+        }
         .alert(BakingTerms.recipePreviewExportFailed, isPresented: Binding(
             get: { exportError != nil },
             set: { if !$0 { exportError = nil } }
@@ -105,13 +119,26 @@ struct RecipeWorkspaceView: View {
         } message: {
             Text(exportSuccessMessage ?? "")
         }
+        .alert(BakingTerms.formulaFileOperationFailed, isPresented: Binding(
+            get: { jsonExportError != nil },
+            set: { if !$0 { jsonExportError = nil } }
+        )) {
+            Button(BakingTerms.ok, role: .cancel) {
+                jsonExportError = nil
+            }
+        } message: {
+            Text(jsonExportError ?? "")
+        }
+        .onAppear {
+            store.refreshCurrentRecipeForDisplay()
+        }
     }
 
     @ViewBuilder
     private func workspaceContent(_ stage: RecipeWorkspaceStage) -> some View {
         switch stage {
         case .preview:
-            RecipePreviewView(showsToolbar: false)
+            RecipePreviewView(toolbarMode: .embedded)
         case .formula:
             FormulaView(embedded: true)
         case .steps:
@@ -134,6 +161,9 @@ struct RecipeWorkspaceView: View {
                         }
                     }
                 },
+                center: {
+                    RecipeKindPinnedLabel(kind: store.currentRecipeKind)
+                },
                 trailing: {
                     Button {
                         showingWorkspaceActions = true
@@ -145,38 +175,33 @@ struct RecipeWorkspaceView: View {
                     .popover(isPresented: $showingWorkspaceActions, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                         BakingDropdownPopover(width: 188) {
                             workspaceDirectActionRow(
-                                title: BakingTerms.saveAsImage,
-                                icon: .save,
-                                iconColor: .brandPrimary
+                                title: BakingTerms.saveAsImage
                             ) {
                                 saveLongImage()
                             }
 
                             workspaceDirectActionRow(
-                                title: BakingTerms.generateTextTutorial,
-                                icon: .copy,
-                                iconColor: .brandText
+                                title: BakingTerms.generateTextTutorial
                             ) {
                                 showingTextTutorial = true
                             }
 
+                            workspaceDirectActionRow(
+                                title: BakingTerms.formulaExportJSON
+                            ) {
+                                exportJSON()
+                            }
+
                             workspaceActionRow(
-                                action: store.isReadyToBake ? .startBake : .reviewBeforeBake,
-                                icon: .bakes,
-                                iconColor: .brandPrimary
+                                action: store.isReadyToBake ? .startBake : .reviewBeforeBake
                             )
 
                             workspaceActionRow(
-                                action: .copyRecipe,
-                                icon: .copy,
-                                iconColor: .brandText
+                                action: .copyRecipe
                             )
 
                             workspaceActionRow(
                                 action: .deleteRecipe,
-                                icon: .delete,
-                                iconColor: BakingComponentTheme.action(role: .destructive).foreground,
-                                foreground: BakingComponentTheme.action(role: .destructive).foreground,
                                 isEnabled: currentRecipe != nil
                             )
                         }
@@ -193,6 +218,7 @@ struct RecipeWorkspaceView: View {
                 guard let selectedStage = RecipeWorkspaceStage(rawValue: selectedID) else { return }
                 stage = selectedStage
             }
+            .padding(.horizontal, -4)
         }
         .padding(.horizontal, 16)
         .padding(.top, 0)
@@ -209,23 +235,22 @@ struct RecipeWorkspaceView: View {
         RecipePreviewShareContent(store: store)
     }
 
+    private var jsonExportFilename: String {
+        store.currentRecipeDisplayName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+    }
+
     private func workspaceDirectActionRow(
         title: String,
-        icon: BakingIcon,
-        iconColor: Color,
-        foreground: Color = .brandText,
         action: @escaping () -> Void
     ) -> some View {
         Button {
             showingWorkspaceActions = false
             action()
         } label: {
-            BakingDropdownRow(title: title, foreground: foreground) {
-                BakingIconView(
-                    icon: icon,
-                    size: BakingTouchTarget.dropdownIconGlyph,
-                    color: iconColor
-                )
+            BakingDropdownRow(title: title, showsLeadingSlot: false) {
+                EmptyView()
             }
         }
         .buttonStyle(.plain)
@@ -233,21 +258,14 @@ struct RecipeWorkspaceView: View {
 
     private func workspaceActionRow(
         action: WorkspaceConfirmationAction,
-        icon: BakingIcon,
-        iconColor: Color,
-        foreground: Color = .brandText,
         isEnabled: Bool = true
     ) -> some View {
         Button {
             showingWorkspaceActions = false
             pendingWorkspaceAction = action
         } label: {
-            BakingDropdownRow(title: action.menuTitle, foreground: foreground) {
-                BakingIconView(
-                    icon: icon,
-                    size: BakingTouchTarget.dropdownIconGlyph,
-                    color: iconColor
-                )
+            BakingDropdownRow(title: action.menuTitle, showsLeadingSlot: false) {
+                EmptyView()
             }
         }
         .buttonStyle(.plain)
@@ -258,6 +276,8 @@ struct RecipeWorkspaceView: View {
         pendingWorkspaceAction = nil
         switch action {
         case .startBake:
+            guard store.startNewBake() else { return }
+            navigationController.selectTab(.history)
             navigationController.push(.cook)
         case .reviewBeforeBake:
             stage = .steps
@@ -278,6 +298,15 @@ struct RecipeWorkspaceView: View {
             return
         }
         saveImageToPhotoLibrary(image)
+    }
+
+    private func exportJSON() {
+        do {
+            jsonExportDocument = RecipeBackupDocument(data: try store.exportCurrentRecipeExchangeData())
+            showingJSONExporter = true
+        } catch {
+            jsonExportError = error.localizedDescription
+        }
     }
 
     private func saveImageToPhotoLibrary(_ image: UIImage) {
@@ -398,6 +427,7 @@ private enum WorkspaceConfirmationAction: Identifiable {
 private struct RecipeBakeHistoryStageView: View {
     @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
+    @State private var selectedBakeRecord: BakeRecord?
 
     var body: some View {
         BakingLibraryList {
@@ -409,10 +439,9 @@ private struct RecipeBakeHistoryStageView: View {
                     ForEach(recipeHistory) { record in
                         Button {
                             if store.canResumeBake(record) {
-                                store.resumeBake(record)
-                                navigationController.push(.cook)
+                                openCurrentBake(record)
                             } else {
-                                navigationController.push(.bakeRecordDetail(record.id))
+                                selectedBakeRecord = record
                             }
                         } label: {
                             BakeHistoryRow(record: record, icon: recipeIcon)
@@ -425,6 +454,12 @@ private struct RecipeBakeHistoryStageView: View {
             }
             .listRowBackground(BakingSurface.rowBackground)
         }
+        .sheet(item: $selectedBakeRecord) { record in
+            BakeRecordReviewSheet(
+                record: record,
+                notes: notesBinding(for: record)
+            )
+        }
     }
 
     private var recipeHistory: [BakeRecord] {
@@ -432,6 +467,23 @@ private struct RecipeBakeHistoryStageView: View {
         return store.bakeHistory
             .filter { $0.recipeID == currentRecipeID }
             .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    private func openCurrentBake(_ record: BakeRecord) {
+        store.resumeBake(record)
+        navigationController.selectTab(.history)
+        navigationController.push(.cook)
+    }
+
+    private func notesBinding(for record: BakeRecord) -> Binding<String> {
+        Binding(
+            get: {
+                store.bakeHistory.first(where: { $0.id == record.id })?.notes ?? record.notes
+            },
+            set: { notes in
+                store.updateBakeRecordNotes(notes, for: record)
+            }
+        )
     }
 
     private var recipeIcon: BakingIcon {

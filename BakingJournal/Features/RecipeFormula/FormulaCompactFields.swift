@@ -28,18 +28,21 @@ struct CompactSummaryPill: View {
 struct CompactTextRow: View {
     let title: String
     @Binding var text: String
-    @FocusState private var isFocused: Bool
+    @State private var isFocused = false
 
     var body: some View {
         HStack(spacing: 12) {
             BakingLabel(text: title, role: .fieldLabel)
             Spacer()
-            TextField(title, text: $text)
-                .font(BakingTypography.rowValue)
-                .foregroundStyle(Color.brandText)
-                .multilineTextAlignment(.trailing)
-                .textFieldStyle(.plain)
-                .focused($isFocused)
+            BakingInlineTextField(
+                text: $text,
+                placeholder: title,
+                isFocused: $isFocused,
+                color: UIColor(Color.brandText),
+                font: .systemFont(ofSize: 15, weight: .semibold),
+                textAlignment: .right,
+                maxLength: nil
+            )
                 .bakingFittedInputField(.long, alignment: .trailing, kind: isFocused ? .focused : .field)
         }
         .padding(.vertical, 6)
@@ -268,17 +271,20 @@ struct CompactRecipeMetrics: View {
     var items: [RecipeItem] = []
     var flourContribution: ((RecipeItem) -> Double)?
     var waterContribution: ((RecipeItem) -> Double)?
+    var showsHydration = true
 
     var body: some View {
         HStack(spacing: 8) {
             CompactMetricCell(title: BakingTerms.formulaMetricDough, value: BakingFormat.weight(summary.doughWeight))
             CompactMetricCell(title: BakingTerms.formulaMetricFlour, value: BakingFormat.weight(summary.flourWeight))
-            CompactMetricCell(
-                title: BakingTerms.formulaMetricHydration,
-                value: "\(BakingFormat.number(summary.hydration, precision: 1))%",
-                background: .waterSurface,
-                hydrationReceipt: hydrationReceipt
-            )
+            if showsHydration {
+                CompactMetricCell(
+                    title: BakingTerms.formulaMetricHydration,
+                    value: "\(BakingFormat.number(summary.hydration, precision: 1))%",
+                    background: .waterSurface,
+                    hydrationReceipt: hydrationReceipt
+                )
+            }
         }
     }
 

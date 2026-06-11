@@ -4,6 +4,7 @@ import SwiftUI
 import UIKit
 
 struct KitchenTimerView: View {
+    @EnvironmentObject private var navigationController: AppNavigationController
     @StateObject private var viewModel = KitchenTimerViewModel()
     @State private var hours = 0
     @State private var minutes = 10
@@ -12,7 +13,14 @@ struct KitchenTimerView: View {
     var body: some View {
         VStack(spacing: 0) {
             BakingTopActionRow(leading: {
-                BakingLabel(text: BakingTerms.kitchenTimerTitle, role: .sectionHeader)
+                if navigationController.canGoBack {
+                    BakingIconButton(
+                        icon: .back,
+                        accessibilityLabel: BakingTerms.back
+                    ) {
+                        navigationController.goBack()
+                    }
+                }
             })
 
             Form {
@@ -347,7 +355,7 @@ private final class KitchenTimerViewModel: ObservableObject {
             systemImageName: "stop.fill"
         )
         let alert = AlarmPresentation.Alert(
-            title: LocalizedStringResource("kitchen_timer.alarm.title", defaultValue: "Kitchen timer finished"),
+            title: LocalizedStringResource("kitchen_timer.alarm.title", defaultValue: "Timer finished"),
             stopButton: stopButton
         )
         let presentation = AlarmPresentation(alert: alert)

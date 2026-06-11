@@ -20,7 +20,6 @@ struct BakeRecordDetailView: View {
 
             BakeRecordReviewContent(
                 record: record,
-                icon: icon,
                 notes: notesBinding,
                 onOpenRecipe: linkedRecipe == nil ? nil : openLinkedRecipe
             )
@@ -48,11 +47,6 @@ struct BakeRecordDetailView: View {
         return store.savedRecipes.first { $0.id == recipeID }
     }
 
-    private var icon: BakingIcon {
-        guard let linkedRecipe else { return .recipe }
-        return BakingIcon.recipeKind(linkedRecipe.kind)
-    }
-
     private var notesBinding: Binding<String> {
         Binding(
             get: { record.notes },
@@ -67,18 +61,25 @@ struct BakeRecordDetailView: View {
     }
 }
 
+enum BakeRecordReviewNotesEditingStyle {
+    case popup
+    case inline
+}
+
 struct BakeRecordReviewContent: View {
     let record: BakeRecord
-    let icon: BakingIcon
     @Binding var notes: String
-    var onOpenRecipe: (() -> Void)?
-
-    @State private var showingNotesEditor = false
+    var onOpenRecipe: (() -> Void)? = nil
+    var showsTitleHeader = true
+    var notesEditingStyle: BakeRecordReviewNotesEditingStyle = .popup
+    @State private var showingReviewNotesEditor = false
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: BakingSpace.lg) {
-                titleHeader
+                if showsTitleHeader {
+                    titleHeader
+                }
                 timeSummaryTable
                 stepTimingTable
                 reviewNotesSection
@@ -88,53 +89,62 @@ struct BakeRecordReviewContent: View {
             .padding(.bottom, BakingSpace.xl)
         }
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
         .background(Color.brandBackground)
-        .sheet(isPresented: $showingNotesEditor) {
-            BakeRecordNotesEditorSheet(notes: $notes)
-                .presentationDetents([.height(BakingPopupSheetMetrics.notesEditorDefaultHeight), .large])
+        .sheet(isPresented: $showingReviewNotesEditor) {
+            BakingNotesEditorSheet(
+                title: BakingTerms.reviewNotes,
+                text: $notes,
+                accessibilityLabel: BakingTerms.reviewNotes
+            )
         }
     }
 
     private var titleHeader: some View {
-        HStack(spacing: BakingSpace.md) {
-            BakingMaterialIconBadge(
-                icon: icon,
-                color: .brandPrimary,
-                background: BakingSurfaceTheme.theme(for: .inputSurface).background
-            )
+        HStack(alignment: .center, spacing: BakingSpace.sm) {
+            titleControl
+                .layoutPriority(1)
 
-            VStack(alignment: .leading, spacing: BakingSpace.xs) {
-                Text(record.recipeSnapshotName)
-                    .font(BakingTypography.screenTitle)
-                    .foregroundStyle(Color.brandText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
+            Spacer(minLength: BakingSpace.sm)
 
-                Text(BakingTerms.cookCompletedTitle)
-                    .font(BakingTypography.rowMeta)
-                    .foregroundStyle(Color.brandSage)
-            }
-
-            Spacer(minLength: 0)
-
-            if let onOpenRecipe {
-                BakingIconButton(
-                    icon: .edit,
-                    accessibilityLabel: BakingTerms.bakeRecordOpenRecipe,
-                    role: .primary
-                ) {
-                    onOpenRecipe()
-                }
+            if record.completedAt != nil {
+                BakingStatusBadge(text: BakingTerms.cookCompletedStatus)
             }
         }
         .padding(.vertical, BakingSpace.xs)
+    }
+
+    @ViewBuilder
+    private var titleControl: some View {
+        if let onOpenRecipe {
+            BakingInlineActionButton(
+                title: record.recipeSnapshotName,
+                accessibilityLabel: BakingTerms.bakeRecordOpenRecipe,
+                role: .secondary,
+                action: onOpenRecipe
+            )
+            .accessibilityLabel(BakingTerms.bakeRecordOpenRecipe)
+            .accessibilityValue(record.recipeSnapshotName)
+        } else {
+            titleText
+        }
+    }
+
+    private var titleText: some View {
+        Text(record.recipeSnapshotName)
+            .font(BakingTypography.screenTitle)
+            .foregroundStyle(Color.brandText)
+            .lineLimit(2)
+            .minimumScaleFactor(0.82)
+            .multilineTextAlignment(.leading)
+            .frame(minHeight: BakingTouchTarget.iconButton, alignment: .leading)
     }
 
     private var timeSummaryTable: some View {
         BakingSectionCard(title: BakingTerms.time) {
             BakeRecordTableRow(
                 title: BakingTerms.start,
-                value: record.startedAt.formatted(date: .abbreviated, time: .shortened)
+                value: BakingFormat.bakeRecordDateTime(record.startedAt)
             )
 
             BakingTableDivider()
@@ -158,52 +168,37 @@ struct BakeRecordReviewContent: View {
         }
     }
 
+    @ViewBuilder
     private var reviewNotesSection: some View {
-        BakingSectionCard(
-            title: BakingTerms.reviewNotes,
-            accessory: {
-                Button {
-                    showingNotesEditor = true
-                } label: {
-                    BakingIconButtonLabel(
-                        icon: .edit,
-                        role: .secondary,
-                        size: .inline
-                    )
-                }
-                .buttonStyle(BakingPressFeedbackButtonStyle())
-                .accessibilityLabel(BakingTerms.bakeRecordEditReviewNotes)
+        switch notesEditingStyle {
+        case .popup:
+            BakingEditableNotesCard(
+                title: BakingTerms.reviewNotes,
+                text: notes,
+                emptyText: BakingTerms.bakeRecordNoReviewNotes,
+                accessibilityLabel: BakingTerms.bakeRecordEditReviewNotes
+            ) {
+                showingReviewNotesEditor = true
             }
-        ) {
-            Button {
-                showingNotesEditor = true
-            } label: {
-                Text(reviewNotesText)
-                    .font(BakingTypography.appPrimaryText)
-                    .foregroundStyle(trimmedNotes.isEmpty ? Color.brandSecondaryText : Color.brandText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
-                    .padding(BakingSpace.md)
+        case .inline:
+            BakingSectionCard(title: BakingTerms.reviewNotes) {
+                BakingMultilineTextEditor(text: $notes)
+                    .frame(minHeight: BakingComponentMetrics.popupNotesEditorMinHeight)
+                    .background(Color.clear)
+                    .padding(10)
+                    .bakingInsetSurface()
+                    .accessibilityLabel(BakingTerms.reviewNotes)
+                    .padding(.horizontal, BakingSpace.md)
+                    .padding(.bottom, BakingSpace.md)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(BakingTerms.bakeRecordEditReviewNotes)
-            .accessibilityValue(reviewNotesText)
         }
     }
 
     private var completedAtText: String {
         if let completedAt = record.completedAt {
-            return completedAt.formatted(date: .abbreviated, time: .shortened)
+            return BakingFormat.bakeRecordDateTime(completedAt)
         }
         return BakingTerms.notFinished
-    }
-
-    private var trimmedNotes: String {
-        notes.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var reviewNotesText: String {
-        trimmedNotes.isEmpty ? BakingTerms.bakeRecordNoReviewNotes : notes
     }
 
     private var stepTimingRows: [BakeRecordStepTimingRowData] {
@@ -239,6 +234,39 @@ struct BakeRecordReviewContent: View {
                 index: index
             )
         }
+    }
+}
+
+struct BakeRecordReviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let record: BakeRecord
+    @Binding var notes: String
+
+    var body: some View {
+        VStack(spacing: 0) {
+            BakingTopActionRow(trailing: {
+                BakingSystemIconButton(
+                    systemImage: "xmark",
+                    accessibilityLabel: BakingTerms.done,
+                    role: .secondary,
+                    size: .secondary,
+                    font: .caption.weight(.bold)
+                ) {
+                    dismiss()
+                }
+            })
+
+            BakeRecordReviewContent(
+                record: record,
+                notes: $notes,
+                showsTitleHeader: false,
+                notesEditingStyle: .inline
+            )
+        }
+        .background(Color.brandBackground)
+        .presentationDetents([BakingPopupSheetMetrics.editSheetTallDetent])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.brandBackground)
     }
 }
 
@@ -314,7 +342,7 @@ private struct BakeRecordClockMetric: View {
 
     var body: some View {
         BakingTableMetricValue(
-            symbol: date == nil ? nil : .systemImage("clock", .brandSecondaryText),
+            symbol: nil,
             value: timeParts.value,
             unit: timeParts.unit,
             numericKind: .clockTime,
@@ -327,12 +355,7 @@ private struct BakeRecordClockMetric: View {
 
     private var timeParts: (value: String, unit: String?) {
         guard let date else { return (BakingTerms.notFinished, nil) }
-        let formatted = date.formatted(date: .omitted, time: .shortened)
-        let parts = formatted.split(separator: " ")
-        guard parts.count > 1, let unit = parts.last else {
-            return (formatted, nil)
-        }
-        return (parts.dropLast().joined(separator: " "), String(unit))
+        return (BakingFormat.bakeRecordClockTime(date), nil)
     }
 }
 
@@ -342,43 +365,4 @@ private struct BakeRecordStepTimingRowData: Identifiable {
     let startedAt: Date
     let completedAt: Date?
     let index: Int
-}
-
-private struct BakeRecordNotesEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var notes: String
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                BakingTopActionRow(trailing: {
-                    BakingSystemIconButton(
-                        systemImage: "xmark",
-                        accessibilityLabel: BakingTerms.done,
-                        role: .secondary,
-                        size: .secondary,
-                        font: .caption.weight(.bold)
-                    ) {
-                        dismiss()
-                    }
-                })
-
-                TextEditor(text: $notes)
-                    .font(BakingTypography.appPrimaryText)
-                    .foregroundStyle(Color.brandText)
-                    .frame(minHeight: BakingComponentMetrics.notesEditorMinHeight)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.clear)
-                    .padding(BakingSpace.md)
-                    .bakingInsetSurface()
-                    .accessibilityLabel(BakingTerms.reviewNotes)
-                    .padding(.horizontal, BakingLayout.screenHorizontalInset)
-                    .padding(.top, BakingSpace.sm)
-
-                Spacer(minLength: 0)
-            }
-            .background(Color.brandBackground)
-        }
-        .scrollDismissesKeyboard(.interactively)
-    }
 }

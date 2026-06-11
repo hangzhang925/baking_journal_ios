@@ -31,9 +31,9 @@ struct AddItemControl: View {
                     dropdownPresenter.present(
                         ActiveDropdownMenu(
                             frame: triggerFrame,
-                            width: 158,
+                            width: store.currentRecipeKind.usesUnifiedIngredientList ? 170 : 158,
                             alignment: .trailing,
-                            items: basicMenuItems
+                            items: store.currentRecipeKind.usesUnifiedIngredientList ? cakeMenuItems : basicMenuItems
                         )
                     )
                 } label: {
@@ -71,26 +71,12 @@ struct AddItemControl: View {
         )
     }
 
-    private func icon(for tag: ItemTag) -> BakingIcon {
-        switch tag {
-        case .water: .water
-        case .salt: .salt
-        case .butter: .butter
-        case .yeast: .yeast
-        case .egg: .egg
-        case .sugar: .sugar
-        case .flour: .flour
-        case .starter: .starter
-        case .other: .other
-        }
-    }
-
     private var flourMenuItems: [DropdownMenuItem] {
         [
-            DropdownMenuItem(title: ItemCategory.flour.label, icon: .flour) {
+            DropdownMenuItem(title: ItemCategory.flour.label) {
                 openEditor(for: store.addItem(category: .flour))
             },
-            DropdownMenuItem(title: ItemCategory.starter.label, icon: .starter) {
+            DropdownMenuItem(title: ItemCategory.starter.label) {
                 openEditor(for: store.addItem(category: .starter))
             }
         ]
@@ -98,10 +84,53 @@ struct AddItemControl: View {
 
     private var basicMenuItems: [DropdownMenuItem] {
         [ItemTag.water, .salt, .butter, .yeast, .egg, .sugar, .other].map { tag in
-            DropdownMenuItem(title: tag.label, icon: icon(for: tag)) {
+            DropdownMenuItem(title: tag.label) {
                 openEditor(for: store.addItem(category: tag == .other ? .other : .basic, tag: tag))
             }
         }
+    }
+
+    private var cakeMenuItems: [DropdownMenuItem] {
+        [
+            DropdownMenuItem(title: ItemTag.flour.label) {
+                openEditor(for: store.addItem(category: .flour))
+            },
+            DropdownMenuItem(title: ItemTag.egg.label) {
+                openEditor(for: store.addItem(category: .basic, tag: .egg))
+            },
+            DropdownMenuItem(title: ItemTag.sugar.label) {
+                openEditor(for: store.addItem(category: .basic, tag: .sugar))
+            },
+            DropdownMenuItem(title: BakingTerms.milk) {
+                openEditor(for: cakeMilkItem())
+            },
+            DropdownMenuItem(title: BakingTerms.cornOil) {
+                openEditor(for: cakeOilItem())
+            },
+            DropdownMenuItem(title: ItemTag.cream.label) {
+                openEditor(for: store.addItem(category: .basic, tag: .cream))
+            },
+            DropdownMenuItem(title: ItemTag.other.label) {
+                openEditor(for: store.addItem(category: .other))
+            }
+        ]
+    }
+
+    private func cakeMilkItem() -> RecipeItem {
+        let item = store.addItem(category: .basic, tag: .water)
+        var next = item
+        next.name = BakingTerms.milk
+        store.updateItem(next)
+        return next
+    }
+
+    private func cakeOilItem() -> RecipeItem {
+        let item = store.addItem(category: .other)
+        var next = item
+        next.name = BakingTerms.cornOil
+        next.weight = 50
+        store.updateItem(next)
+        return next
     }
 
     private func openEditor(for item: RecipeItem) {
@@ -122,6 +151,8 @@ struct FormulaItemDisplayRow: View {
 
     @EnvironmentObject private var store: RecipeStore
     let item: RecipeItem
+    var tablePercentage: Double? = nil
+    var showsPercentage = true
     var isEditing = false
     var canDelete = true
     var onReorderBegan: (FormulaRowReorderValue) -> Void = { _ in }
@@ -133,19 +164,10 @@ struct FormulaItemDisplayRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.lg) {
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(currentItem.name)
-                        .bakingLabelStyle(.inputLabel)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    if hasWaterContent {
-                        Image(systemName: "drop.fill")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Color.waterText.opacity(0.88))
-                            .frame(width: 12, alignment: .leading)
-                    }
-                }
+                Text(currentItem.name)
+                    .bakingLabelStyle(.inputLabel)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 if let detailText {
                     Text(detailText)
@@ -158,10 +180,10 @@ struct FormulaItemDisplayRow: View {
             .layoutPriority(1)
 
             HStack(alignment: .firstTextBaseline, spacing: BakingSpace.sm) {
-                Group {
-                    if currentItem.category != .flour {
+                if showsPercentage {
+                    if let displayedPercentage {
                         BakingPercentColumn(
-                            value: BakingFormat.number(percent, precision: 0),
+                            value: BakingFormat.number(displayedPercentage, precision: 0),
                             color: Color.brandText,
                             unitColor: Color.brandSecondaryText,
                             width: Self.percentColumnWidth
@@ -183,7 +205,7 @@ struct FormulaItemDisplayRow: View {
                     unitWidth: Self.weightUnitWidth
                 )
             }
-            .frame(width: Self.numericColumnsWidth, alignment: .trailing)
+            .frame(width: Self.displayNumericColumnsWidth(showsPercentage: showsPercentage), alignment: .trailing)
             .layoutPriority(0)
 
             if isEditing {
@@ -247,7 +269,7 @@ struct FormulaItemDisplayRow: View {
     }
 
     private var hasWaterContent: Bool {
-        store.hasWaterContent(currentItem)
+        store.currentRecipeKind.usesHydrationSystem && store.hasWaterContent(currentItem)
     }
 
     private var isPureWaterItem: Bool {
@@ -262,6 +284,15 @@ struct FormulaItemDisplayRow: View {
         store.summary.flourWeight > 0 ? currentItem.weight / store.summary.flourWeight * 100 : 0
     }
 
+    private var displayedPercentage: Double? {
+        guard showsPercentage else { return nil }
+        if let tablePercentage {
+            return tablePercentage
+        }
+        guard currentItem.category != .flour else { return nil }
+        return percent
+    }
+
     private var weightParts: BakingFormattedUnitValue {
         BakingFormat.weightParts(currentItem.weight, gramPrecision: currentItem.tag == .yeast ? 1 : 0)
     }
@@ -273,34 +304,69 @@ struct FormulaItemDisplayRow: View {
         return nil
     }
 
+    static func displayNumericColumnsWidth(showsPercentage: Bool) -> CGFloat {
+        showsPercentage ? numericColumnsWidth : weightColumnWidth
+    }
+
 }
 
 struct FormulaIngredientTableHeader: View {
     var showsPercentage = true
+    var lockMode: FormulaIngredientLockMode? = nil
+    var onToggleLockMode: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .center, spacing: BakingSpace.lg) {
-            Text(BakingTerms.formulaTableIngredient)
-                .bakingLabelStyle(.tableHeader)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity)
 
             HStack(spacing: FormulaItemDisplayRow.numericColumnSpacing) {
-                Text(BakingTerms.formulaTablePercentage)
-                    .bakingLabelStyle(.tableHeader)
-                    .frame(width: FormulaItemDisplayRow.percentColumnWidth, alignment: .trailing)
-                    .opacity(showsPercentage ? 1 : 0)
+                if showsPercentage {
+                    lockableColumnHeader(
+                        mode: .percentage,
+                        width: FormulaItemDisplayRow.percentColumnWidth
+                    )
 
-                Text(BakingTerms.formulaTableWeight)
-                    .bakingLabelStyle(.tableHeader)
-                    .frame(width: FormulaItemDisplayRow.weightColumnWidth, alignment: .trailing)
+                    lockableColumnHeader(
+                        mode: .weight,
+                        width: FormulaItemDisplayRow.weightColumnWidth
+                    )
+                } else {
+                    Color.clear
+                        .frame(width: FormulaItemDisplayRow.weightColumnWidth, height: 24)
+                }
             }
-            .frame(width: FormulaItemDisplayRow.numericColumnsWidth, alignment: .trailing)
+            .frame(width: FormulaItemDisplayRow.displayNumericColumnsWidth(showsPercentage: showsPercentage), alignment: .trailing)
         }
         .padding(.leading, BakingSpace.sm)
         .padding(.trailing, BakingSpace.md)
         .padding(.top, BakingSpace.sm)
         .padding(.bottom, BakingSpace.xs)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func lockableColumnHeader(mode: FormulaIngredientLockMode, width: CGFloat) -> some View {
+        lockToggle(for: mode)
+        .frame(width: width, alignment: .trailing)
+    }
+
+    private func lockToggle(for mode: FormulaIngredientLockMode) -> some View {
+        Button {
+            if lockMode != mode {
+                onToggleLockMode()
+            }
+        } label: {
+            BakingSystemIconButtonLabel(
+                systemImage: lockMode == mode ? "lock.fill" : "lock.open.fill",
+                tint: lockMode == mode ? .brandPrimary : .brandSecondaryText,
+                visualSize: 24,
+                font: BakingTypography.appPrimaryText
+            )
+        }
+        .buttonStyle(BakingPressFeedbackButtonStyle())
+        .accessibilityLabel(BakingTerms.formulaIngredientLockToggleAccessibility)
+        .accessibilityValue(lockMode?.label ?? "")
     }
 }
 
@@ -311,7 +377,7 @@ struct FormulaRowReorderValue {
 }
 
 private struct FormulaRowInteractionSurface: UIViewRepresentable {
-    private static let log = Logger(subsystem: "com.hang.BakingJournal", category: "FormulaReorder")
+    private static let log = Logger(subsystem: "com.openbakery.bready", category: "FormulaReorder")
 
     let minimumPressDuration: TimeInterval
     var onTap: () -> Void
@@ -474,14 +540,16 @@ struct FormulaItemCard: View {
 
                 HStack(alignment: .top, spacing: 6) {
                     if currentItem.category == .starter {
-                        ReadOnlyInlineMetric(
-                            value: BakingFormat.number(percent, precision: 0),
-                            unit: "%",
-                            font: .callout,
-                            color: .brandText,
-                            totalWidth: 62,
-                            isWaterStyle: isPureWaterItem
-                        )
+                        if store.currentRecipeKind.usesBakerPercentageSystem {
+                            ReadOnlyInlineMetric(
+                                value: BakingFormat.number(percent, precision: 0),
+                                unit: "%",
+                                font: .callout,
+                                color: .brandText,
+                                totalWidth: 62,
+                                isWaterStyle: isPureWaterItem
+                            )
+                        }
                         ReadOnlyInlineMetric(
                             value: BakingFormat.number(currentItem.weight, precision: 0),
                             unit: BakingTerms.unitGram,
@@ -491,14 +559,16 @@ struct FormulaItemCard: View {
                             isWaterStyle: false
                         )
                     } else if currentItem.tag == .egg {
-                        ReadOnlyInlineMetric(
-                            value: BakingFormat.number(percent, precision: 0),
-                            unit: "%",
-                            font: .callout,
-                            color: .brandText,
-                            totalWidth: 58,
-                            isWaterStyle: false
-                        )
+                        if store.currentRecipeKind.usesBakerPercentageSystem {
+                            ReadOnlyInlineMetric(
+                                value: BakingFormat.number(percent, precision: 0),
+                                unit: "%",
+                                font: .callout,
+                                color: .brandText,
+                                totalWidth: 58,
+                                isWaterStyle: false
+                            )
+                        }
                         ReadOnlyInlineMetric(
                             value: BakingFormat.number(currentItem.weight, precision: 0),
                             unit: BakingTerms.unitGram,
@@ -508,12 +578,12 @@ struct FormulaItemCard: View {
                             isWaterStyle: false
                         )
                     } else {
-                        if currentItem.category != .flour {
+                        if store.currentRecipeKind.usesBakerPercentageSystem, currentItem.category != .flour {
                             BakingPercentageField(value: Binding(
                                 get: { percent },
                                 set: { store.updateItemPercent(currentItem, percent: $0) }
                             ), precision: 0, font: .callout, color: .brandText, fieldWidth: 34, totalWidth: 62, isWaterStyle: false)
-                        } else {
+                        } else if store.currentRecipeKind.usesBakerPercentageSystem {
                             Color.clear
                                 .frame(width: 58, height: 1)
                         }
@@ -678,7 +748,7 @@ struct FormulaItemCard: View {
     }
 
     private var hasWaterContent: Bool {
-        store.hasWaterContent(currentItem)
+        store.currentRecipeKind.usesHydrationSystem && store.hasWaterContent(currentItem)
     }
 
     private var isPureWaterItem: Bool {
@@ -738,29 +808,33 @@ private struct OtherMiniRecipeEditor: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(BakingTerms.formulaWaterContent)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandSecondaryText)
+            if store.currentRecipeKind.usesHydrationSystem {
+                Text(BakingTerms.formulaWaterContent)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.brandSecondaryText)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
 
-            BakingPercentageField(
-                value: waterContentBinding,
-                precision: 1,
-                font: .caption,
-                color: .brandText,
-                fieldWidth: 40,
-                totalWidth: 74,
-                isWaterStyle: true,
-                height: 32
-            )
+                BakingPercentageField(
+                    value: waterContentBinding,
+                    precision: 1,
+                    font: .caption,
+                    color: .brandText,
+                    fieldWidth: 40,
+                    totalWidth: 74,
+                    isWaterStyle: true,
+                    height: 32
+                )
 
-            CompactInfoBadge(
-                icon: "drop.fill",
-                text: BakingFormat.weight(store.waterContribution(currentItem)),
-                isWater: true,
-                compact: true
-            )
+                CompactInfoBadge(
+                    icon: "drop.fill",
+                    text: BakingFormat.weight(store.waterContribution(currentItem)),
+                    isWater: true,
+                    compact: true
+                )
+            } else {
+                Spacer(minLength: 0)
+            }
 
             if canRemove {
                 Button(role: .destructive) {

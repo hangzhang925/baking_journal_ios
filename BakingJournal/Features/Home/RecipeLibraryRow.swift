@@ -3,6 +3,7 @@ import SwiftUI
 struct RecipeLibraryRow: View {
     let recipe: SavedRecipe
     let bakeCount: Int
+    var filterMatchState: BakingFilterMatchState = .matching
 
     var body: some View {
         HStack(spacing: BakingSpace.lg) {
@@ -35,6 +36,7 @@ struct RecipeLibraryRow: View {
         .frame(minHeight: BakingComponentMetrics.listRowMinHeight)
         .padding(.horizontal, BakingLayout.screenHorizontalInset)
         .padding(.vertical, BakingSpace.sm)
+        .bakingFilterMatchState(filterMatchState)
         .contentShape(Rectangle())
     }
 }

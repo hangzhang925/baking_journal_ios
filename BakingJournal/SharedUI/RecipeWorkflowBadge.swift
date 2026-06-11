@@ -6,7 +6,7 @@ struct RecipeWorkflowBadge: View {
     var body: some View {
         Text(state.label)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(foregroundColor)
+            .foregroundStyle(state.badgeForegroundColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(backgroundColor)
@@ -15,15 +15,6 @@ struct RecipeWorkflowBadge: View {
                 Capsule()
                     .stroke(borderColor, lineWidth: 0.6)
             }
-    }
-
-    private var foregroundColor: Color {
-        switch state {
-        case .draft:
-            return .brandPrimaryLight   // accent-hover reads cleaner on the soft gold fill
-        case .ready:
-            return .brandSage
-        }
     }
 
     private var backgroundColor: Color {
@@ -45,10 +36,42 @@ struct RecipeWorkflowBadge: View {
     }
 }
 
+extension RecipeWorkflowState {
+    var badgeForegroundColor: Color {
+        switch self {
+        case .draft:
+            return .brandPrimaryLight
+        case .ready:
+            return .brandSage
+        }
+    }
+}
+
+struct RecipeKindPinnedLabel: View {
+    let kind: RecipeKind
+
+    var body: some View {
+        Text(kind.label)
+            .font(BakingTypography.rowMeta)
+            .foregroundStyle(Color.brandPrimary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, BakingSpace.md)
+            .frame(height: BakingComponentMetrics.compactPillHeight)
+            .background(BakingSurface.selectedRowBackground)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(BakingSurface.selectedStroke, lineWidth: 0.6)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityLabel(BakingTerms.recipeKindPinnedAccessibility(kind.label))
+    }
+}
+
 struct RecipeWorkflowStateButton: View {
     @EnvironmentObject private var store: RecipeStore
 
-    @State private var showingReadyConfirmation = false
     @State private var showingNeedsStepDialog = false
 
     var body: some View {
@@ -59,16 +82,6 @@ struct RecipeWorkflowStateButton: View {
             systemFont: .title3.weight(.semibold)
         ) { selectedID in
             selectStatus(selectedID)
-        }
-        .confirmationDialog(
-            BakingTerms.workflowReadyConfirmationTitle,
-            isPresented: $showingReadyConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(BakingTerms.stepsMarkReady) {
-                _ = store.markReadyToBake()
-            }
-            Button(BakingTerms.cancel, role: .cancel) {}
         }
         .confirmationDialog(
             BakingTerms.readinessNeedsSteps,
@@ -113,10 +126,6 @@ struct RecipeWorkflowStateButton: View {
             return
         }
 
-        if store.steps.count < 3 || store.items.count < 3 {
-            showingReadyConfirmation = true
-        } else {
-            _ = store.markReadyToBake()
-        }
+        _ = store.markReadyToBake()
     }
 }

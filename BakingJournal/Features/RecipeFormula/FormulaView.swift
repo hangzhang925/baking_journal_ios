@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import OSLog
 
 struct FormulaView: View {
-    private static let reorderLog = Logger(subsystem: "com.hang.BakingJournal", category: "FormulaReorder")
+    private static let reorderLog = Logger(subsystem: "com.openbakery.bready", category: "FormulaReorder")
 
     @Environment(\.historySwipeSuppressionHandler) private var setHistorySwipeSuppressed
     @EnvironmentObject private var navigationController: AppNavigationController
@@ -51,7 +51,8 @@ struct FormulaView: View {
                             summary: store.summary,
                             items: store.items,
                             flourContribution: store.flourContribution,
-                            waterContribution: store.waterContribution
+                            waterContribution: store.waterContribution,
+                            showsHydration: store.currentRecipeKind.usesHydrationSystem
                         )
 
                         ForEach(displayCategories) { category in
@@ -70,7 +71,10 @@ struct FormulaView: View {
             .background(Color.brandBackground)
 
             if let activeItem {
-                FormulaItemDisplayRow(item: activeItem)
+                FormulaItemDisplayRow(
+                    item: activeItem,
+                    tablePercentage: activeItemTablePercentage
+                )
                     .frame(width: activeItemFrame?.width)
                     .reorderLiftedAppearance()
                     .offset(activeItemOverlayOffset)
@@ -187,10 +191,11 @@ struct FormulaView: View {
                     showingToolbarActions = false
                     exportRecipe()
                 } label: {
-                    BakingDropdownRow(title: BakingTerms.formulaExportJSON) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.brandPrimary)
+                    BakingDropdownRow(
+                        title: BakingTerms.formulaExportJSON,
+                        showsLeadingSlot: false
+                    ) {
+                        EmptyView()
                     }
                 }
                 .buttonStyle(.plain)
@@ -199,10 +204,11 @@ struct FormulaView: View {
                     showingToolbarActions = false
                     importingRecipe = true
                 } label: {
-                    BakingDropdownRow(title: BakingTerms.formulaImportJSON) {
-                        Image(systemName: "square.and.arrow.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.brandPrimary)
+                    BakingDropdownRow(
+                        title: BakingTerms.formulaImportJSON,
+                        showsLeadingSlot: false
+                    ) {
+                        EmptyView()
                     }
                 }
                 .buttonStyle(.plain)
@@ -217,7 +223,9 @@ struct FormulaView: View {
                 HStack(spacing: 4) {
                     Text(category.label)
                         .bakingLabelStyle(.sectionHeader)
-                    if category == .basic {
+                    if category == .flour, store.currentRecipeKind.usesBakerPercentageSystem {
+                        FlourTablePercentageInfoButton()
+                    } else if category == .basic, store.currentRecipeKind.usesBakerPercentageSystem {
                         BakerPercentageInfoButton()
                     }
                 }
@@ -243,8 +251,17 @@ struct FormulaView: View {
                     .padding(.vertical, BakingSpace.xl)
             } else {
                 VStack(spacing: 0) {
+                    if category == .basic, store.currentRecipeKind.usesBakerPercentageSystem {
+                        FormulaIngredientTableHeader(
+                            showsPercentage: store.currentRecipeKind.usesBakerPercentageSystem,
+                            lockMode: store.formulaIngredientLockMode,
+                            onToggleLockMode: store.toggleFormulaIngredientLockMode
+                        )
+                        BakingTableDivider(leadingInset: FormulaItemDisplayRow.separatorLeadingInset)
+                    }
+
                     ForEach(Array(categoryItems.enumerated()), id: \.element.id) { index, item in
-                        formulaItemRow(item, in: category)
+                        formulaItemRow(item, in: category, categoryItems: categoryItems)
                             .opacity(activeItemID == item.id ? ReorderMotion.previewOpacity : 1)
                             .background(ReorderFrameReader(id: item.id, coordinateSpace: reorderCoordinateSpace))
                             .animation(ReorderMotion.animation, value: categoryItems.map(\.id))
@@ -260,7 +277,10 @@ struct FormulaView: View {
     }
 
     private var displayCategories: [ItemCategory] {
-        [.flour, .basic]
+        if store.currentRecipeKind.usesUnifiedIngredientList {
+            return [.basic]
+        }
+        return [.flour, .basic]
     }
 
     private func items(for category: ItemCategory) -> [RecipeItem] {
@@ -268,6 +288,9 @@ struct FormulaView: View {
         case .flour:
             return store.items.filter { $0.category == .flour || $0.category == .starter }
         case .basic:
+            if store.currentRecipeKind.usesUnifiedIngredientList {
+                return store.items.filter { $0.category != .starter }
+            }
             return store.items.filter { $0.category == .basic || $0.category == .other }
         default:
             return store.items.filter { $0.category == category }
@@ -283,9 +306,11 @@ struct FormulaView: View {
     }
 
     @ViewBuilder
-    private func formulaItemRow(_ item: RecipeItem, in category: ItemCategory) -> some View {
+    private func formulaItemRow(_ item: RecipeItem, in category: ItemCategory, categoryItems: [RecipeItem]) -> some View {
         let row = FormulaItemDisplayRow(
             item: item,
+            tablePercentage: tablePercentage(for: item, in: category, categoryItems: categoryItems),
+            showsPercentage: store.currentRecipeKind.usesBakerPercentageSystem,
             isEditing: isItemListEditing,
             canDelete: canRemove(item),
             onReorderBegan: { drag in
@@ -319,6 +344,11 @@ struct FormulaView: View {
         row
     }
 
+    private func tablePercentage(for item: RecipeItem, in category: ItemCategory, categoryItems: [RecipeItem]) -> Double? {
+        guard store.currentRecipeKind.usesBakerPercentageSystem, category == .flour else { return nil }
+        return store.flourTablePercentage(for: item, in: categoryItems)
+    }
+
     private var activeItem: RecipeItem? {
         guard let activeItemID else { return nil }
         if let activeItemCategory,
@@ -326,6 +356,13 @@ struct FormulaView: View {
             return previewItem
         }
         return store.items.first { $0.id == activeItemID }
+    }
+
+    private var activeItemTablePercentage: Double? {
+        guard store.currentRecipeKind.usesBakerPercentageSystem,
+              let activeItem,
+              activeItemCategory == .flour else { return nil }
+        return store.flourTablePercentage(for: activeItem, in: displayedItems(for: .flour))
     }
 
     private var activeItemOverlayOffset: CGSize {
@@ -433,7 +470,11 @@ struct FormulaView: View {
         if let activeItemCategory,
            let previewItems = previewItemsByCategory[activeItemCategory],
            previewItems.map(\.id) != items(for: activeItemCategory).map(\.id) {
-            store.reorderItems(in: activeItemCategory, orderedIDs: previewItems.map(\.id))
+            if store.currentRecipeKind.usesUnifiedIngredientList, activeItemCategory == .basic {
+                store.reorderCakeMaterialItems(orderedIDs: previewItems.map(\.id))
+            } else {
+                store.reorderItems(in: activeItemCategory, orderedIDs: previewItems.map(\.id))
+            }
         }
         cancelItemReorder()
     }
@@ -591,22 +632,12 @@ struct FormulaView: View {
                         dropdownPresenter.dismiss()
                         item.action()
                     } label: {
-                        if menu.reservesLeadingIconSlot {
-                            BakingDropdownRow(title: item.title, isSelected: item.isSelected) {
-                                if let icon = item.icon {
-                                    BakingIconView(icon: icon, size: BakingTouchTarget.dropdownIconGlyph, color: .brandPrimary)
-                                } else {
-                                    Color.clear
-                                }
-                            }
-                        } else {
-                            BakingDropdownRow(
-                                title: item.title,
-                                isSelected: item.isSelected,
-                                showsLeadingSlot: false
-                            ) {
-                                EmptyView()
-                            }
+                        BakingDropdownRow(
+                            title: item.title,
+                            isSelected: item.isSelected,
+                            showsLeadingSlot: false
+                        ) {
+                            EmptyView()
                         }
                     }
                     .buttonStyle(.plain)
@@ -621,7 +652,7 @@ struct FormulaView: View {
     }
 
     private func dropdownWidth(for menu: ActiveDropdownMenu, in containerSize: CGSize) -> CGFloat {
-        min(menu.width, max(0, containerSize.width - 16))
+        menu.fittedWidth(in: containerSize)
     }
 
     private func dropdownLayout(for menu: ActiveDropdownMenu, width: CGFloat, in containerSize: CGSize) -> (origin: CGPoint, height: CGFloat) {
@@ -645,6 +676,29 @@ struct FormulaView: View {
 }
 
 private struct BakerPercentageInfoButton: View {
+    var body: some View {
+        FormulaPercentageInfoButton(
+            accessibilityLabel: BakingTerms.formulaBakerPercentageInfoAccessibility,
+            title: BakingTerms.formulaBakerPercentageInfoTitle,
+            message: BakingTerms.formulaBakerPercentageInfoBody
+        )
+    }
+}
+
+private struct FlourTablePercentageInfoButton: View {
+    var body: some View {
+        FormulaPercentageInfoButton(
+            accessibilityLabel: BakingTerms.formulaFlourPercentageInfoAccessibility,
+            title: BakingTerms.formulaFlourPercentageInfoTitle,
+            message: BakingTerms.formulaFlourPercentageInfoBody
+        )
+    }
+}
+
+private struct FormulaPercentageInfoButton: View {
+    let accessibilityLabel: String
+    let title: String
+    let message: String
     @State private var showingInfo = false
 
     var body: some View {
@@ -658,15 +712,18 @@ private struct BakerPercentageInfoButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(BakingTerms.formulaBakerPercentageInfoAccessibility)
+        .accessibilityLabel(accessibilityLabel)
         .popover(isPresented: $showingInfo, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-            BakerPercentageTooltip()
+            FormulaPercentageTooltip(title: title, message: message)
                 .presentationCompactAdaptation(.popover)
         }
     }
 }
 
-private struct BakerPercentageTooltip: View {
+private struct FormulaPercentageTooltip: View {
+    let title: String
+    let message: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -677,12 +734,12 @@ private struct BakerPercentageTooltip: View {
                     .background(BakingSurfaceTheme.theme(for: .selected).background)
                     .clipShape(Circle())
 
-                Text(BakingTerms.formulaBakerPercentageInfoTitle)
+                Text(title)
                     .font(BakingTypography.appPrimaryText)
                     .foregroundStyle(Color.brandText)
             }
 
-            Text(BakingTerms.formulaBakerPercentageInfoBody)
+            Text(message)
                 .font(BakingTypography.appSecondaryText)
                 .foregroundStyle(Color.brandSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)

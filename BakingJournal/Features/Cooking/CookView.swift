@@ -5,6 +5,8 @@ struct CookView: View {
     @EnvironmentObject private var store: RecipeStore
     @State private var now = Date()
     @State private var showingActions = false
+    @State private var showingCompletionToast = false
+    @State private var completionFeedbackTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,7 +22,9 @@ struct CookView: View {
                 } else if store.cookState.completedAt != nil {
                     CookSummaryView()
                 } else {
-                    CookStepView(now: now)
+                    CookStepView(now: now) {
+                        showCompletionToast()
+                    }
                 }
             }
         }
@@ -31,6 +35,20 @@ struct CookView: View {
         }
         .onAppear {
             store.beginCookIfNeeded()
+        }
+        .overlay(alignment: .center) {
+            if showingCompletionToast {
+                BakingTransientStatusToast(title: BakingTerms.cookCompletedStatus)
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.96).combined(with: .opacity),
+                            removal: .opacity
+                        )
+                    )
+            }
+        }
+        .onDisappear {
+            completionFeedbackTask?.cancel()
         }
     }
 
@@ -92,22 +110,35 @@ struct CookView: View {
             }
         )
     }
+
+    private func showCompletionToast() {
+        completionFeedbackTask?.cancel()
+
+        withAnimation(BakingMotion.quick) {
+            showingCompletionToast = true
+        }
+
+        completionFeedbackTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.28)) {
+                showingCompletionToast = false
+            }
+        }
+    }
 }
 
 private struct CookStepView: View {
     @EnvironmentObject private var store: RecipeStore
     let now: Date
-    @State private var notesExpanded = false
+    let onStepCompleted: () -> Void
+    @State private var showingRecipePreview = false
     @State private var stepSelection = 0
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: BakingSpace.sm) {
                 recipeHeader
-
-                if !trimmedOverallNotes.isEmpty {
-                    notesSection
-                }
             }
             .padding(.horizontal, BakingLayout.screenHorizontalInset)
             .padding(.top, BakingLayout.contentTopInset)
@@ -123,7 +154,11 @@ private struct CookStepView: View {
                                 isCurrent: index == store.cookState.currentIndex
                             )
 
-                            CookTimerCard(step: step, now: now)
+                            CookTimerCard(
+                                step: step,
+                                now: now,
+                                isCurrent: index == store.cookState.currentIndex
+                            )
 
                             CookInstructionCard(instruction: stepInstructionText(step))
                         }
@@ -136,10 +171,13 @@ private struct CookStepView: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-
-            bottomStepStatus
         }
         .background(Color.brandBackground)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            bottomStepStatus
+                .padding(.bottom, CookBottomActionMetrics.tabBarClearance)
+                .background(BakingSurface.bottomBarBackground)
+        }
         .onAppear {
             stepSelection = store.cookState.currentIndex
         }
@@ -156,65 +194,39 @@ private struct CookStepView: View {
         .accessibilityAction(named: BakingTerms.cookNextStep) {
             store.moveCookStep(1)
         }
+        .sheet(isPresented: $showingRecipePreview) {
+            RecipePreviewView(toolbarMode: .referenceSheet)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private var recipeHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: BakingSpace.sm) {
-            BakingLabel(text: store.currentRecipeDisplayName, role: .sectionHeader)
-                .foregroundStyle(Color.brandText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
+        HStack(alignment: .center, spacing: BakingSpace.sm) {
+            CookRecipeNameButton(recipeName: store.currentRecipeDisplayName) {
+                showingRecipePreview = true
+            }
+            .layoutPriority(1)
 
             Spacer(minLength: BakingSpace.sm)
 
-            CookReturnToCurrentStepButton(
-                isEnabled: stepSelection != store.cookState.currentIndex,
-                action: returnToCurrentStep
-            )
+            if !isSelectedCurrentStep {
+                CookReturnToCurrentStepButton(
+                    action: returnToCurrentStep
+                )
+            }
         }
         .padding(.vertical, BakingSpace.xs)
     }
 
-    private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            BakingDisclosureHeader(
-                title: BakingTerms.stepsPageNotes,
-                value: "",
-                showsValue: false,
-                systemImage: "note.text",
-                isExpanded: notesExpanded
-            ) {
-                withAnimation(BakingMotion.standard) {
-                    notesExpanded.toggle()
-                }
-            }
-
-            if notesExpanded {
-                Text(trimmedOverallNotes)
-                    .font(BakingTypography.appPrimaryText)
-                    .foregroundStyle(Color.brandText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(10)
-                    .bakingInsetSurface()
-            }
-        }
-        .padding(10)
-        .bakingSectionCard()
-    }
-
     @ViewBuilder
     private var bottomStepStatus: some View {
-        if let step = selectedStep {
-            if store.isCookStepCompleted(step) {
-                CookStepCompletedBottomStatus()
-            } else {
-                BakingBottomActionButton(
-                    title: stepCompletionTitle(for: stepSelection),
-                    accessibilityLabel: stepCompletionTitle(for: stepSelection)
-                ) {
-                    completeStep(at: stepSelection)
-                }
+        if let step = selectedStep, isSelectedCurrentStep, !store.isCookStepCompleted(step) {
+            BakingBottomActionButton(
+                title: stepCompletionTitle(for: stepSelection),
+                accessibilityLabel: stepCompletionTitle(for: stepSelection)
+            ) {
+                completeStep(at: stepSelection)
             }
         }
     }
@@ -224,8 +236,8 @@ private struct CookStepView: View {
         return store.steps[stepSelection]
     }
 
-    private var trimmedOverallNotes: String {
-        store.recipeOverallNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var isSelectedCurrentStep: Bool {
+        stepSelection == store.cookState.currentIndex
     }
 
     private func stepCompletionTitle(for index: Int) -> String {
@@ -233,7 +245,9 @@ private struct CookStepView: View {
     }
 
     private func completeStep(at index: Int) {
-        store.completeCookStep(at: index)
+        if store.completeCookStep(at: index) {
+            onStepCompleted()
+        }
     }
 
     private func returnToCurrentStep() {
@@ -250,36 +264,41 @@ private struct CookStepView: View {
     }
 }
 
-private struct CookReturnToCurrentStepButton: View {
-    let isEnabled: Bool
+private enum CookBottomActionMetrics {
+    static let tabBarClearance = BakingComponentMetrics.tabItemHeight + BakingSpace.xxs * 2
+}
+
+private struct CookRecipeNameButton: View {
+    let recipeName: String
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(BakingTerms.cookReturnToCurrentStep)
-                .font(BakingTypography.appSecondaryText.weight(.semibold))
-                .foregroundStyle(isEnabled ? Color.brandPrimary : Color.brandSecondaryText.opacity(0.52))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .padding(.horizontal, BakingSpace.md)
-                .frame(minHeight: BakingTouchTarget.inlineIconSurface)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(BakingPressFeedbackButtonStyle())
-        .disabled(!isEnabled)
-        .accessibilityLabel(BakingTerms.cookReturnToCurrentStep)
+        BakingInlineActionButton(
+            title: recipeName,
+            accessibilityLabel: BakingTerms.cookOpenRecipePreview,
+            role: .secondary,
+            action: action
+        )
+        .accessibilityValue(recipeName)
+    }
+}
+
+private struct CookReturnToCurrentStepButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        BakingInlineActionButton(
+            title: BakingTerms.cookReturnToCurrentStep,
+            accessibilityLabel: BakingTerms.cookReturnToCurrentStep,
+            role: .secondary,
+            action: action
+        )
     }
 }
 
 private struct CookCurrentStageBadge: View {
     var body: some View {
-        Text(BakingTerms.cookCurrentStage)
-            .font(.caption.weight(.bold))
-            .foregroundStyle(Color.brandOnPrimary)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Color.brandPrimary)
-            .clipShape(RoundedRectangle(cornerRadius: BakingRadius.chip, style: .continuous))
+        BakingLabel(text: BakingTerms.cookCurrentStage, role: .helperText)
             .contentTransition(.opacity)
     }
 }
@@ -291,34 +310,28 @@ private struct CookStepHeaderCard: View {
     let isCurrent: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                if isCurrent {
-                    CookCurrentStageBadge()
-                }
-
+        HStack(alignment: .top, spacing: BakingSpace.md) {
+            VStack(alignment: .leading, spacing: BakingSpace.xs) {
                 Text(progressText)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isCurrent ? Color.brandPrimary : Color.brandSecondaryText)
+                    .bakingLabelStyle(.tableHeader)
                     .contentTransition(.opacity)
+
+                Text(step.name)
+                    .font(BakingTypography.tableNumber)
+                    .foregroundStyle(Color.brandText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
-            Text(step.name)
-                .font(BakingTypography.rowTitle)
-                .foregroundStyle(isCurrent ? Color.brandText : Color.brandSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            Spacer(minLength: BakingSpace.sm)
+
+            if isCurrent {
+                CookCurrentStageBadge()
+            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .bakingCard(
-            background: isCurrent ? BakingSurface.selectedRowBackground : .clear,
-            radius: BakingRadius.card,
-            stroke: isCurrent ? BakingSurface.selectedStroke : BakingSurface.warmHairline,
-            lineWidth: isCurrent ? 0.9 : 0.5
-        )
-        .opacity(isCurrent ? 1 : 0.7)
+        .padding(BakingTableTheme.rowPadding)
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .bakingSurface(.card)
         .animation(BakingMotion.standard, value: isCurrent)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(progressText)
@@ -335,8 +348,37 @@ private struct CookTimerCard: View {
     @EnvironmentObject private var store: RecipeStore
     let step: JournalStep
     let now: Date
+    let isCurrent: Bool
+    @State private var reminderTime = Date()
+    @State private var reminderStepID: UUID?
+    @State private var hasEditedReminderTime = false
 
     var body: some View {
+        VStack(alignment: .leading, spacing: BakingSpace.sm) {
+            timingMetricStrip
+
+            if shouldShowFoldControls {
+                foldReminderCard
+                foldRecordsCard
+            } else if shouldShowReminder {
+                reminderCard
+            }
+        }
+        .onAppear {
+            syncReminderTime(force: true)
+        }
+        .onChange(of: step.id) { _, _ in
+            syncReminderTime(force: true)
+        }
+        .onChange(of: defaultReminderTime) { _, _ in
+            syncReminderTime(force: false)
+        }
+        .onChange(of: scheduledReminderTime) { _, _ in
+            syncReminderTime(force: false)
+        }
+    }
+
+    private var timingMetricStrip: some View {
         HStack(spacing: 0) {
             CookStepMetricCell(
                 title: BakingTerms.recipePreviewEstimatedDuration,
@@ -345,43 +387,247 @@ private struct CookTimerCard: View {
 
             metricDivider
 
-            Button {
-                store.startTimer(for: step)
-            } label: {
-                CookStepMetricCell(
-                    title: BakingTerms.cookFinishAt,
-                    value: BakingFormat.clockTime(projectedEnd)
-                )
-            }
-            .buttonStyle(BakingPressFeedbackButtonStyle())
-            .accessibilityLabel(isRunning ? BakingTerms.cookRestartTimer : BakingTerms.cookStartTimer)
-            .accessibilityValue(BakingFormat.clockTime(projectedEnd))
+            CookStepMetricCell(
+                title: BakingTerms.cookStartAt,
+                value: startTimeText
+            )
 
             metricDivider
 
             CookStepMetricCell(
-                title: BakingTerms.stepsFieldTemperature,
-                value: temperatureText ?? BakingTerms.stepsNoValue
+                title: BakingTerms.cookFinishAt,
+                value: completionTimeText
             )
+
+            if let temperatureText {
+                metricDivider
+
+                CookStepMetricCell(
+                    title: BakingTerms.stepsFieldTemperature,
+                    value: temperatureText
+                )
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, BakingComponentMetrics.metricStripHorizontalPadding)
+        .padding(.vertical, BakingComponentMetrics.metricStripVerticalPadding)
         .bakingCard()
     }
 
-    private var isRunning: Bool {
-        store.cookState.timerStepId == step.id && store.cookState.timerEndsAt != nil
+    private var reminderCard: some View {
+        BakingSectionCard(title: BakingTerms.cookReminderSection, headerBottomPadding: 0) {
+            VStack(spacing: 0) {
+                BakingToggleRow(
+                    title: BakingTerms.cookReminderSection,
+                    isOn: reminderEnabledBinding
+                )
+
+                if isReminderEnabled {
+                    BakingTableDivider()
+
+                    BakingFormRow(title: BakingTerms.cookReminderTime) {
+                        DatePicker(
+                            BakingTerms.cookReminderTime,
+                            selection: reminderTimeBinding,
+                            displayedComponents: [.hourAndMinute]
+                        )
+                        .labelsHidden()
+                        .tint(.brandPrimary)
+                        .accessibilityLabel(BakingTerms.cookReminderTime)
+                    }
+                }
+            }
+        }
     }
 
-    private var projectedEnd: Date {
-        if isRunning, let timerEndsAt = store.cookState.timerEndsAt {
-            return timerEndsAt
+    private var foldReminderCard: some View {
+        BakingSectionCard(title: BakingTerms.cookFoldReminderSection, headerBottomPadding: 0) {
+            VStack(spacing: 0) {
+                BakingToggleRow(
+                    title: BakingTerms.cookFoldReminderToggle,
+                    isOn: foldReminderEnabledBinding
+                )
+
+                if isFoldReminderEnabled {
+                    BakingTableDivider()
+
+                    BakingFormRow(title: BakingTerms.cookFoldFrequency) {
+                        Text(foldFrequencyText)
+                            .font(BakingTypography.tableNumber)
+                            .foregroundStyle(Color.brandText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
+
+                    BakingTableDivider()
+
+                    BakingFormRow(title: BakingTerms.cookFoldNextTime) {
+                        Text(foldNextTimeText)
+                            .font(BakingTypography.tableNumber)
+                            .foregroundStyle(Color.brandText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
+                }
+            }
         }
-        return now.addingTimeInterval(store.stepMinutes(step) * 60)
+    }
+
+    private var foldRecordsCard: some View {
+        BakingSectionCard(
+            title: BakingTerms.cookFoldRecordsSection,
+            detail: foldProgressText,
+            headerBottomPadding: BakingSpace.xs
+        ) {
+            VStack(alignment: .leading, spacing: BakingSpace.sm) {
+                if !hasCompletedFoldPlan {
+                    HStack {
+                        Spacer(minLength: BakingSpace.sm)
+
+                        BakingInlineActionButton(
+                            title: BakingTerms.cookFoldAction,
+                            accessibilityLabel: BakingTerms.cookFoldAction
+                        ) {
+                            store.recordFold(for: step)
+                        }
+                        .frame(width: 118)
+                    }
+                    .frame(minHeight: BakingTouchTarget.primaryAction)
+                } else {
+                    Text(BakingTerms.cookFoldCompleted)
+                        .bakingLabelStyle(.helperText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                CookFoldRecordTable(records: foldRecords)
+            }
+            .padding(.horizontal, BakingSpace.md)
+            .padding(.bottom, BakingSpace.md)
+        }
+    }
+
+    private var shouldShowReminder: Bool {
+        isCurrent
+            && step.foldPlan == nil
+            && !store.isCookStepCompleted(step)
+            && estimatedCompletionAt != nil
+            && store.stepMinutes(step) > 0
+    }
+
+    private var shouldShowFoldControls: Bool {
+        isCurrent && !store.isCookStepCompleted(step) && step.foldPlan != nil
+    }
+
+    private var stepStartedAt: Date? {
+        store.cookStepStartedAt(for: step)
+    }
+
+    private var estimatedCompletionAt: Date? {
+        store.cookStepEstimatedCompletionAt(for: step)
+    }
+
+    private var scheduledReminderTime: Date? {
+        guard store.isStepCompletionReminderEnabled(for: step) else { return nil }
+        return store.cookState.timerEndsAt
+    }
+
+    private var foldScheduledReminderTime: Date? {
+        guard store.isFoldReminderEnabled(for: step) else { return nil }
+        return store.cookState.timerEndsAt
+    }
+
+    private var defaultReminderTime: Date {
+        scheduledReminderTime ?? estimatedCompletionAt ?? now
+    }
+
+    private var reminderTimeBinding: Binding<Date> {
+        Binding(
+            get: { reminderTime },
+            set: { newValue in
+                let nextTime = normalizedReminderTime(newValue)
+                reminderTime = nextTime
+                hasEditedReminderTime = true
+                if isReminderEnabled {
+                    store.scheduleCookStepReminder(for: step, at: nextTime)
+                }
+            }
+        )
+    }
+
+    private var isReminderEnabled: Bool {
+        scheduledReminderTime != nil
+    }
+
+    private var isFoldReminderEnabled: Bool {
+        foldScheduledReminderTime != nil
+    }
+
+    private var reminderEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { isReminderEnabled },
+            set: { isEnabled in
+                if isEnabled {
+                    scheduleReminder()
+                } else {
+                    store.clearCookStepReminder(for: step)
+                    hasEditedReminderTime = false
+                }
+            }
+        )
+    }
+
+    private var foldReminderEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { isFoldReminderEnabled },
+            set: { isEnabled in
+                withAnimation(BakingMotion.quick) {
+                    if isEnabled {
+                        store.scheduleFoldReminder(for: step)
+                    } else {
+                        store.clearFoldReminder(for: step)
+                    }
+                }
+            }
+        )
+    }
+
+    private var startTimeText: String {
+        guard let stepStartedAt else { return BakingTerms.stepsNoValue }
+        return BakingFormat.clockTime(stepStartedAt)
+    }
+
+    private var completionTimeText: String {
+        guard let estimatedCompletionAt else { return BakingTerms.stepsNoValue }
+        return BakingFormat.clockTime(estimatedCompletionAt)
     }
 
     private var durationText: String {
         BakingFormat.duration(minutes: store.stepMinutes(step))
+    }
+
+    private var foldRecords: [BakeFoldRecord] {
+        store.foldRecords(for: step)
+    }
+
+    private var foldProgressText: String? {
+        guard let progress = store.foldProgress(for: step) else { return nil }
+        return BakingTerms.cookFoldProgress(completed: progress.completed, target: progress.target)
+    }
+
+    private var hasCompletedFoldPlan: Bool {
+        guard let progress = store.foldProgress(for: step) else { return false }
+        return progress.completed >= progress.target
+    }
+
+    private var foldFrequencyText: String {
+        guard let foldPlan = step.foldPlan else { return BakingTerms.stepsNoValue }
+        return BakingFormat.duration(minutes: Double(foldPlan.normalizedIntervalMinutes))
+    }
+
+    private var foldNextTimeText: String {
+        guard let nextTime = foldScheduledReminderTime ?? store.nextFoldReminderDate(for: step) else {
+            return BakingTerms.stepsNoValue
+        }
+        return BakingFormat.clockTime(nextTime)
     }
 
     private var temperatureText: String? {
@@ -402,6 +648,90 @@ private struct CookTimerCard: View {
             )
             .padding(.horizontal, 6)
     }
+
+    private func scheduleReminder() {
+        let fireDate = normalizedReminderTime(reminderTime)
+        reminderTime = fireDate
+        hasEditedReminderTime = false
+        store.scheduleCookStepReminder(for: step, at: fireDate)
+    }
+
+    private func syncReminderTime(force: Bool) {
+        if reminderStepID != step.id {
+            reminderStepID = step.id
+            reminderTime = defaultReminderTime
+            hasEditedReminderTime = false
+            return
+        }
+
+        guard force || !hasEditedReminderTime else { return }
+        reminderTime = defaultReminderTime
+    }
+
+    private func normalizedReminderTime(_ date: Date) -> Date {
+        let minimumDate = now.addingTimeInterval(1)
+        return date < minimumDate ? minimumDate : date
+    }
+}
+
+private struct CookFoldRecordTable: View {
+    let records: [BakeFoldRecord]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            BakingTableDivider(leadingInset: 0)
+
+            if records.isEmpty {
+                Text(BakingTerms.cookFoldRecordsEmpty)
+                    .bakingLabelStyle(.helperText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, BakingSpace.md)
+                    .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
+            } else {
+                ForEach(Array(records.enumerated()), id: \.element.id) { index, record in
+                    row(record)
+
+                    if index < records.count - 1 {
+                        BakingTableDivider(leadingInset: 0)
+                    }
+                }
+            }
+        }
+        .bakingInsetSurface()
+    }
+
+    private var header: some View {
+        HStack(spacing: BakingSpace.md) {
+            BakingLabel(text: BakingTerms.cookFoldRecordIndex, role: .tableHeader)
+
+            Spacer(minLength: BakingSpace.md)
+
+            BakingLabel(text: BakingTerms.cookFoldRecordTime, role: .tableHeader)
+        }
+        .padding(.horizontal, BakingSpace.md)
+        .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
+    }
+
+    private func row(_ record: BakeFoldRecord) -> some View {
+        HStack(spacing: BakingSpace.md) {
+            Text("\(record.sequence)")
+                .font(BakingTypography.tableNumber)
+                .foregroundStyle(Color.brandText)
+                .lineLimit(1)
+
+            Spacer(minLength: BakingSpace.md)
+
+            Text(BakingFormat.clockTime(record.foldedAt))
+                .font(BakingTypography.tableNumber)
+                .foregroundStyle(Color.brandText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .padding(.horizontal, BakingSpace.md)
+        .frame(minHeight: BakingComponentMetrics.popupTableRowMinHeight)
+    }
 }
 
 private struct CookStepMetricCell: View {
@@ -411,8 +741,7 @@ private struct CookStepMetricCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(BakingTypography.appSecondaryText)
-                .foregroundStyle(Color.brandSecondaryText)
+                .bakingLabelStyle(.tableHeader)
                 .lineLimit(1)
 
             Text(value)
@@ -432,12 +761,7 @@ private struct CookInstructionCard: View {
     let instruction: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(BakingTerms.cookTips)
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(Color.brandSecondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+        BakingSectionCard(title: BakingTerms.cookTips) {
             Text(instruction)
                 .font(BakingTypography.appPrimaryText)
                 .foregroundStyle(Color.brandText)
@@ -445,32 +769,9 @@ private struct CookInstructionCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(10)
                 .bakingInsetSurface()
+                .padding(.horizontal, BakingSpace.md)
+                .padding(.bottom, BakingSpace.md)
         }
-        .padding(10)
-        .bakingSectionCard()
-    }
-}
-
-private struct CookStepCompletedBottomStatus: View {
-    var body: some View {
-        HStack(spacing: BakingSpace.sm) {
-            BakingIconView(icon: .complete, size: BakingTouchTarget.inlineIconGlyph, color: .semanticSuccessDeep)
-                .accessibilityHidden(true)
-
-            Text(BakingTerms.cookStepCompleted)
-                .font(BakingTypography.actionLabel)
-                .foregroundStyle(Color.semanticSuccessDeep)
-        }
-        .padding(.horizontal, BakingSpace.xxl)
-        .frame(minHeight: BakingTouchTarget.primaryAction)
-        .bakingSurface(.success)
-        .padding(.horizontal, BakingLayout.screenHorizontalInset)
-        .padding(.top, BakingSpace.sm)
-        .padding(.bottom, BakingSpace.sm)
-        .frame(maxWidth: .infinity)
-        .background(BakingSurface.bottomBarBackground)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(BakingTerms.cookStepCompleted)
     }
 }
 
@@ -482,7 +783,6 @@ private struct CookSummaryView: View {
         if let activeBakeRecord = store.activeBakeRecord {
             BakeRecordReviewContent(
                 record: activeBakeRecord,
-                icon: BakingIcon.recipeKind(store.currentRecipeKind),
                 notes: notesBinding,
                 onOpenRecipe: {
                     navigationController.push(.recipeWorkspace(.formula))

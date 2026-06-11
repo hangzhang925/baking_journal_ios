@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var store: RecipeStore
+    @EnvironmentObject private var languageSettings: AppLanguageSettings
     @StateObject private var navigationController = AppNavigationController()
 
     var body: some View {
@@ -12,6 +13,7 @@ struct RootView: View {
 
                 NavigationStack(path: $navigationController.path) {
                     HomeView()
+                        .id(languageSettings.selectedLanguage.id)
                 }
                 .id(navigationController.resetToken)
                 .tint(.brandPrimary)
@@ -28,8 +30,7 @@ struct RootView: View {
                     selection: Binding(
                         get: { navigationController.selectedTab },
                         set: { navigationController.selectTab($0) }
-                    ),
-                    isStarterReminderDue: store.isStarterReminderDue
+                    )
                 )
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -46,5 +47,5 @@ struct RootView: View {
 }
 
 private enum RootTabBarMetrics {
-    static let contentInsetHeight = BakingComponentMetrics.tabItemHeight + BakingSpace.xxs * 2
+    static let contentInsetHeight = BakingComponentMetrics.tabBarVisualHeight
 }

@@ -51,6 +51,7 @@ enum BakingIcon {
         case .salt: .salt
         case .sugar: .sugar
         case .butter: .butter
+        case .cream: .butter
         case .yeast: .yeast
         case .egg: .egg
         case .other: .other

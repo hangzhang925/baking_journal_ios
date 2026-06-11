@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		AA0000010000000000000001 /* BakingJournalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000011 /* BakingJournalApp.swift */; };
 		AA0000010000000000000002 /* BakingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000012 /* BakingModels.swift */; };
+		AA0000010000000000000314 /* RecipeExchangeSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000214 /* RecipeExchangeSchema.swift */; };
 		AA0000010000000000000003 /* RecipeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000013 /* RecipeStore.swift */; };
 		AA0000010000000000000004 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000014 /* Formatters.swift */; };
 		AA0000010000000000000005 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000015 /* RootView.swift */; };
@@ -29,6 +30,7 @@
 		AA0000010000000000000114 /* FormulaCompactFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000025 /* FormulaCompactFields.swift */; };
 		AA0000010000000000000115 /* BakingDragPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000026 /* BakingDragPayload.swift */; };
 		AA0000010000000000000116 /* RecipeSourcePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000027 /* RecipeSourcePickerView.swift */; };
+		AA0000010000000000000315 /* AIRecipeImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000215 /* AIRecipeImportView.swift */; };
 		AA0000010000000000000117 /* BakeRecipePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000028 /* BakeRecipePickerView.swift */; };
 		AA0000010000000000000118 /* StepSharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000029 /* StepSharedComponents.swift */; };
 		AA0000010000000000000119 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000003A /* L10n.swift */; };
@@ -52,12 +54,34 @@
 		AA0000010000000000000310 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000210 /* InfoPlist.strings */; };
 		AA0000010000000000000311 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000211 /* InfoPlist.strings */; };
 		AA0000010000000000000312 /* BakingLibraryListShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000212 /* BakingLibraryListShell.swift */; };
+		AA0000010000000000000313 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000213 /* OnboardingView.swift */; };
+		AA0000010000000000000316 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000003B /* Localizable.strings */; };
+		AA0000010000000000000317 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000003C /* Localizable.strings */; };
+		AB0000010000000000000001 /* BakingAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000010000000000000011 /* BakingAnalytics.swift */; };
+		AB0000010000000000000003 /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000010000000000000013 /* AppLogger.swift */; };
+		AB0000010000000000000004 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000010000000000000014 /* AppInfo.swift */; };
+		AB0000010000000000000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AB0000010000000000000012 /* PrivacyInfo.xcprivacy */; };
+		FB0000010000000000000001 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = FB0000010000000000000011 /* GoogleService-Info.plist */; };
+		FB0000010000000000000002 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = FB0000010000000000000021 /* FirebaseAnalyticsCore */; };
+		FB0000010000000000000003 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = FB0000010000000000000022 /* FirebaseCrashlytics */; };
+		BB0000010000000000000001 /* RecipeExchangeSchemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000010000000000000011 /* RecipeExchangeSchemaTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BB0000010000000000000042 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000010000000000000050 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000010000000000000040;
+			remoteInfo = BakingJournal;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		AA0000010000000000000010 /* BakingJournal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BakingJournal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000010000000000000011 /* BakingJournalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingJournalApp.swift; sourceTree = "<group>"; };
 		AA0000010000000000000012 /* BakingModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingModels.swift; sourceTree = "<group>"; };
+		AA0000010000000000000214 /* RecipeExchangeSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeExchangeSchema.swift; sourceTree = "<group>"; };
 		AA0000010000000000000013 /* RecipeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeStore.swift; sourceTree = "<group>"; };
 		AA0000010000000000000014 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
 		AA0000010000000000000015 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -78,12 +102,13 @@
 		AA0000010000000000000025 /* FormulaCompactFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormulaCompactFields.swift; sourceTree = "<group>"; };
 		AA0000010000000000000026 /* BakingDragPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingDragPayload.swift; sourceTree = "<group>"; };
 		AA0000010000000000000027 /* RecipeSourcePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeSourcePickerView.swift; sourceTree = "<group>"; };
+		AA0000010000000000000215 /* AIRecipeImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRecipeImportView.swift; sourceTree = "<group>"; };
 		AA0000010000000000000028 /* BakeRecipePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakeRecipePickerView.swift; sourceTree = "<group>"; };
 		AA0000010000000000000029 /* StepSharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepSharedComponents.swift; sourceTree = "<group>"; };
 		AA000001000000000000002A /* StarterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterView.swift; sourceTree = "<group>"; };
 		AA000001000000000000003A /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
-		AA000001000000000000003B /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		AA000001000000000000003C /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		AA000001000000000000003B /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = ../en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		AA000001000000000000003C /* Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Localizable.strings; path = "../zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		AA000001000000000000003D /* BakingNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingNotificationService.swift; sourceTree = "<group>"; };
 		AA000001000000000000003E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA0000010000000000000201 /* AppNavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationController.swift; sourceTree = "<group>"; };
@@ -104,6 +129,14 @@
 		AA0000010000000000000210 /* InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = InfoPlist.strings; path = ../en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		AA0000010000000000000211 /* InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = InfoPlist.strings; path = "../zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		AA0000010000000000000212 /* BakingLibraryListShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingLibraryListShell.swift; sourceTree = "<group>"; };
+		AA0000010000000000000213 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		AB0000010000000000000011 /* BakingAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BakingAnalytics.swift; sourceTree = "<group>"; };
+		AB0000010000000000000013 /* AppLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogger.swift; sourceTree = "<group>"; };
+		AB0000010000000000000014 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
+		AB0000010000000000000012 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		FB0000010000000000000011 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		BB0000010000000000000011 /* RecipeExchangeSchemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeExchangeSchemaTests.swift; sourceTree = "<group>"; };
+		BB0000010000000000000012 /* BakingJournalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BakingJournalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000010000000000000501 /* INGREDIENT_LIBRARY_AND_SYNC_PLAN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = INGREDIENT_LIBRARY_AND_SYNC_PLAN.md; sourceTree = "<group>"; };
 		AA0000010000000000000502 /* IOS_CRASH_TESTING_PLAN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IOS_CRASH_TESTING_PLAN.md; sourceTree = "<group>"; };
 		AA0000010000000000000503 /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
@@ -123,6 +156,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FB0000010000000000000002 /* FirebaseAnalyticsCore in Frameworks */,
+				FB0000010000000000000003 /* FirebaseCrashlytics in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000010000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -133,6 +175,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000010000000000000031 /* BakingJournal */,
+				BB0000010000000000000030 /* BakingJournalTests */,
 				AA0000010000000000000500 /* docs */,
 				AA0000010000000000000032 /* Products */,
 			);
@@ -140,16 +183,18 @@
 		};
 		AA0000010000000000000031 /* BakingJournal */ = {
 			isa = PBXGroup;
-			children = (
-				FF4268B72FD3E64C002F21C0 /* designs */,
-				AA0000010000000000000401 /* App */,
-				AA0000010000000000000402 /* Core */,
-				AA0000010000000000000403 /* Features */,
-				AA0000010000000000000404 /* SharedUI */,
-				AA0000010000000000000036 /* Localization */,
-				AA000001000000000000003E /* Info.plist */,
-				AA000001000000000000001B /* Assets.xcassets */,
-			);
+				children = (
+					FF4268B72FD3E64C002F21C0 /* designs */,
+					AA0000010000000000000401 /* App */,
+					AA0000010000000000000402 /* Core */,
+					AA0000010000000000000403 /* Features */,
+					AA0000010000000000000404 /* SharedUI */,
+					AA0000010000000000000036 /* Localization */,
+					AA000001000000000000003E /* Info.plist */,
+					AB0000010000000000000012 /* PrivacyInfo.xcprivacy */,
+					FB0000010000000000000011 /* GoogleService-Info.plist */,
+					AA000001000000000000001B /* Assets.xcassets */,
+				);
 			path = BakingJournal;
 			sourceTree = "<group>";
 		};
@@ -157,6 +202,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000010000000000000010 /* BakingJournal.app */,
+				BB0000010000000000000012 /* BakingJournalTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -165,6 +211,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000010000000000000012 /* BakingModels.swift */,
+				AA0000010000000000000214 /* RecipeExchangeSchema.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -175,6 +222,15 @@
 				AA0000010000000000000013 /* RecipeStore.swift */,
 			);
 			path = Store;
+			sourceTree = "<group>";
+		};
+		AB0000010000000000000021 /* Analytics */ = {
+			isa = PBXGroup;
+			children = (
+				AB0000010000000000000011 /* BakingAnalytics.swift */,
+				AB0000010000000000000013 /* AppLogger.swift */,
+			);
+			path = Analytics;
 			sourceTree = "<group>";
 		};
 		AA0000010000000000000036 /* Localization */ = {
@@ -202,6 +258,8 @@
 		AA0000010000000000000402 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				AB0000010000000000000014 /* AppInfo.swift */,
+				AB0000010000000000000021 /* Analytics */,
 				AA0000010000000000000033 /* Models */,
 				AA0000010000000000000034 /* Store */,
 				AA000001000000000000040A /* Formatting */,
@@ -213,6 +271,7 @@
 		AA0000010000000000000403 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				AA0000010000000000000415 /* Onboarding */,
 				AA000001000000000000040C /* Home */,
 				AA000001000000000000040D /* RecipeFormula */,
 				AA000001000000000000040E /* RecipeSteps */,
@@ -290,6 +349,7 @@
 				AA0000010000000000000025 /* FormulaCompactFields.swift */,
 				AA0000010000000000000026 /* BakingDragPayload.swift */,
 				AA0000010000000000000027 /* RecipeSourcePickerView.swift */,
+				AA0000010000000000000215 /* AIRecipeImportView.swift */,
 				AA0000010000000000000017 /* ItemEditorView.swift */,
 			);
 			path = RecipeFormula;
@@ -354,6 +414,14 @@
 			path = EmptyState;
 			sourceTree = "<group>";
 		};
+		AA0000010000000000000415 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000010000000000000213 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
 		AA0000010000000000000500 /* docs */ = {
 			isa = PBXGroup;
 			children = (
@@ -385,6 +453,14 @@
 			path = gestures;
 			sourceTree = "<group>";
 		};
+		BB0000010000000000000030 /* BakingJournalTests */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000010000000000000011 /* RecipeExchangeSchemaTests.swift */,
+			);
+			path = BakingJournalTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -395,6 +471,7 @@
 				AA0000010000000000000041 /* Sources */,
 				AA0000010000000000000020 /* Frameworks */,
 				AA0000010000000000000042 /* Resources */,
+				FB0000010000000000000031 /* Upload Crashlytics dSYMs */,
 			);
 			buildRules = (
 			);
@@ -404,9 +481,31 @@
 				FF4268B72FD3E64C002F21C0 /* designs */,
 			);
 			name = BakingJournal;
+			packageProductDependencies = (
+				FB0000010000000000000021 /* FirebaseAnalyticsCore */,
+				FB0000010000000000000022 /* FirebaseCrashlytics */,
+			);
 			productName = BakingJournal;
 			productReference = AA0000010000000000000010 /* BakingJournal.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BB0000010000000000000040 /* BakingJournalTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB0000010000000000000070 /* Build configuration list for PBXNativeTarget "BakingJournalTests" */;
+			buildPhases = (
+				BB0000010000000000000021 /* Sources */,
+				BB0000010000000000000020 /* Frameworks */,
+				BB0000010000000000000022 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BB0000010000000000000041 /* PBXTargetDependency */,
+			);
+			name = BakingJournalTests;
+			productName = BakingJournalTests;
+			productReference = BB0000010000000000000012 /* BakingJournalTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -421,6 +520,10 @@
 					AA0000010000000000000040 = {
 						CreatedOnToolsVersion = 26.0;
 					};
+					BB0000010000000000000040 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = AA0000010000000000000040;
+					};
 				};
 			};
 			buildConfigurationList = AA0000010000000000000060 /* Build configuration list for PBXProject "BakingJournal" */;
@@ -434,11 +537,15 @@
 			);
 			mainGroup = AA0000010000000000000030;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FB0000010000000000000020 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			productRefGroup = AA0000010000000000000032 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				AA0000010000000000000040 /* BakingJournal */,
+				BB0000010000000000000040 /* BakingJournalTests */,
 			);
 		};
 /* End PBXProject section */
@@ -449,12 +556,50 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA000001000000000000000C /* Assets.xcassets in Resources */,
-				AA0000010000000000000310 /* InfoPlist.strings in Resources */,
-				AA0000010000000000000311 /* InfoPlist.strings in Resources */,
+					AA0000010000000000000316 /* Localizable.strings in Resources */,
+					AA0000010000000000000317 /* Localizable.strings in Resources */,
+					AA0000010000000000000310 /* InfoPlist.strings in Resources */,
+					AA0000010000000000000311 /* InfoPlist.strings in Resources */,
+					AB0000010000000000000002 /* PrivacyInfo.xcprivacy in Resources */,
+					FB0000010000000000000001 /* GoogleService-Info.plist in Resources */,
+				);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000010000000000000022 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FB0000010000000000000031 /* Upload Crashlytics dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			name = "Upload Crashlytics dSYMs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		AA0000010000000000000041 /* Sources */ = {
@@ -463,6 +608,7 @@
 			files = (
 				AA0000010000000000000001 /* BakingJournalApp.swift in Sources */,
 				AA0000010000000000000002 /* BakingModels.swift in Sources */,
+				AA0000010000000000000314 /* RecipeExchangeSchema.swift in Sources */,
 				AA0000010000000000000003 /* RecipeStore.swift in Sources */,
 				AA0000010000000000000004 /* Formatters.swift in Sources */,
 				AA0000010000000000000005 /* RootView.swift in Sources */,
@@ -482,6 +628,7 @@
 				AA0000010000000000000114 /* FormulaCompactFields.swift in Sources */,
 				AA0000010000000000000115 /* BakingDragPayload.swift in Sources */,
 				AA0000010000000000000116 /* RecipeSourcePickerView.swift in Sources */,
+				AA0000010000000000000315 /* AIRecipeImportView.swift in Sources */,
 				AA0000010000000000000117 /* BakeRecipePickerView.swift in Sources */,
 				AA0000010000000000000118 /* StepSharedComponents.swift in Sources */,
 				AA0000010000000000000119 /* L10n.swift in Sources */,
@@ -503,10 +650,30 @@
 				AA000001000000000000030E /* BakeRecordDetailView.swift in Sources */,
 				AA000001000000000000030F /* KitchenTimerView.swift in Sources */,
 				AA0000010000000000000312 /* BakingLibraryListShell.swift in Sources */,
+				AA0000010000000000000313 /* OnboardingView.swift in Sources */,
+				AB0000010000000000000001 /* BakingAnalytics.swift in Sources */,
+				AB0000010000000000000003 /* AppLogger.swift in Sources */,
+				AB0000010000000000000004 /* AppInfo.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000010000000000000021 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB0000010000000000000001 /* RecipeExchangeSchemaTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BB0000010000000000000041 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA0000010000000000000040 /* BakingJournal */;
+			targetProxy = BB0000010000000000000042 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AA0000010000000000000061 /* Debug */ = {
@@ -542,7 +709,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -636,7 +803,11 @@
 				INFOPLIST_FILE = BakingJournal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hang.BakingJournal;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.openbakery.bready;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -659,12 +830,66 @@
 				INFOPLIST_FILE = BakingJournal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hang.BakingJournal;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.openbakery.bready;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BB0000010000000000000071 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J37J65KDUY;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openbakery.bready.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BakingJournal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BakingJournal";
+			};
+			name = Debug;
+		};
+		BB0000010000000000000072 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J37J65KDUY;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openbakery.bready.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BakingJournal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BakingJournal";
 			};
 			name = Release;
 		};
@@ -689,7 +914,40 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		BB0000010000000000000070 /* Build configuration list for PBXNativeTarget "BakingJournalTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0000010000000000000071 /* Debug */,
+				BB0000010000000000000072 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FB0000010000000000000020 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.14.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FB0000010000000000000021 /* FirebaseAnalyticsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB0000010000000000000020 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsCore;
+		};
+		FB0000010000000000000022 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB0000010000000000000020 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = AA0000010000000000000050 /* Project object */;
 }
