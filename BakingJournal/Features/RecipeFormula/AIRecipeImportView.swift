@@ -1,56 +1,62 @@
 import SwiftUI
-import UIKit
+import UniformTypeIdentifiers
 
 struct AIRecipeImportView: View {
     @EnvironmentObject private var navigationController: AppNavigationController
     @EnvironmentObject private var store: RecipeStore
-    @State private var jsonText = ""
-    @State private var copiedMessage: String?
+    @State private var importingRecipe = false
     @State private var importError: String?
+    @State private var showingImportSuccess = false
+    @State private var importFeedbackTask: Task<Void, Never>?
 
     var body: some View {
-        VStack(spacing: 0) {
-            BakingTopActionRow(leading: {
-                if navigationController.canGoBack {
-                    BakingIconButton(
-                        icon: .back,
-                        accessibilityLabel: BakingTerms.back
-                    ) {
-                        navigationController.goBack()
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                BakingTopActionRow(leading: {
+                    if navigationController.canGoBack {
+                        BakingIconButton(
+                            icon: .back,
+                            accessibilityLabel: BakingTerms.back
+                        ) {
+                            navigationController.goBack()
+                        }
                     }
-                }
-            })
+                })
 
-            ScrollView {
-                LazyVStack(spacing: BakingSpace.lg) {
-                    tutorialCard
-                    promptCard
-                    jsonInputCard
+                ScrollView {
+                    LazyVStack(spacing: BakingSpace.lg) {
+                        tutorialCard
+                        fileCard
+                    }
+                    .padding(.horizontal, BakingLayout.screenHorizontalInset)
+                    .padding(.top, BakingLayout.contentTopInset)
+                    .padding(.bottom, BakingSpace.xxl)
                 }
-                .padding(.horizontal, BakingLayout.screenHorizontalInset)
-                .padding(.top, BakingLayout.contentTopInset)
-                .padding(.bottom, BakingSpace.xxl)
             }
-            .scrollDismissesKeyboard(.interactively)
-        }
-        .safeAreaInset(edge: .bottom) {
-            BakingBottomActionButton(
-                title: BakingTerms.aiRecipeImportAction,
-                accessibilityLabel: BakingTerms.aiRecipeImportAction,
-                state: canImport ? .normal : .disabled
-            ) {
-                importRecipe()
+            .safeAreaInset(edge: .bottom) {
+                BakingBottomActionButton(
+                    title: BakingTerms.recipeImportSelectFileAction,
+                    accessibilityLabel: BakingTerms.recipeImportSelectFileAction
+                ) {
+                    importingRecipe = true
+                }
+            }
+            .background(Color.brandBackground)
+            .fileImporter(
+                isPresented: $importingRecipe,
+                allowedContentTypes: [.json]
+            ) { result in
+                importRecipe(result)
+            }
+
+            if showingImportSuccess {
+                BakingTransientStatusToast(title: BakingTerms.recipeImportSucceeded)
+                    .padding(.top, BakingSpace.lg)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(10)
             }
         }
-        .background(Color.brandBackground)
-        .alert(BakingTerms.copiedToClipboard, isPresented: Binding(
-            get: { copiedMessage != nil },
-            set: { if !$0 { copiedMessage = nil } }
-        )) {
-            Button(BakingTerms.ok, role: .cancel) { copiedMessage = nil }
-        } message: {
-            Text(copiedMessage ?? "")
-        }
+        .animation(BakingMotion.quick, value: showingImportSuccess)
         .alert(BakingTerms.aiRecipeImportFailedTitle, isPresented: Binding(
             get: { importError != nil },
             set: { if !$0 { importError = nil } }
@@ -59,85 +65,68 @@ struct AIRecipeImportView: View {
         } message: {
             Text(importError ?? "")
         }
-    }
-
-    private var canImport: Bool {
-        !jsonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        .onDisappear {
+            importFeedbackTask?.cancel()
+        }
     }
 
     private var tutorialCard: some View {
         BakingSectionCard(title: BakingTerms.aiRecipeImportTutorialTitle) {
             VStack(alignment: .leading, spacing: BakingSpace.md) {
-                tutorialRow(number: "1", text: BakingTerms.aiRecipeImportTutorialCopyPrompt)
-                tutorialRow(number: "2", text: BakingTerms.aiRecipeImportTutorialUseAI)
-                tutorialRow(number: "3", text: BakingTerms.aiRecipeImportTutorialPasteJSON)
+                RecipeTransferInstructionRow(number: "1", text: BakingTerms.recipeImportTutorialChooseFile)
+                RecipeTransferInstructionRow(number: "2", text: BakingTerms.recipeImportTutorialLoadRecipe)
+                RecipeTransferInstructionRow(number: "3", text: BakingTerms.recipeImportTutorialEditAfterImport)
             }
             .padding(.horizontal, BakingSpace.md)
             .padding(.bottom, BakingSpace.md)
         }
     }
 
-    private var promptCard: some View {
-        BakingSectionCard(title: BakingTerms.aiRecipeImportPromptTitle) {
-            VStack(spacing: BakingSpace.md) {
-                Text(BakingTerms.aiRecipeImportPromptPreview)
-                    .font(BakingTypography.appPrimaryText)
-                    .foregroundStyle(Color.brandSecondaryText)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(BakingSpace.md)
-                    .bakingInsetSurface()
-
-                BakingActionButton(
-                    title: BakingTerms.aiRecipeImportCopyPrompt,
-                    accessibilityLabel: BakingTerms.aiRecipeImportCopyPrompt,
-                    icon: .copy,
-                    role: .secondary
-                ) {
-                    UIPasteboard.general.string = BakingTerms.aiRecipeImportPrompt
-                    copiedMessage = BakingTerms.aiRecipeImportPromptCopied
-                }
-            }
-            .padding(.horizontal, BakingSpace.md)
-            .padding(.bottom, BakingSpace.md)
-        }
-    }
-
-    private var jsonInputCard: some View {
-        BakingSectionCard(title: BakingTerms.aiRecipeImportJSONTitle) {
-            BakingMultilineTextEditor(text: $jsonText)
-                .frame(minHeight: 240)
-                .padding(10)
+    private var fileCard: some View {
+        BakingSectionCard(title: BakingTerms.recipeImportFileTitle) {
+            Text(BakingTerms.recipeImportFileDescription)
+                .font(BakingTypography.appPrimaryText)
+                .foregroundStyle(Color.brandSecondaryText)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(BakingSpace.md)
                 .bakingInsetSurface()
-                .accessibilityLabel(BakingTerms.aiRecipeImportJSONAccessibility)
                 .padding(.horizontal, BakingSpace.md)
                 .padding(.bottom, BakingSpace.md)
         }
     }
 
-    private func tutorialRow(number: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: BakingSpace.sm) {
-            Text(number)
-                .font(BakingTypography.iconCaption)
-                .foregroundStyle(Color.brandPrimary)
-                .frame(width: 22, height: 22)
-                .bakingSurface(.readOnly)
-                .accessibilityHidden(true)
-
-            Text(text)
-                .font(BakingTypography.appPrimaryText)
-                .foregroundStyle(Color.brandText)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private func importRecipe(_ result: Result<URL, Error>) {
+        do {
+            let url = try result.get()
+            let hasAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if hasAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+            let data = try Data(contentsOf: url)
+            try store.importRecipeData(data)
+            showImportSuccess()
+        } catch {
+            importError = error.localizedDescription
         }
     }
 
-    private func importRecipe() {
-        do {
-            _ = try store.importRecipeExchangeJSONString(jsonText)
+    private func showImportSuccess() {
+        importFeedbackTask?.cancel()
+
+        withAnimation(BakingMotion.quick) {
+            showingImportSuccess = true
+        }
+
+        importFeedbackTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.0))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                showingImportSuccess = false
+            }
             navigationController.push(.recipeWorkspace(.formula))
-        } catch {
-            importError = error.localizedDescription
         }
     }
 }

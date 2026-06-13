@@ -10,6 +10,7 @@ final class RecipeExchangeSchemaTests: XCTestCase {
 
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: "baking-journal-ios:state")
+        AppLanguage.english.save()
         super.tearDown()
     }
 
@@ -41,6 +42,30 @@ final class RecipeExchangeSchemaTests: XCTestCase {
         XCTAssertEqual(imported.workflowState, .draft)
     }
 
+    func testTemplateRecipeSavesAsReady() {
+        let store = makeStore()
+
+        store.applyTemplate(.toast)
+        store.saveCurrentRecipe()
+
+        XCTAssertEqual(store.savedRecipes.first?.workflowState, .ready)
+        XCTAssertTrue(store.isReadyToBake)
+    }
+
+    func testSimpleDraftRecipeCanStartBakeWhenItHasStepContent() throws {
+        let store = makeStore()
+
+        store.applyTemplate(.toast)
+        store.markDraft()
+        store.saveCurrentRecipe()
+
+        let savedRecipe = try XCTUnwrap(store.savedRecipes.first)
+        XCTAssertEqual(savedRecipe.workflowState, .draft)
+        XCTAssertTrue(store.isReadyToBake(savedRecipe))
+        XCTAssertTrue(store.startNewBake())
+        XCTAssertNotNil(store.activeBakeRecordID)
+    }
+
     func testImportsStarterEggFoldPlanAndMaterialAllocations() throws {
         let imported = try makeStore().importRecipeExchangeJSONString(Self.richRecipeJSON)
 
@@ -70,6 +95,31 @@ final class RecipeExchangeSchemaTests: XCTestCase {
         XCTAssertEqual(imported.name, "Minimal Bread")
         XCTAssertEqual(imported.items.count, 1)
         XCTAssertEqual(imported.steps.count, 1)
+    }
+
+    func testExportWritesUTF8AndLocalizesKnownEnglishIngredientNames() throws {
+        AppLanguage.simplifiedChinese.save()
+        let store = makeStore()
+        store.applyTemplate(.countryBread)
+        store.items[0].name = "Bread Flour"
+
+        let data = try store.exportCurrentRecipeExchangeData()
+        XCTAssertTrue(data.starts(with: Data.utf8ByteOrderMark))
+
+        let json = try XCTUnwrap(String(data: data.removingUTF8ByteOrderMark(), encoding: .utf8))
+        XCTAssertTrue(json.contains("\"name\" : \"高粉\""))
+        XCTAssertFalse(json.contains("\"name\" : \"Bread Flour\""))
+
+        let document = try RecipeExchangeDocumentV1.decode(from: data)
+        XCTAssertEqual(document.recipe.ingredients.first?.name, "高粉")
+    }
+
+    func testImportLocalizesKnownEnglishIngredientNamesForCurrentLanguage() throws {
+        AppLanguage.simplifiedChinese.save()
+
+        let imported = try makeStore().importRecipeExchangeJSONString(Self.minimalRecipeJSON)
+
+        XCTAssertEqual(imported.items.first?.name, "高粉")
     }
 
     func testRejectsUnsupportedVersion() {

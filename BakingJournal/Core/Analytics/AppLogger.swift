@@ -3,7 +3,7 @@ import Foundation
 import OSLog
 
 enum AppLogger {
-    private static let subsystem = "com.openbakery.bready"
+    private static let subsystem = "com.openbakery.toastmark"
 
     static func configureCrashContext(appInfo: AppInfo = .current) {
         let crashlytics = Crashlytics.crashlytics()

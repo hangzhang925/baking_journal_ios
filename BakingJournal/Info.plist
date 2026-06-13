@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bready</string>
+	<string>Toastmark</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,9 +25,9 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.food-and-drink</string>
 	<key>NSAlarmKitUsageDescription</key>
-	<string>Bready uses alarms to alert you when a kitchen timer finishes.</string>
+	<string>Toastmark uses alarms to alert you when a kitchen timer finishes.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Bready saves recipe long images to your photo library.</string>
+	<string>Toastmark saves recipe long images to your photo library.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>
@@ -53,9 +53,9 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Bready Step Material Payload</string>
+			<string>Toastmark Step Material Payload</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.openbakery.bready.step-material</string>
+			<string>com.openbakery.toastmark.step-material</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

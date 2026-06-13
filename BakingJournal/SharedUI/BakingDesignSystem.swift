@@ -1497,7 +1497,7 @@ struct BakingSegmentedStageControl: View {
         let textWidth = (option.title as NSString).size(withAttributes: [
             .font: BakingTypography.stageTabLabelUIFont
         ]).width
-        return ceil(iconSize + BakingSpace.xs + textWidth + BakingSpace.xs)
+        return ceil(iconSize + BakingSpace.xxs + textWidth + BakingSpace.xs)
     }
 }
 
@@ -1513,7 +1513,7 @@ private struct BakingSegmentedStageButtonLabel: View {
         let labelColor = isSelected ? BakingNavigationItemTheme.selectedTextColor : BakingNavigationItemTheme.defaultTextColor
 
         VStack(spacing: BakingSpace.xxs) {
-            HStack(spacing: BakingSpace.xs) {
+            HStack(spacing: BakingSpace.xxs) {
                 stageIcon(option.icon, tint: tint, variant: isSelected ? .selected : .outline)
                     .frame(
                         width: iconSize,
