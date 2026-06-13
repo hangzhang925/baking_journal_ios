@@ -749,7 +749,7 @@ enum BakingTerms {
     }
 
     static var starterProfileDefaultName: String { L10n.tr("starter_profile.default_name", default: "酵种") }
-    static var starterTabTitle: String { L10n.tr("starter_profile.tab.title", default: "酵种") }
+    static var starterTabTitle: String { L10n.tr("starter_profile.tab.title", default: "种面") }
     static var starterSectionName: String { L10n.tr("starter_profile.section.name", default: "名称") }
     static var starterSectionContainer: String { L10n.tr("starter_profile.section.container", default: "容器") }
     static var starterSectionWeight: String { L10n.tr("starter_profile.section.weight", default: "重量") }
