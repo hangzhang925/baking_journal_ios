@@ -172,8 +172,8 @@
 "home.section.review_notes" = "复盘备注";
 "home.active_bake.progress" = "进行到第 %d/%d 步 · %@";
 "workspace.stage.preview" = "预览";
-"workspace.stage.formula" = "面团";
-"workspace.stage.steps" = "流程";
+"workspace.stage.formula" = "材料";
+"workspace.stage.steps" = "制作";
 "workspace.stage.history" = "记录";
 "workspace.stage.picker" = "编辑阶段";
 "formula.item.missing" = "这个材料已经不存在了";
@@ -226,7 +226,7 @@
 "bake_picker.replace_active.message" = "现在有一个正在制作的烘焙。开始新的烘焙会替换当前进度。";
 "bake_picker.replace_active.confirm" = "开始新的烘焙";
 "starter_profile.default_name" = "酵种";
-"starter_profile.tab.title" = "酵种";
+"starter_profile.tab.title" = "种面";
 "starter_profile.section.name" = "名称";
 "starter_profile.section.container" = "容器";
 "starter_profile.section.weight" = "重量";
