@@ -1,6 +1,6 @@
 # Analytics Event Schema
 
-This document is the source of truth for Firebase Analytics / GA4 events emitted by Bready.
+This document is the source of truth for Firebase Analytics / GA4 events emitted by Toastmark.
 
 ## Naming Rules
 
@@ -27,7 +27,7 @@ Custom events should only carry product-specific parameters. Firebase / GA4 auto
 | --- | --- | --- |
 | App instance identifier | `user_pseudo_id` | Pseudonymous app-instance identifier. Do not send your own device ID. |
 | Platform | `platform` | For this app, expected value is `IOS`. |
-| Bundle ID | `app_info.id` | Expected value is `com.openbakery.bready`. |
+| Bundle ID | `app_info.id` | Expected value is `com.openbakery.toastmark`. |
 | Firebase app ID | `app_info.firebase_app_id` | Comes from `GoogleService-Info.plist`. |
 | App version | `app_info.version` | The app short bundle version. |
 | Device category | `device.category` | Example values include mobile and tablet. |

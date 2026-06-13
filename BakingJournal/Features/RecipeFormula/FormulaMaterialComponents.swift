@@ -377,7 +377,7 @@ struct FormulaRowReorderValue {
 }
 
 private struct FormulaRowInteractionSurface: UIViewRepresentable {
-    private static let log = Logger(subsystem: "com.openbakery.bready", category: "FormulaReorder")
+    private static let log = Logger(subsystem: "com.openbakery.toastmark", category: "FormulaReorder")
 
     let minimumPressDuration: TimeInterval
     var onTap: () -> Void

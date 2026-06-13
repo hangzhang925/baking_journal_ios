@@ -3,7 +3,7 @@ import UIKit
 import OSLog
 
 struct StepsView: View {
-    private static let reorderLog = Logger(subsystem: "com.openbakery.bready", category: "StepsReorder")
+    private static let reorderLog = Logger(subsystem: "com.openbakery.toastmark", category: "StepsReorder")
 
     @Environment(\.historySwipeSuppressionHandler) private var setHistorySwipeSuppressed
     @EnvironmentObject private var store: RecipeStore
@@ -2664,7 +2664,7 @@ private struct StepRowReorderValue {
 }
 
 private struct StepRowInteractionSurface: UIViewRepresentable {
-    private static let log = Logger(subsystem: "com.openbakery.bready", category: "StepsReorder")
+    private static let log = Logger(subsystem: "com.openbakery.toastmark", category: "StepsReorder")
 
     let minimumPressDuration: TimeInterval
     var onTap: () -> Void

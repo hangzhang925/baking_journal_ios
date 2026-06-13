@@ -438,7 +438,7 @@ private struct SettingsTabView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
     @State private var showingLanguageDropdown = false
     @State private var showingOnboardingTutorial = false
-    @State private var showingAboutBready = false
+    @State private var showingAboutToastmark = false
 
     var body: some View {
         BakingLibraryList {
@@ -490,10 +490,10 @@ private struct SettingsTabView: View {
             }
             .listRowBackground(BakingSurface.rowBackground)
 
-            // Keep About Bready as the final settings entry.
+            // Keep About Toastmark as the final settings entry.
             Section {
                 Button {
-                    showingAboutBready = true
+                    showingAboutToastmark = true
                 } label: {
                     SettingsNavigationRow(
                         icon: .settings,
@@ -514,8 +514,8 @@ private struct SettingsTabView: View {
             }
             .presentationBackground(Color.brandBackground)
         }
-        .sheet(isPresented: $showingAboutBready) {
-            SettingsAboutBreadyView()
+        .sheet(isPresented: $showingAboutToastmark) {
+            SettingsAboutToastmarkView()
                 .presentationDragIndicator(.visible)
         }
     }
@@ -542,7 +542,7 @@ private struct SettingsTabView: View {
     }
 }
 
-private struct SettingsAboutBreadyView: View {
+private struct SettingsAboutToastmarkView: View {
     var body: some View {
         NavigationStack {
             Form {

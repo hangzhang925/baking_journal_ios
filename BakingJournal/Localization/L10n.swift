@@ -264,7 +264,7 @@ enum BakingTerms {
     static var bakeSortStartedOldest: String { L10n.tr("bake_library.filter.started_sort.oldest", default: "最早开始优先") }
     static var noMatchingBakeRecords: String { L10n.tr("bake_library.empty.no_matching_records", default: "没有匹配的烘焙记录") }
     static var settingsSectionTools: String { L10n.tr("settings.section.tools", default: "工具") }
-    static var settingsLanguageTitle: String { L10n.tr("settings.language.title", default: "语言") }
+    static var settingsLanguageTitle: String { L10n.tr("settings.language.title", default: "语言 Language") }
     static var settingsLanguageOpenAccessibility: String {
         L10n.tr("settings.language.action.open", default: "选择语言")
     }
@@ -275,23 +275,23 @@ enum BakingTerms {
         L10n.tr("settings.language.option.system", default: "跟随系统")
     }
     static var settingsLanguageEnglishOption: String {
-        L10n.tr("settings.language.option.english", default: "英语")
+        L10n.tr("settings.language.option.english", default: "英文 English")
     }
     static var settingsLanguageSimplifiedChineseOption: String {
-        L10n.tr("settings.language.option.zh_hans", default: "简体中文")
+        L10n.tr("settings.language.option.zh_hans", default: "中文 Chinese")
     }
     static var settingsTimerDetail: String { L10n.tr("settings.timer.detail", default: "独立计时器，适合烘烤、发酵和醒发提醒") }
     static var settingsTutorialTitle: String { L10n.tr("settings.tutorial.title", default: "新手教程") }
     static var settingsTutorialOpenAccessibility: String {
         L10n.tr("settings.tutorial.action.open", default: "打开新手教程")
     }
-    static var settingsAboutTitle: String { L10n.tr("settings.about.title", default: "关于 Bready") }
-    static var settingsAboutOpenAccessibility: String { L10n.tr("settings.about.action.open", default: "打开关于 Bready") }
+    static var settingsAboutTitle: String { L10n.tr("settings.about.title", default: "关于 Toastmark") }
+    static var settingsAboutOpenAccessibility: String { L10n.tr("settings.about.action.open", default: "打开关于 Toastmark") }
     static var settingsAboutFeedbackMessage: String {
-        L10n.tr("settings.about.feedback_message", default: "欢迎提交 feedback，帮助我们把 Bready 做得更好。")
+        L10n.tr("settings.about.feedback_message", default: "欢迎提交 feedback，帮助我们把 Toastmark 做得更好。")
     }
     static var settingsAboutLocalDataMessage: String {
-        L10n.tr("settings.about.local_data_message", default: "目前，你在 Bready 中记录的配方、烘焙记录和酵种等数据都保存在本地，不会上传到我们的服务器。")
+        L10n.tr("settings.about.local_data_message", default: "目前，你在 Toastmark 中记录的配方、烘焙记录和酵种等数据都保存在本地，不会上传到我们的服务器。")
     }
     static var settingsAboutVersion: String { L10n.tr("settings.about.version", default: "版本") }
     static var settingsAboutVersionUnavailable: String {
@@ -308,8 +308,8 @@ enum BakingTerms {
     static var stepCount: String { L10n.tr("home.label.step_count", default: "步骤数") }
     static var reviewNotes: String { L10n.tr("home.section.review_notes", default: "复盘备注") }
     static var workspaceStagePreview: String { L10n.tr("workspace.stage.preview", default: "预览") }
-    static var workspaceStageFormula: String { L10n.tr("workspace.stage.formula", default: "材料") }
-    static var workspaceStageSteps: String { L10n.tr("workspace.stage.steps", default: "制作") }
+    static var workspaceStageFormula: String { L10n.tr("workspace.stage.formula", default: "面团") }
+    static var workspaceStageSteps: String { L10n.tr("workspace.stage.steps", default: "流程") }
     static var workspaceStageHistory: String { L10n.tr("workspace.stage.history", default: "记录") }
     static var workspaceStagePicker: String { L10n.tr("workspace.stage.picker", default: "编辑阶段") }
     static var formulaItemMissing: String { L10n.tr("formula.item.missing", default: "这个材料已经不存在了") }
@@ -326,7 +326,7 @@ enum BakingTerms {
     static var recipeSourceTemplatesSection: String { L10n.tr("recipe_source.section.templates", default: "模板") }
     static var recipeSourceExistingSection: String { L10n.tr("recipe_source.section.existing", default: "从已有配方开始") }
     static var recipeSourceCustom: String { L10n.tr("recipe_source.action.custom", default: "自定义") }
-    static var aiRecipeImportEntry: String { L10n.tr("recipe_import_ai.entry", default: "从 AI 导入") }
+    static var aiRecipeImportEntry: String { L10n.tr("recipe_import_ai.entry", default: "导入") }
     static var aiRecipeImportTutorialTitle: String { L10n.tr("recipe_import_ai.tutorial.title", default: "导入流程") }
     static var aiRecipeImportTutorialCopyPrompt: String {
         L10n.tr("recipe_import_ai.tutorial.copy_prompt", default: "复制下面的提示词。")
@@ -339,7 +339,7 @@ enum BakingTerms {
     }
     static var aiRecipeImportPromptTitle: String { L10n.tr("recipe_import_ai.prompt.title", default: "AI 提示词") }
     static var aiRecipeImportPromptPreview: String {
-        L10n.tr("recipe_import_ai.prompt.preview", default: "让 AI 只返回 Bready 可识别的配方 JSON。")
+        L10n.tr("recipe_import_ai.prompt.preview", default: "让 AI 只返回 Toastmark 可识别的配方 JSON。")
     }
     static var aiRecipeImportCopyPrompt: String { L10n.tr("recipe_import_ai.action.copy_prompt", default: "复制提示词") }
     static var aiRecipeImportPromptCopied: String {
@@ -351,9 +351,30 @@ enum BakingTerms {
     }
     static var aiRecipeImportAction: String { L10n.tr("recipe_import_ai.action.import", default: "导入配方") }
     static var aiRecipeImportFailedTitle: String { L10n.tr("recipe_import_ai.alert.failed", default: "导入失败") }
+    static var recipeImportTutorialChooseFile: String {
+        L10n.tr("recipe_import.file_tutorial.choose_file", default: "从本地文件中选择之前导出的配方文件。")
+    }
+    static var recipeImportTutorialLoadRecipe: String {
+        L10n.tr("recipe_import.file_tutorial.load_recipe", default: "Toastmark 会读取文件内容，并把配方加载到当前编辑流程。")
+    }
+    static var recipeImportTutorialEditAfterImport: String {
+        L10n.tr("recipe_import.file_tutorial.edit_after_import", default: "导入成功后可以继续调整材料、步骤和备注。")
+    }
+    static var recipeImportFileTitle: String {
+        L10n.tr("recipe_import.file.title", default: "本地文件")
+    }
+    static var recipeImportFileDescription: String {
+        L10n.tr("recipe_import.file.description", default: "请选择 Toastmark 导出的 JSON 配方文件。文件只会在本机读取，用于恢复或迁移配方。")
+    }
+    static var recipeImportSelectFileAction: String {
+        L10n.tr("recipe_import.action.select_file", default: "选择文件")
+    }
+    static var recipeImportSucceeded: String {
+        L10n.tr("recipe_import.status.succeeded", default: "导入成功")
+    }
     static var aiRecipeImportPrompt: String {
         L10n.tr("recipe_import_ai.prompt.full", default: """
-        请把我提供的烘焙配方图片或文字整理成 Bready 可导入的 JSON。
+        请把我提供的烘焙配方图片或文字整理成 Toastmark 可导入的 JSON。
 
         只输出 JSON，不要输出 Markdown、代码块或解释。
         使用 schema: "bready.recipe"，schemaVersion: 1。
@@ -406,7 +427,7 @@ enum BakingTerms {
         L10n.tr("recipe_import.error.invalid_json", default: "没有识别到有效 JSON。")
     }
     static var recipeImportErrorInvalidSchema: String {
-        L10n.tr("recipe_import.error.invalid_schema", default: "这个文件不是 Bready 配方 JSON。")
+        L10n.tr("recipe_import.error.invalid_schema", default: "这个文件不是 Toastmark 配方 JSON。")
     }
     static func recipeImportErrorUnsupportedVersion(_ version: Int) -> String {
         L10n.format("recipe_import.error.unsupported_version", default: "暂不支持 schemaVersion %d。", version)
@@ -640,6 +661,7 @@ enum BakingTerms {
     static var kitchenTimerStopAccessibility: String {
         L10n.tr("kitchen_timer.action.stop", default: "停止计时")
     }
+    static var kitchenTimerAlarmTime: String { L10n.tr("kitchen_timer.label.alarm_time", default: "响铃时间") }
     static var kitchenTimerHours: String { L10n.tr("kitchen_timer.unit.hours", default: "小时") }
     static var kitchenTimerMinutes: String { L10n.tr("kitchen_timer.unit.minutes", default: "分钟") }
     static var kitchenTimerSeconds: String { L10n.tr("kitchen_timer.unit.seconds", default: "秒") }
@@ -813,8 +835,23 @@ enum BakingTerms {
     static var formulaExpandMaterialSettings: String { L10n.tr("formula.action.expand_material_settings", default: "展开材料设置") }
     static var formulaCollapseMaterialSettings: String { L10n.tr("formula.action.collapse_material_settings", default: "收起材料设置") }
     static var formulaFileOperationFailed: String { L10n.tr("formula.alert.file_operation_failed", default: "文件操作失败") }
-    static var formulaExportJSON: String { L10n.tr("formula.action.export_json", default: "导出 JSON") }
-    static var formulaImportJSON: String { L10n.tr("formula.action.import_json", default: "导入 JSON") }
+    static var formulaExportJSON: String { L10n.tr("formula.action.export_json", default: "导出") }
+    static var formulaImportJSON: String { L10n.tr("formula.action.import_json", default: "导入") }
+    static var recipeExportInstructionTitle: String {
+        L10n.tr("recipe_export.instruction.title", default: "导出说明")
+    }
+    static var recipeExportInstructionLocalFile: String {
+        L10n.tr("recipe_export.instruction.local_file", default: "导出的文件会保存在你选择的本地位置，例如“文件”App 或 iCloud Drive。")
+    }
+    static var recipeExportInstructionImportUse: String {
+        L10n.tr("recipe_export.instruction.import_use", default: "这个文件可以在 Toastmark 的“导入”入口重新载入，用于恢复或迁移配方。")
+    }
+    static var recipeExportInstructionKeepFile: String {
+        L10n.tr("recipe_export.instruction.keep_file", default: "请保留文件名和 .json 后缀，之后导入时选择同一个文件即可。")
+    }
+    static var recipeExportInstructionContinue: String {
+        L10n.tr("recipe_export.instruction.continue", default: "继续导出")
+    }
     static var formulaEmptyMaterials: String { L10n.tr("formula.empty.materials", default: "还没有材料") }
     static var formulaFlourPercentageInfoAccessibility: String { L10n.tr("formula.flour_percentage.accessibility", default: "面粉百分比说明") }
     static var formulaFlourPercentageInfoTitle: String { L10n.tr("formula.flour_percentage.title", default: "仅限面粉表") }

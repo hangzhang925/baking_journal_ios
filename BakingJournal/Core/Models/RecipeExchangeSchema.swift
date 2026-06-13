@@ -62,14 +62,15 @@ struct RecipeExchangeDocumentV1: Codable, Equatable {
 
     static func decode(from data: Data) throws -> RecipeExchangeDocumentV1 {
         let decoder = JSONDecoder()
-        let envelope = try decoder.decode(RecipeExchangeEnvelope.self, from: data)
+        let normalizedData = data.removingUTF8ByteOrderMark()
+        let envelope = try decoder.decode(RecipeExchangeEnvelope.self, from: normalizedData)
         guard envelope.schema == schemaName else {
             throw RecipeExchangeError.invalidSchema
         }
         guard envelope.schemaVersion == currentVersion else {
             throw RecipeExchangeError.unsupportedVersion(envelope.schemaVersion)
         }
-        return try decoder.decode(RecipeExchangeDocumentV1.self, from: data)
+        return try decoder.decode(RecipeExchangeDocumentV1.self, from: normalizedData)
     }
 
     static func data(fromJSONString text: String) throws -> Data {
@@ -259,7 +260,7 @@ struct RecipeExchangeIngredientV1: Codable, Equatable {
     init(item: RecipeItem) {
         self.init(
             ingredientId: item.id.uuidString,
-            name: item.name,
+            name: RecipeExchangeLocalization.exportIngredientName(for: item),
             category: item.category.rawValue,
             tag: item.tag.rawValue,
             weightGrams: item.weight,
@@ -274,9 +275,9 @@ struct RecipeExchangeIngredientV1: Codable, Equatable {
             waterContentPct: item.waterContentPct,
             eggCount: item.eggCount,
             eggUnitWeight: item.eggUnitWeight,
-            eggType: item.eggType,
-            starterType: item.starterType,
-            yeastType: item.yeastType
+            eggType: RecipeExchangeLocalization.exportEggType(item.eggType),
+            starterType: RecipeExchangeLocalization.exportStarterType(item.starterType),
+            yeastType: RecipeExchangeLocalization.exportYeastType(item.yeastType)
         )
     }
 
@@ -303,11 +304,19 @@ struct RecipeExchangeIngredientV1: Codable, Equatable {
         let itemTag = ItemTag(rawValue: tag) ?? .other
         let itemCategory = ItemCategory(rawValue: category) ?? defaultCategory(for: itemTag)
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedName = RecipeExchangeLocalization.importIngredientName(
+            trimmedName,
+            category: itemCategory,
+            tag: itemTag
+        )
+        let normalizedEggType = RecipeExchangeLocalization.importEggType(eggType)
+        let normalizedStarterType = RecipeExchangeLocalization.importStarterType(starterType)
+        let normalizedYeastType = RecipeExchangeLocalization.importYeastType(yeastType)
         return RecipeItem(
             id: UUID(),
             category: itemCategory,
             tag: itemTag,
-            name: trimmedName.isEmpty ? itemTag.label : trimmedName,
+            name: normalizedName.isEmpty ? itemTag.label : normalizedName,
             weight: max(0, weightGrams),
             hydrationPct: hydrationPct,
             starterEggCount: starterEggCount,
@@ -320,9 +329,9 @@ struct RecipeExchangeIngredientV1: Codable, Equatable {
             waterContentPct: waterContentPct,
             eggCount: eggCount,
             eggUnitWeight: eggUnitWeight,
-            eggType: eggType,
-            starterType: starterType,
-            yeastType: yeastType
+            eggType: normalizedEggType,
+            starterType: normalizedStarterType,
+            yeastType: normalizedYeastType
         )
     }
 
@@ -519,5 +528,144 @@ struct RecipeExchangeMaterialAllocationV1: Codable, Equatable {
         guard percentage.isFinite, percentage >= 0, percentage <= 100 else {
             throw RecipeExchangeError.invalidNumber("step.materialAllocations.percentage")
         }
+    }
+}
+
+private enum RecipeExchangeLocalization {
+    private struct Term {
+        let aliases: [String]
+        let localizedValue: () -> String
+        let canonicalValue: String
+
+        init(_ aliases: [String], canonicalValue: String? = nil, localizedValue: @escaping () -> String) {
+            self.aliases = aliases
+            self.localizedValue = localizedValue
+            self.canonicalValue = canonicalValue ?? aliases[0]
+        }
+
+        func matches(_ value: String) -> Bool {
+            let normalizedValue = Self.normalize(value)
+            return aliases.contains { Self.normalize($0) == normalizedValue }
+        }
+
+        private static func normalize(_ value: String) -> String {
+            value
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        }
+    }
+
+    private static let ingredientTerms: [Term] = [
+        Term(["Flour", "面粉"], localizedValue: { BakingTerms.flour }),
+        Term(["Bread Flour", "High Gluten Flour", "高粉", "高筋面粉"], localizedValue: { BakingTerms.highGlutenFlour }),
+        Term(["Cake Flour", "Low Gluten Flour", "低粉", "低筋面粉"], localizedValue: { BakingTerms.lowGlutenFlour }),
+        Term(["Whole Wheat Flour", "全麦粉", "全麦面粉"], localizedValue: { BakingTerms.wholeWheatFlour }),
+        Term(["Water", "水"], localizedValue: { BakingTerms.water }),
+        Term(["Salt", "盐"], localizedValue: { BakingTerms.salt }),
+        Term(["Sugar", "糖"], localizedValue: { BakingTerms.sugar }),
+        Term(["Granulated Sugar", "细砂糖"], localizedValue: { BakingTerms.granulatedSugar }),
+        Term(["Butter", "黄油"], localizedValue: { BakingTerms.butter }),
+        Term(["Cream", "奶油"], localizedValue: { BakingTerms.cream }),
+        Term(["Yeast", "酵母"], localizedValue: { BakingTerms.yeast }),
+        Term(["Egg", "Whole Egg", "鸡蛋"], localizedValue: { BakingTerms.egg }),
+        Term(["Milk", "牛奶"], localizedValue: { BakingTerms.milk }),
+        Term(["Corn Oil", "玉米油"], localizedValue: { BakingTerms.cornOil }),
+        Term(["Olive Oil", "橄榄油"], localizedValue: { BakingTerms.oliveOil }),
+        Term(["Other", "其他"], localizedValue: { BakingTerms.custom })
+    ]
+
+    private static let starterTerms: [Term] = [
+        Term(["Levain", "鲁邦种"], canonicalValue: BakingTerms.levainStarter, localizedValue: { BakingTerms.starterDisplayName(BakingTerms.levainStarter) }),
+        Term(["Liquid Starter", "液种"], canonicalValue: BakingTerms.liquidStarter, localizedValue: { BakingTerms.starterDisplayName(BakingTerms.liquidStarter) }),
+        Term(["Tangzhong", "汤种"], canonicalValue: BakingTerms.tangzhongStarter, localizedValue: { BakingTerms.starterDisplayName(BakingTerms.tangzhongStarter) }),
+        Term(["Scalded Dough", "烫种"], canonicalValue: BakingTerms.scaldedStarter, localizedValue: { BakingTerms.starterDisplayName(BakingTerms.scaldedStarter) }),
+        Term(["Poolish", "波兰种"], canonicalValue: BakingTerms.poolishStarter, localizedValue: { BakingTerms.starterDisplayName(BakingTerms.poolishStarter) })
+    ]
+
+    private static let yeastTerms: [Term] = [
+        Term(["Dry Yeast", "干酵母"], canonicalValue: BakingTerms.dryYeast, localizedValue: { BakingTerms.yeastDisplayName(BakingTerms.dryYeast) }),
+        Term(["Fresh Yeast", "鲜酵母"], canonicalValue: BakingTerms.freshYeast, localizedValue: { BakingTerms.yeastDisplayName(BakingTerms.freshYeast) }),
+        Term(["Yeast Water", "酵液"], canonicalValue: BakingTerms.liquidYeast, localizedValue: { BakingTerms.yeastDisplayName(BakingTerms.liquidYeast) })
+    ]
+
+    private static let eggTerms: [Term] = [
+        Term(["Whole Egg", "Egg", "鸡蛋"], canonicalValue: BakingTerms.wholeEgg, localizedValue: { BakingTerms.eggDisplayName(BakingTerms.wholeEgg) }),
+        Term(["Beaten Egg", "全蛋液"], canonicalValue: BakingTerms.beatenEgg, localizedValue: { BakingTerms.eggDisplayName(BakingTerms.beatenEgg) }),
+        Term(["Yolk", "Egg Yolk", "蛋黄"], canonicalValue: BakingTerms.yolk, localizedValue: { BakingTerms.eggDisplayName(BakingTerms.yolk) }),
+        Term(["White", "Egg White", "蛋白"], canonicalValue: BakingTerms.white, localizedValue: { BakingTerms.eggDisplayName(BakingTerms.white) })
+    ]
+
+    static func exportIngredientName(for item: RecipeItem) -> String {
+        importIngredientName(item.name, category: item.category, tag: item.tag)
+    }
+
+    static func importIngredientName(_ name: String, category: ItemCategory, tag: ItemTag) -> String {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let term = ingredientTerms.first(where: { $0.matches(trimmedName) }) {
+            return term.localizedValue()
+        }
+        if category == .starter,
+           let term = starterTerms.first(where: { $0.matches(trimmedName) }) {
+            return term.localizedValue()
+        }
+        if tag == .yeast,
+           let term = yeastTerms.first(where: { $0.matches(trimmedName) }) {
+            return term.localizedValue()
+        }
+        if tag == .egg,
+           let term = eggTerms.first(where: { $0.matches(trimmedName) }) {
+            return term.localizedValue()
+        }
+        return trimmedName
+    }
+
+    static func exportEggType(_ value: String?) -> String? {
+        value.flatMap { localizedValue($0, in: eggTerms) }
+    }
+
+    static func exportStarterType(_ value: String?) -> String? {
+        value.flatMap { localizedValue($0, in: starterTerms) }
+    }
+
+    static func exportYeastType(_ value: String?) -> String? {
+        value.flatMap { localizedValue($0, in: yeastTerms) }
+    }
+
+    static func importEggType(_ value: String?) -> String? {
+        value.flatMap { canonicalValue($0, in: eggTerms) }
+    }
+
+    static func importStarterType(_ value: String?) -> String? {
+        value.flatMap { canonicalValue($0, in: starterTerms) }
+    }
+
+    static func importYeastType(_ value: String?) -> String? {
+        value.flatMap { canonicalValue($0, in: yeastTerms) }
+    }
+
+    private static func localizedValue(_ value: String, in terms: [Term]) -> String {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return terms.first { $0.matches(trimmedValue) }?.localizedValue() ?? trimmedValue
+    }
+
+    private static func canonicalValue(_ value: String, in terms: [Term]) -> String {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return terms.first { $0.matches(trimmedValue) }?.canonicalValue ?? trimmedValue
+    }
+}
+
+extension Data {
+    static let utf8ByteOrderMark = Data([0xEF, 0xBB, 0xBF])
+
+    func addingUTF8ByteOrderMark() -> Data {
+        guard !starts(with: Self.utf8ByteOrderMark) else { return self }
+        var data = Self.utf8ByteOrderMark
+        data.append(self)
+        return data
+    }
+
+    func removingUTF8ByteOrderMark() -> Data {
+        guard starts(with: Self.utf8ByteOrderMark) else { return self }
+        return Data(dropFirst(Self.utf8ByteOrderMark.count))
     }
 }

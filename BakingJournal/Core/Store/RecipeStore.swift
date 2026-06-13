@@ -225,7 +225,7 @@ final class RecipeStore: ObservableObject {
     }
 
     var isReadyToBake: Bool {
-        recipeWorkflowState == .ready
+        canMarkReadyToBake
     }
 
     var canMarkReadyToBake: Bool {
@@ -237,7 +237,7 @@ final class RecipeStore: ObservableObject {
     }
 
     func isReadyToBake(_ recipe: SavedRecipe) -> Bool {
-        recipe.workflowState == .ready && Self.hasReadyStepContent(
+        Self.hasReadyStepContent(
             steps: recipe.steps,
             stepsMode: recipe.stepsMode,
             simpleStep: recipe.simpleStep
@@ -411,7 +411,7 @@ final class RecipeStore: ObservableObject {
         cookState = CookState()
         currentRecipeID = nil
         activeBakeRecordID = nil
-        currentWorkflowState = .draft
+        currentWorkflowState = .ready
         formulaIngredientLockMode = .weight
         isLoading = false
         persist()
@@ -839,16 +839,31 @@ final class RecipeStore: ObservableObject {
         guard var next = items.first(where: { $0.id == item.id }) else { return }
         if next.category == .starter {
             let optionalWeight = (next.starterYeastWeight ?? 0) + starterEggWeight(next)
-            let currentBase = max(1, flourContribution(next) + starterBaseWater(next))
+            let currentFlour = flourContribution(next)
+            let currentWater = starterBaseWater(next)
+            let currentBase = currentFlour + currentWater
             let nextBase = max(0, weight - optionalWeight)
-            let scale = nextBase / currentBase
-            setStarterParts(&next, flour: flourContribution(next) * scale, water: starterBaseWater(next) * scale)
+            if currentBase > 0 {
+                let scale = nextBase / currentBase
+                setStarterParts(&next, flour: currentFlour * scale, water: currentWater * scale)
+            } else {
+                let hydrationPct = starterHydrationForRebuild(next)
+                let flour = nextBase / (1 + hydrationPct / 100)
+                setStarterParts(&next, flour: flour, water: nextBase - flour)
+            }
         } else if next.tag == .egg {
             setEggWeight(&next, weight: weight)
         } else {
             next.weight = max(0, weight)
         }
         updateItem(next)
+    }
+
+    private func starterHydrationForRebuild(_ item: RecipeItem) -> Double {
+        if let hydrationPct = item.hydrationPct, hydrationPct > 0 {
+            return hydrationPct
+        }
+        return Self.hydration(forStarterRatio: item.starterRatio ?? "1:1")
     }
 
     func updateEggType(_ type: String, for item: RecipeItem) {
@@ -1388,7 +1403,7 @@ final class RecipeStore: ObservableObject {
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        return try encoder.encode(document)
+        return try encoder.encode(document).addingUTF8ByteOrderMark()
     }
 
     @discardableResult

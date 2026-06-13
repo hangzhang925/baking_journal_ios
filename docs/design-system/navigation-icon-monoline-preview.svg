@@ -1,6 +1,6 @@
 <svg width="1180" height="470" viewBox="0 0 1180 470" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="1180" height="470" rx="28" fill="#FFF8EC"/>
-  <text x="48" y="56" fill="#17130D" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="700">Bready navigation + top action icons - simple monoline proposal</text>
+  <text x="48" y="56" fill="#17130D" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="700">Toastmark navigation + top action icons - simple monoline proposal</text>
   <text x="48" y="84" fill="#68533B" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="14">2pt stroke on a 24pt grid. Active changes color only. No bakery illustration details.</text>
 
   <defs>

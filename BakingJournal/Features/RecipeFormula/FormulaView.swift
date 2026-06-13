@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import OSLog
 
 struct FormulaView: View {
-    private static let reorderLog = Logger(subsystem: "com.openbakery.bready", category: "FormulaReorder")
+    private static let reorderLog = Logger(subsystem: "com.openbakery.toastmark", category: "FormulaReorder")
 
     @Environment(\.historySwipeSuppressionHandler) private var setHistorySwipeSuppressed
     @EnvironmentObject private var navigationController: AppNavigationController
@@ -12,6 +12,7 @@ struct FormulaView: View {
     @State private var exportDocument = RecipeBackupDocument(data: Data())
     @State private var fileError: String?
     @State private var importingRecipe = false
+    @State private var showingExportInstructions = false
     @State private var showingExporter = false
     @State private var showingToolbarActions = false
     @State private var previewItemsByCategory: [ItemCategory: [RecipeItem]] = [:]
@@ -130,6 +131,15 @@ struct FormulaView: View {
         ) { result in
             if case .failure(let error) = result {
                 fileError = error.localizedDescription
+            }
+        }
+        .sheet(isPresented: $showingExportInstructions) {
+            RecipeExportInstructionSheet {
+                showingExportInstructions = false
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    showingExporter = true
+                }
             }
         }
         .fileImporter(
@@ -592,7 +602,7 @@ struct FormulaView: View {
     private func exportRecipe() {
         do {
             exportDocument = RecipeBackupDocument(data: try store.exportRecipeData())
-            showingExporter = true
+            showingExportInstructions = true
         } catch {
             fileError = error.localizedDescription
         }

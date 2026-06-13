@@ -48,6 +48,7 @@ struct RecipeWorkspaceView: View {
     @State private var exportError: String?
     @State private var exportSuccessMessage: String?
     @State private var jsonExportDocument = RecipeBackupDocument(data: Data())
+    @State private var showingJSONExportInstructions = false
     @State private var showingJSONExporter = false
     @State private var jsonExportError: String?
 
@@ -97,6 +98,15 @@ struct RecipeWorkspaceView: View {
         ) { result in
             if case .failure(let error) = result {
                 jsonExportError = error.localizedDescription
+            }
+        }
+        .sheet(isPresented: $showingJSONExportInstructions) {
+            RecipeExportInstructionSheet {
+                showingJSONExportInstructions = false
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    showingJSONExporter = true
+                }
             }
         }
         .alert(BakingTerms.recipePreviewExportFailed, isPresented: Binding(
@@ -303,7 +313,7 @@ struct RecipeWorkspaceView: View {
     private func exportJSON() {
         do {
             jsonExportDocument = RecipeBackupDocument(data: try store.exportCurrentRecipeExchangeData())
-            showingJSONExporter = true
+            showingJSONExportInstructions = true
         } catch {
             jsonExportError = error.localizedDescription
         }
